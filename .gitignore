@@ -1,0 +1,42 @@
+# 機密情報
+.env
+.env.*
+*.pem
+
+# Python / uv 仮想環境・キャッシュ
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ツール・リンターのキャッシュ
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.pylintcache
+
+# IDE / エディタの設定ファイル
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS生成ファイル
+.DS_Store
+Thumbs.db
+
+# ドキュメント
+docs/_build/
+
+# Coverage reports
+.coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+htmlcov/
+.pytest_cache/
+
+# バックアップファイル
+*.bak

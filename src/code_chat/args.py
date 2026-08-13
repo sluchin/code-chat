@@ -1,0 +1,226 @@
+"""Gemini CLI Tool - Argument Parser and Context Collector."""
+
+import argparse
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+from code_chat.constants import EXCLUDE_DIRS, TEXT_EXTENSIONS
+from code_chat.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+@dataclass
+class CliArgs:
+    """解析済み引数とコンテキスト情報を保持するデータクラス."""
+
+    prompt: str
+    """ユーザーが指定した初期プロンプト文字列."""
+
+    target_path: str | None
+    """`-f`/`--file` で指定された参照パス."""
+
+    output_path: str | None
+    """`-o`/`--output` で指定されたログ保存先パス."""
+
+    auto_save: bool
+    """`-s`/`--auto-save` による自動保存の有効化フラグ."""
+
+    write_mode: bool
+    """`-w`/`--write` によるソースコード直接修正モードの有効化フラグ."""
+
+    model: str
+    """使用する Gemini モデル名."""
+
+    debug: bool
+    """デバッグモード."""
+
+    log_level: str
+    """ログレベル文字列."""
+
+    list_models: bool
+    """モデル一覧表示."""
+
+    generate_commit_msg: bool
+    """コミットメッセージ生成."""
+
+    context: str
+    """読み込まれた標準入力およびファイルコンテキストの結合文字列."""
+
+
+def read_path_content(target_path: str) -> str:
+    """指定されたパス（単一ファイルまたはディレクトリ）からコンテンツを読み込む.
+
+    ディレクトリが指定された場合は再帰的に探索し、対象の拡張子を持つファイルの内容を
+    除外ディレクトリを回避しながら結合して返します.
+
+    Args:
+        target_path (str): 読み込み対象のファイルまたはディレクトリのパス.
+
+    Returns:
+        str: 読み込まれたファイル内容のテキスト. 該当ファイルが存在しない場合は空文字列.
+
+    Raises:
+        SystemExit: 指定されたパスが存在しない場合、またはファイルの読み込みに失敗した場合に
+            ステータスコード 1 で終了します.
+    """
+    path = Path(target_path)
+
+    if not path.exists():
+        logger.error("パス '%s' が見つかりません。", target_path)
+        sys.exit(1)
+
+    if path.is_file():
+        # 単一ファイルの場合
+        try:
+            return f"=== File: {path} ===\n" + path.read_text(encoding="utf-8")
+        except OSError:
+            logger.exception("ファイル '%s' の読み込みに失敗しました", path)
+            sys.exit(1)
+
+    if path.is_dir():
+        # ディレクトリの場合
+        contents: list[str] = []
+        for p in path.rglob("*"):
+            # 除外対象ディレクトリ配下のファイルはスキップ
+            if any(part in EXCLUDE_DIRS for part in p.parts):
+                continue
+
+            if p.is_file() and p.suffix.lower() in TEXT_EXTENSIONS:
+                try:
+                    text = p.read_text(encoding="utf-8", errors="ignore")
+                    contents.append(f"=== File: {p} ===\n{text}")
+                except OSError as e:
+                    logger.warning("'%s' の読み込みをスキップしました: %s", p, e)
+
+        if not contents:
+            logger.warning(
+                "ディレクトリ '%s' 内に対象ファイルが見つかりませんでした。",
+                target_path,
+            )
+            return ""
+
+        return "\n\n".join(contents)
+
+    return ""
+
+
+def read_stdin_content() -> str:
+    """標準入力（パイプやリダイレクト）からテキストを読み込む.
+
+    Returns:
+        str: 標準入力から読み込まれたテキスト. 端末（tty）からの入力である場合は空文字列.
+    """
+    if not sys.stdin.isatty():
+        return sys.stdin.read()
+    return ""
+
+
+def parse_args() -> CliArgs:
+    """コマンドライン引数を解析し、コンテキストを取得して返す.
+
+    標準入力および `-f`/`--file` オプション経由で指定されたコンテキスト情報を収集し、
+    解析済みデータクラス `CliArgs` にまとめて返却します.
+
+    Returns:
+        CliArgs: 解析済みのコマンドライン引数と収集されたコンテキストを保持するオブジェクト.
+    """
+    parser = argparse.ArgumentParser(description="Gemini API を使った CLI ツール")
+    parser.add_argument(
+        "prompt",
+        nargs="?",
+        default="",
+        help="Gemini への初期プロンプト（省略時は対話モードへ）",
+    )
+    parser.add_argument(
+        "-f",
+        "--file",
+        type=str,
+        help="参照するファイルまたはディレクトリのパス",
+        default=None,
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        help="指定したファイル名で対話ログを保存",
+        default=None,
+    )
+    parser.add_argument(
+        "-s",
+        "--auto-save",
+        action="store_true",
+        help="対話内容からタイトルを自動生成して保存",
+    )
+    parser.add_argument(
+        "-w",
+        "--write",
+        action="store_true",
+        help="Gemini によるソースコードの直接修正・書き換えを許可するモード",
+    )
+    parser.add_argument(
+        "-m",
+        "--model",
+        type=str,
+        default="gemini-flash-latest",
+        help="使用する Gemini モデル名 (デフォルト: gemini-flash-latest)",
+    )
+    # デバッグフラグ (-D / --debug)
+    parser.add_argument(
+        "-D",
+        "--debug",
+        action="store_true",
+        help="デバッグモードを有効にします（--log-level DEBUG と同等）",
+    )
+    parser.add_argument(
+        "--log-level",
+        type=str.upper,
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default="INFO",
+        help="ログレベルを指定します (デフォルト: INFO)",
+    )
+    parser.add_argument(
+        "-l",
+        "--list-models",
+        action="store_true",
+        help="利用可能なモデルの一覧を表示して終了します",
+    )
+    parser.add_argument(
+        "-g",
+        "--generate-commit-msg",
+        action="store_true",
+        help="git diff (--cached) からコミットメッセージ案を生成します",
+    )
+
+    raw_args = parser.parse_args()
+
+    # コンテキストの収集
+    context_parts: list[str] = []
+
+    # パイプからの入力を取得
+    stdin_text = read_stdin_content()
+    if stdin_text:
+        context_parts.append(f"--- [標準入力] ---\n{stdin_text}")
+
+    # -f オプションからの入力を取得
+    if raw_args.file:
+        path_text = read_path_content(raw_args.file)
+        if path_text:
+            context_parts.append(f"--- [パス入力: {raw_args.file}] ---\n{path_text}")
+
+    context_str = "\n\n".join(context_parts)
+
+    return CliArgs(
+        prompt=raw_args.prompt,
+        target_path=raw_args.file,
+        output_path=raw_args.output,
+        auto_save=raw_args.auto_save,
+        write_mode=raw_args.write,
+        model=raw_args.model,
+        debug=raw_args.debug,
+        log_level=raw_args.log_level,
+        list_models=raw_args.list_models,
+        generate_commit_msg=raw_args.generate_commit_msg,
+        context=context_str,
+    )
