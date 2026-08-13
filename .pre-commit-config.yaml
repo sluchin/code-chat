@@ -1,0 +1,34 @@
+repos:
+  # 末尾スペース削除
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+
+  # Ruff (リンター & フォーマッター)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.2
+    hooks:
+      # フォーマット自動修正
+      - id: ruff-format
+      # コードチェック & 自動修正可能なものは修正
+      - id: ruff
+        args: [--fix]
+
+  # Pylint (uv のローカル環境を利用して実行)
+  - repo: local
+    hooks:
+      - id: pylint
+        name: pylint
+        entry: uv run pylint
+        language: system
+        types: [python]
+        # 大規模なプロジェクトで必要に応じて設定
+
+  # Mypy (型チェック)
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.3.0
+    hooks:
+      - id: mypy
+        # 追加の型定義パッケージが必要な場合はここに記述
+        additional_dependencies: []
