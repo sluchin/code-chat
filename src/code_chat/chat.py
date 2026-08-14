@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Gemini API を使用してローカルコードの参照・対話を行うCLIチャットツール.
 
 このモジュールは、指定されたファイルやパイプ入力をコンテキストとして読み込み、
@@ -7,9 +6,9 @@ Gemini API と対話を行うためのコマンドラインインターフェー
 """
 
 import re
+import subprocess
 import sys
 import time
-import subprocess
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
@@ -258,17 +257,17 @@ def handle_commit_msg_generation(
 
         # 言語に応じたテンプレートの選択（標準を日本語に設定）
         template = (
-            COMMIT_PROMPT_TEMPLATE_JA
-            if lang == "ja"
-            else COMMIT_PROMPT_TEMPLATE_EN
+            COMMIT_PROMPT_TEMPLATE_JA if lang == "ja" else COMMIT_PROMPT_TEMPLATE_EN
         )
         prompt = template.format(diff=diff_text)
 
-        response = client.models.generate_content(
-            model=model_name,
-            contents=prompt,
+        response_stream = send_message_stream_with_retry(
+            chat=client.chats.create(model=model_name), prompt=prompt
         )
-        print(response.text.strip())
+
+        for chunk in response_stream:
+            print(chunk.text, end="", flush=True)
+        print()
 
     except subprocess.CalledProcessError as e:
         logger.error("Git コマンドの実行に失敗しました: %s", e)
@@ -276,7 +275,7 @@ def handle_commit_msg_generation(
     except APIError as e:
         logger.error("Gemini API でエラーが発生しました: %s", e)
         raise
-    except Exception as e: # pylint: disable=broad-exception-caught
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("予期せぬエラーが発生しました: %s", e)
         raise
 
@@ -298,7 +297,7 @@ def _is_retryable_error(e: APIError) -> bool:
         try:
             if int(code) in (503, 429):
                 return True
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             pass
 
     # code 属性で判定できない場合はメッセージ文字列から判定
@@ -333,21 +332,31 @@ def send_message_stream_with_retry(
         APIError: 最大リトライ回数を超えてエラーが発生した場合.
     """
     delay = initial_delay
+
     for attempt in range(1, max_retries + 1):
+        yielded_any = False  # チャンクを1つでも上位へ返したかのフラグ
+
         try:
-            # ストリームイテレータを取得
             response_stream = chat.send_message_stream(prompt)
-            
-            # イテレーションを実際に消費して chunk を yield する
-            # （イテレーション中の 503 等もこの try ブロックでキャッチできる）
+
+            # イテレーション（データ受信）自体も try ブロック内で実行
             for chunk in response_stream:
+                yielded_any = True
                 yield chunk
-            
-            # 正常にすべての chunk を出力し終えたらループを抜ける
+
+            # 正常にストリームを最後まで消費できたら終了
             return
 
         except APIError as e:
-            # リトライ対象外のエラー（400 Bad Request 等）は即座に例外を送出
+            # すでに一部のレスポンスを返している場合は、重複防止のためリトライせずに raise
+            if yielded_any:
+                logger.error(
+                    "ストリーミングの受信途中でエラーが発生しました（一部出力済みのためリトライ中断）: %s",
+                    e,
+                )
+                raise
+
+            # 400 Bad Request などリトライ不可のエラーは即座に raise
             if not _is_retryable_error(e):
                 logger.error("リトライ不可な API エラーが発生しました: %s", e)
                 raise
@@ -355,12 +364,16 @@ def send_message_stream_with_retry(
             logger.warning(
                 "Gemini API 通信エラー (試行 %d/%d): %s", attempt, max_retries, e
             )
+
             if attempt == max_retries:
                 logger.error("最大リトライ回数 (%d 回) に達しました。", max_retries)
                 raise
 
-            # 画面に出力中だった場合の改行処理
-            print(f"\n[一時的なエラーが発生しました (503/429)。{delay:.1f}秒後に再試行します...]")
+            print(
+                f"\n[一時的なエラーが発生しました ({e.code if hasattr(e, 'code') else '503'})。{delay:.1f}秒後に再試行します... ({attempt}/{max_retries})]",
+                file=sys.stderr,
+                flush=True,
+            )
             time.sleep(delay)
             delay *= backoff_factor
 
