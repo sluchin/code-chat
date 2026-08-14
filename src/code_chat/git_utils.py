@@ -1,5 +1,4 @@
 import subprocess
-import sys
 from logging import getLogger
 
 logger = getLogger(__name__)
@@ -25,7 +24,7 @@ def get_git_diff() -> str:
         logger.error(
             "git diff の実行に失敗しました。Git リポジトリ内か確認してください."
         )
-        sys.exit(1)
+        raise
     except FileNotFoundError:
         logger.error("git コマンドが見つかりません.")
-        sys.exit(1)
+        raise

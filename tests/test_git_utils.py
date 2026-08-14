@@ -1,4 +1,5 @@
 import subprocess
+from subprocess import CalledProcessError
 from unittest.mock import patch
 
 import pytest
@@ -50,24 +51,24 @@ def test_get_git_diff_no_diff():
 
 
 def test_get_git_diff_called_process_error():
-    """git diff コマンドが失敗した場合、SystemExit(1) となること。"""
+    """git diff コマンドが失敗した場合、CalledProcessError が再送出されること."""
     with patch("subprocess.check_output") as mock_check_output:
         mock_check_output.side_effect = subprocess.CalledProcessError(
             returncode=128, cmd=["git", "diff", "--cached"]
         )
 
-        with pytest.raises(SystemExit) as exc_info:
+        with pytest.raises(CalledProcessError) as exc_info:
             get_git_diff()
 
-        assert exc_info.value.code == 1
+        assert exc_info.value.returncode == 128
 
 
-def test_get_git_diff_file_not_found_error():
-    """git コマンドが存在しない場合、SystemExit(1) となること。"""
-    with patch("subprocess.check_output") as mock_check_output:
-        mock_check_output.side_effect = FileNotFoundError("git command not found")
+@patch("code_chat.git_utils.subprocess.check_output")
+def test_get_git_diff_file_not_found_error(mock_check_output):
+    """git コマンド不在時に FileNotFoundError が発生することを検証."""
+    mock_check_output.side_effect = FileNotFoundError("git command not found")
 
-        with pytest.raises(SystemExit) as exc_info:
-            get_git_diff()
+    with pytest.raises(FileNotFoundError) as exc_info:
+        get_git_diff()
 
-        assert exc_info.value.code == 1
+    assert "git command not found" in str(exc_info.value)

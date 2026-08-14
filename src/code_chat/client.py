@@ -10,6 +10,10 @@ from code_chat.logger import get_logger
 logger = get_logger(__name__)
 
 
+class ClientConfigError(Exception):
+    """クライアント設定や環境変数に関する例外."""
+
+
 def get_gemini_client() -> genai.Client:
     """環境変数 GEMINI_API_KEY から API キーを取得して Gemini クライアントを作成する.
 
@@ -29,6 +33,6 @@ def get_gemini_client() -> genai.Client:
             "実行前に export GEMINI_API_KEY='your-api-key' を設定してください。",
             file=sys.stderr,
         )
-        sys.exit(1)
+        raise ClientConfigError("GEMINI_API_KEY is missing")
 
     return genai.Client(api_key=api_key)

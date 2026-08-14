@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from code_chat.client import get_gemini_client
+from code_chat.client import ClientConfigError, get_gemini_client
 
 
 def test_get_gemini_client_success(monkeypatch):
@@ -22,17 +22,13 @@ def test_get_gemini_client_success(monkeypatch):
         assert client == mock_instance
 
 
-def test_get_gemini_client_missing_api_key(monkeypatch, capsys):
-    """環境変数 GEMINI_API_KEY が未設定の場合、エラーメッセージを出力して sys.exit(1) で終了するか検証."""
+def test_get_gemini_client_missing_api_key(monkeypatch):
+    """環境変数 GEMINI_API_KEY が未設定の場合、ClientConfigError が発生するか検証."""
     # 環境変数を削除
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
-    # sys.exit(1) が発生することを確認
-    with pytest.raises(SystemExit) as exc_info:
+    # ClientConfigError が送出されることを確認
+    with pytest.raises(ClientConfigError) as exc_info:
         get_gemini_client()
 
-    assert exc_info.value.code == 1
-
-    # stderr に期待する案内メッセージが出力されたか検証
-    captured = capsys.readouterr()
-    assert "export GEMINI_API_KEY='your-api-key'" in captured.err
+    assert "GEMINI_API_KEY" in str(exc_info.value)
