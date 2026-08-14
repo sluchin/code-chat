@@ -10,10 +10,19 @@ import re
 import subprocess
 import sys
 import time
+import atexit
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+try:
+    import readline
+except ImportError:
+    try:
+        import pyreadline3 as readline  # Windows用
+    except ImportError:
+        readline = None
 
 from google.genai import types
 from google.genai.errors import APIError, ClientError, ServerError
@@ -307,8 +316,10 @@ def handle_commit_msg_generation(
         logger.error("Git コマンドの実行に失敗しました: %s", e)
         raise
     except (APIError, ServerError, ClientError) as e:
-        # logger.exception ではなく logger.error にすることでトレースバックを抑制
-        logger.error("Gemini API でエラーが発生しました: %s", e)
+        error_detail = (
+            str(e) if logger.isEnabledFor(logging.DEBUG) else type(e).__name__
+        )
+        logger.error("Gemini API でエラーが発生しました: %s", error_detail)
         raise
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("予期せぬエラーが発生しました: %s", e)
@@ -580,6 +591,37 @@ def run_single_turn_mode(chat: Any, cli_args: Any, chat_history: list[str]) -> N
             handle_write_mode_confirmation(cli_args.target_path, response_text)
 
 
+# 履歴ファイルの保存先指定（例: ホームディレクトリ配下）
+HISTORY_FILE = Path.home() / ".code_chat_history"
+MAX_HISTORY_LENGTH = 1000
+
+
+def setup_readline_history() -> None:
+    """コマンド履歴の読み込みと自動保存を設定します."""
+    if readline is not None:
+        # 履歴ファイルが存在すれば読み込み
+        if HISTORY_FILE.exists() and hasattr(readline, "read_history_file"):
+            try:
+                readline.read_history_file(str(HISTORY_FILE))
+            except OSError:
+                pass
+
+        # 履歴の最大保持件数を設定
+        if hasattr(readline, "set_history_length"):
+            readline.set_history_length(MAX_HISTORY_LENGTH)
+
+
+def save_readline_history() -> None:
+    """コマンド履歴をファイルに書き出します."""
+    if readline is not None and hasattr(readline, "write_history_file"):
+        try:
+            # ディレクトリがない場合は作成して保存
+            HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+            readline.write_history_file(str(HISTORY_FILE))
+        except OSError:
+            pass
+
+
 def run_interactive_loop(
     chat: Any, cli_args: Any, output_file: str | None, chat_history: list[str]
 ) -> None:
@@ -594,10 +636,22 @@ def run_interactive_loop(
         output_file (str | None): 履歴保存先ファイルパス.
         chat_history (list[str]): 対話履歴を格納するリスト.
     """
+    # readline 履歴の初期化
+    setup_readline_history()
+    # プログラム終了時（または Ctrl+C 時）に履歴を保存
+    if readline is not None:
+        atexit.register(save_readline_history)
+
     print("=== Gemini Chat Mode (終了: 'exit' / 保存: '/save <path>') ===\n")
 
     while True:
-        user_input = input("You > ").strip()
+        try:
+            user_input = input("You > ").strip()
+        except (KeyboardInterrupt, EOFError):
+            print()
+            logger.info("会話を終了します.")
+            sys.exit(0)
+            #break
 
         if not user_input:
             continue
@@ -713,14 +767,14 @@ def main() -> None:
             run_interactive_loop(chat, cli_args, output_file, chat_history)
 
     # 例外処理・終了時の保存処理
-    except KeyboardInterrupt, EOFError:
+    except (KeyboardInterrupt, EOFError):
         logger.info("\n[Ctrl+C] 会話を終了します。")
         sys.exit(0)
     except (APIError, ServerError, ClientError) as e:
         # トレースバックを出さず、標準エラー出力等に警告を出して終了
         logger.error("Gemini API エラーにより処理を中断しました: %s", e)
         sys.exit(1)
-    except FileNotFoundError, ValueError, PermissionError:
+    except (FileNotFoundError, ValueError, PermissionError):
         logger.exception("ファイル操作でエラーが発生しました")
         sys.exit(1)
     except Exception as e:  # pylint: disable=broad-exception-caught
