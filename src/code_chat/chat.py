@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from google.genai import types
-from google.genai.errors import APIError
+from google.genai.errors import APIError, ClientError, ServerError
 
 from code_chat.args import parse_args
 from code_chat.client import get_gemini_client
@@ -146,7 +146,7 @@ def sanitize_code_output(text: str) -> str:
 
     テキストの先頭および末尾に存在する Markdown のコードブロック囲み記号
     （```python や ``` など）を取り除き、POSIX 標準に適合するよう末尾に
-    1 つの改行コード（\n）を保証した文字列を生成します。
+    1 つの改行コード（\\n）を保証した文字列を生成します.
 
     Args:
         text (str): LLM から取得したレスポンス文字列.
@@ -170,6 +170,8 @@ def handle_write_mode_confirmation(
     target_path_str: str | None, response_text: str
 ) -> None:
     """Write Mode 時に抽出したコードでファイルを更新します.
+
+    抽出したコードの妥当性を検証し、ユーザーに確認を求めた上でファイルの上書きを行います.
 
     Args:
         target_path_str (str | None): 書き換え対象のファイルパス.
@@ -227,6 +229,26 @@ def handle_write_mode_confirmation(
         logger.info("上書きをキャンセルしました.")
 
 
+def handle_list_models(client: Any) -> None:
+    """利用可能な Gemini モデル一覧を取得して標準出力に表示します.
+
+    Args:
+        client (Any): Gemini API クライアントインスタンス.
+
+    Raises:
+        Exception: モデル一覧の取得時にエラーが発生した場合.
+    """
+    try:
+        print("利用可能なモデル一覧:")
+        for model in client.models.list():
+            if "generateContent" in model.supported_actions:
+                model_id = model.name.replace("models/", "")
+                print(f"- {model_id} ({model.display_name})")
+    except Exception:  # pylint: disable=broad-exception-caught
+        logger.exception("モデル一覧の取得に失敗しました")
+        raise
+
+
 def handle_commit_msg_generation(
     client: Any, model_name: str, lang: str = "en"
 ) -> None:
@@ -234,7 +256,7 @@ def handle_commit_msg_generation(
 
     `git diff --staged`（ステージング済み差分）および `git diff`（未ステージング差分）を
     読み取り、変更内容が存在する場合に指定された言語で Conventional Commits 形式に沿った
-    適切なコミットメッセージを生成して標準出力に表示します。
+    適切なコミットメッセージを生成して標準出力に表示します.
 
     Args:
         client (Any): Gemini API クライアントインスタンス.
@@ -280,30 +302,108 @@ def handle_commit_msg_generation(
         raise
 
 
-def _is_retryable_error(e: APIError) -> bool:
-    """APIError がリトライ対象（503, 429 一時的エラー等）か判定します.
-
-    エラーオブジェクトの `code` 属性およびエラーメッセージ文字列を参照し、
-    503 Service Unavailable や 429 Too Many Requests などの一時的な通信エラーであるかを評価します.
+def _extract_retry_delay(e: Exception) -> float | None:
+    """APIのエラー詳細情報 (RetryInfo) から推奨待機時間 (秒) を抽出します.
 
     Args:
-        e (APIError): 検証対象の Gemini API 例外オブジェクト.
+        e (Exception): 発生した例外オブジェクト.
+
+    Returns:
+        float | None: 抽出された推奨待機秒数. 抽出できない場合は None.
+    """
+    err_str = str(e)
+    match = re.search(r"retryDelay[\"']?\s*:\s*[\"']?(\d+(?:\.\d+)?)s", err_str)
+    if match:
+        try:
+            return float(match.group(1))
+        except ValueError:
+            pass
+    return None
+
+
+def _is_retryable_error(e: Exception) -> bool:
+    """リトライ対象のエラー（503/429等）かどうかを判定します.
+
+    Args:
+        e (Exception): 検証対象の Gemini API 例外オブジェクト.
 
     Returns:
         bool: リトライ対象のエラーである場合は True、400 Bad Request 等のリトライ不可エラーの場合は False.
     """
-    code = getattr(e, "code", None)
-    if code is not None:
+    err_str = str(e)
+
+    # 1日あたりのクォータ超過 (RPD) は待機しても回復しないためリトライしない
+    if "PerDay" in err_str or "GenerateRequestsPerDay" in err_str:
+        logger.error("1日あたりの API 利用上限 (RPD) に到達しました。")
+        return False
+
+    # APIError, ServerError, ClientError すべてを対象
+    if isinstance(e, (APIError, ServerError, ClientError)):
+        code = getattr(e, "code", None) or getattr(e, "status_code", None)
+        if code in (503, 429):
+            return True
+
+    err_msg = str(e).upper()
+    return any(
+        keyword in err_msg
+        for keyword in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED")
+    )
+
+
+def send_message_with_retry(
+    chat: Any,
+    prompt: str,
+    max_retries: int = 3,
+    initial_delay: float = 1.0,
+    backoff_factor: float = 2.0,
+) -> Any:
+    """Gemini API へのリクエストを送信し、通信エラー発生時にリトライを行います.
+
+    Args:
+        chat (Any): Gemini Chat インスタンス.
+        prompt (str): 送信するプロンプト文字列.
+        max_retries (int, optional): 最大リトライ回数. デフォルトは 3.
+        initial_delay (float, optional): 初回リトライ時の待ち時間（秒）. デフォルトは 1.0.
+        backoff_factor (float, optional): 指数バックオフの倍率. デフォルトは 2.0.
+
+    Returns:
+        Any: Gemini API からのレスポンス.
+
+    Raises:
+        Exception: 最大リトライ回数を超えてエラーが発生した場合.
+        AssertionError: 内部状態の不整合により例外オブジェクトが保持されなかった場合.
+    """
+    delay = initial_delay
+    last_exception: Exception | None = None
+
+    for attempt in range(1, max_retries + 1):
         try:
-            if int(code) in (503, 429):
-                return True
-        except ValueError, TypeError:
-            pass
+            return chat.send_message(prompt)
 
-    # code 属性で判定できない場合はメッセージ文字列から判定
-    err_msg = str(e)
+        except Exception as e:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+            last_exception = e
+            if attempt == max_retries or not _is_retryable_error(e):
+                break
 
-    return "503" in err_msg or "429" in err_msg
+            api_retry_delay = _extract_retry_delay(e)
+            if api_retry_delay is not None:
+                sleep_time = api_retry_delay + 1.0
+            else:
+                sleep_time = delay
+                delay *= backoff_factor
+
+            logger.warning(
+                "Gemini API で一時的なエラーが発生しました (%d/%d): %s. %.1f秒後に再試行します...",
+                attempt,
+                max_retries,
+                e,
+                sleep_time,
+            )
+            time.sleep(sleep_time)
+
+    # ここに到達した時点で last_exception は必ず存在する
+    assert last_exception is not None  # 型チェッカーへの明示
+    raise last_exception
 
 
 def send_message_stream_with_retry(
@@ -315,15 +415,15 @@ def send_message_stream_with_retry(
 ) -> Iterator[Any]:
     """Gemini API へのストリーミングリクエストを送信し、通信エラー発生時にリトライを行います.
 
-    イテレーション中の API エラー（503/429等）もキャッチして再試行します。
+    イテレーション中の API エラー（503/429等）もキャッチして再試行します.
     途中でエラーが発生した場合は画面に通知し、リトライ時は最初からメッセージを送り直します.
 
     Args:
         chat (Any): Gemini Chat インスタンス.
         prompt (str): 送信するプロンプト文字列.
-        max_retries (int, optional): 最大リトライ回数. Defaults to 3.
-        initial_delay (float, optional): 初回リトライ時の待ち時間（秒）. Defaults to 1.0.
-        backoff_factor (float, optional): 指数バックオフの倍率. Defaults to 2.0.
+        max_retries (int, optional): 最大リトライ回数. デフォルトは 3.
+        initial_delay (float, optional): 初回リトライ時の待ち時間（秒）. デフォルトは 1.0.
+        backoff_factor (float, optional): 指数バックオフの倍率. デフォルトは 2.0.
 
     Yields:
         Any: Gemini API からのレスポンスチャンク.
@@ -334,65 +434,189 @@ def send_message_stream_with_retry(
     delay = initial_delay
 
     for attempt in range(1, max_retries + 1):
-        yielded_any = False  # チャンクを1つでも上位へ返したかのフラグ
+        has_yielded_content = False
 
         try:
             response_stream = chat.send_message_stream(prompt)
-
-            # イテレーション（データ受信）自体も try ブロック内で実行
             for chunk in response_stream:
-                yielded_any = True
+                has_yielded_content = True  # チャンクをひとつでも送出したら True に変更
                 yield chunk
+            return  # 正常終了
 
-            # 正常にストリームを最後まで消費できたら終了
-            return
-
-        except APIError as e:
-            # すでに一部のレスポンスを返している場合は、重複防止のためリトライせずに raise
-            if yielded_any:
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            # 既にユーザーに画面出力が開始されている途中で切れた場合は、
+            # 出力の重複を防ぐためリトライせずにエラーを送出する
+            if (
+                has_yielded_content
+                or attempt == max_retries
+                or not _is_retryable_error(e)
+            ):
                 logger.error(
                     "ストリーミングの受信途中でエラーが発生しました（一部出力済みのためリトライ中断）: %s",
                     e,
                 )
                 raise
 
-            # 400 Bad Request などリトライ不可のエラーは即座に raise
-            if not _is_retryable_error(e):
-                logger.error("リトライ不可な API エラーが発生しました: %s", e)
-                raise
+            # API側から retryDelay の指定があれば優先、なければ指数バックオフ
+            api_retry_delay = _extract_retry_delay(e)
+            if api_retry_delay is not None:
+                sleep_time = api_retry_delay + 1.0
+            else:
+                sleep_time = delay
+                delay *= backoff_factor
 
             logger.warning(
-                "Gemini API 通信エラー (試行 %d/%d): %s", attempt, max_retries, e
+                "Gemini API で一時的なエラーが発生しました (%d/%d): %s. %.1f秒後に再試行します...",
+                attempt,
+                max_retries,
+                e,
+                sleep_time,
+            )
+            time.sleep(sleep_time)
+
+
+def run_single_turn_mode(chat: Any, cli_args: Any, chat_history: list[str]) -> None:
+    """コンテキスト指定時やワンショットプロンプト実行時の単発処理を行います.
+
+    Args:
+        chat (Any): Gemini Chat インスタンス.
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+        chat_history (list[str]): 対話履歴を格納するリスト.
+    """
+    if cli_args.context:
+        initial_prompt_parts = [
+            "以下のソースコード・テキストを読み込んで、今後の指示に対応してください。\n",
+            cli_args.context,
+        ]
+        if cli_args.prompt:
+            prompt_text = cli_args.prompt
+            if cli_args.write_mode:
+                prompt_text += "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください。"
+            initial_prompt_parts.append(f"\n--- [指示] ---\n{prompt_text}")
+        else:
+            initial_prompt_parts.append(
+                "\n準備ができたら「データを読み込みました。どのような対応を行いますか？」と簡潔に返答してください。"
             )
 
-            if attempt == max_retries:
-                logger.error("最大リトライ回数 (%d 回) に達しました。", max_retries)
-                raise
+        full_init_prompt = "\n".join(initial_prompt_parts)
+        chat_history.append(f"### User (Initial Context)\n\n{full_init_prompt}")
 
-            print(
-                f"\n[一時的なエラーが発生しました ({e.code if hasattr(e, 'code') else '503'})。{delay:.1f}秒後に再試行します... ({attempt}/{max_retries})]",
-                file=sys.stderr,
-                flush=True,
-            )
-            time.sleep(delay)
-            delay *= backoff_factor
+        logger.info("Gemini にコンテキストを送信中...")
+
+        if cli_args.write_mode:
+            # Write Mode の場合はストリーミングせず一括取得
+            # 途中で切れるリスクを回避
+            response = send_message_with_retry(chat, full_init_prompt)
+            response_text = response.text or ""
+            print(response_text)
+        else:
+            # 通常モードはストリーミング表示
+            print("Gemini > ", end="", flush=True)
+            chunks = []
+            for chunk in send_message_stream_with_retry(chat, full_init_prompt):
+                if chunk.text:
+                    print(chunk.text, end="", flush=True)
+                    chunks.append(chunk.text)
+            print("\n")
+            response_text = "".join(chunks)
+
+        chat_history.append(f"### Gemini\n\n{response_text}")
+
+        if cli_args.write_mode and cli_args.prompt:
+            handle_write_mode_confirmation(cli_args.target_path, response_text)
+
+    elif cli_args.prompt:
+        prompt_text = cli_args.prompt
+        if cli_args.write_mode:
+            prompt_text += "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください。"
+
+        print(f"You > {prompt_text}")
+        chat_history.append(f"### User\n\n{prompt_text}")
+
+        print("Gemini > ", end="", flush=True)
+        chunks = []
+        for chunk in send_message_stream_with_retry(chat, prompt_text):
+            if chunk.text:
+                print(chunk.text, end="", flush=True)
+                chunks.append(chunk.text)
+        print("\n")
+
+        response_text = "".join(chunks)
+        logger.debug("レスポンス受信完了 - 文字数: %d", len(response_text))
+        chat_history.append(f"### Gemini\n\n{response_text}")
+
+        if cli_args.write_mode:
+            handle_write_mode_confirmation(cli_args.target_path, response_text)
+
+
+def run_interactive_loop(
+    chat: Any, cli_args: Any, output_file: str | None, chat_history: list[str]
+) -> None:
+    """対話型チャットループを実行します.
+
+    ユーザーからの標準入力を受け取り、Gemini と連続して対話を行います.
+    終了コマンドや保存コマンドのハンドリングも含みます.
+
+    Args:
+        chat (Any): Gemini Chat インスタンス.
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+        output_file (str | None): 履歴保存先ファイルパス.
+        chat_history (list[str]): 対話履歴を格納するリスト.
+    """
+    print("=== Gemini Chat Mode (終了: 'exit' / 保存: '/save <path>') ===\n")
+
+    while True:
+        user_input = input("You > ").strip()
+
+        if not user_input:
+            continue
+
+        if user_input.lower() in ["exit", "quit", "q"]:
+            logger.info("会話を終了します.")
+            break
+
+        if user_input.startswith("/save"):
+            parts = user_input.split(maxsplit=1)
+            save_path = parts[1] if len(parts) > 1 else output_file
+            if save_path:
+                save_chat_history(save_path, chat_history)
+            else:
+                logger.error(
+                    "保存先のファイルパスを指定してください（例: /save result.md）"
+                )
+            continue
+
+        send_text = user_input
+        if cli_args.write_mode:
+            send_text += "\n\n(※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください)"
+
+        chat_history.append(f"### User\n\n{user_input}")
+
+        print("Gemini > ", end="", flush=True)
+        chunks = []
+        for chunk in send_message_stream_with_retry(chat, send_text):
+            if chunk.text:
+                print(chunk.text, end="", flush=True)
+                chunks.append(chunk.text)
+        print("\n")
+
+        response_text = "".join(chunks)
+        logger.debug("対話レスポンス受信完了 - 文字数: %d", len(response_text))
+        chat_history.append(f"### Gemini\n\n{response_text}")
+
+        if cli_args.write_mode:
+            handle_write_mode_confirmation(cli_args.target_path, response_text)
 
 
 def main() -> None:
-    """Gemini CLI のメイン対話処理を実行する.
+    """Gemini CLI のメイン対話処理を実行します.
 
-    コマンドライン引数の解析、クライアントの初期化、コンテキスト情報の送出、
-    ユーザーとのリアルタイム対話ループ、および終了時の履歴保存やファイル自動書き換え処理を制御します.
-
-    Raises:
-        APIError: Gemini API との通信中に発生したエラー.
-        FileNotFoundError: コンテキストファイル等が見つからない場合のエラー.
-        ValueError: コマンドライン引数等の指定値が不正な場合のエラー.
-        PermissionError: ファイルへのアクセス権限が不足している場合のエラー.
+    引数のパース、ロギング設定、Gemini クライアントの初期化を行い、
+    指定されたサブコマンドまたは対話セッションを実行します.
+    セッション終了時には必要に応じて対話ログをファイルに保存します.
     """
     chat_history: list[str] = []
     output_file = None
-    client = None
 
     try:
         # 引数・オプションの解析とプロンプトの組み立て
@@ -414,20 +638,10 @@ def main() -> None:
         # クライアント作成
         client = get_gemini_client()
 
-        # --list-models オプションが指定された場合
+        # サブコマンドの処理分岐
         if cli_args.list_models:
-            try:
-                client = get_gemini_client()
-                print("利用可能なモデル一覧:")
-                for model in client.models.list():
-                    # generateContent をサポートしているモデルを表示
-                    if "generateContent" in model.supported_actions:
-                        model_id = model.name.replace("models/", "")
-                        print(f"- {model_id} ({model.display_name})")
-                sys.exit(0)
-            except Exception:  # pylint: disable=broad-exception-caught
-                logger.exception("モデル一覧の取得に失敗しました")
-                sys.exit(1)
+            handle_list_models(client)
+            sys.exit(0)
 
         if cli_args.generate_commit_msg:
             try:
@@ -436,10 +650,8 @@ def main() -> None:
                 sys.exit(1)
             sys.exit(0)
 
-        # 保存ファイル
         output_file = cli_args.output_path
 
-        # システム指示（書き換えモードの有無で動作を変更）
         system_instruction = (
             "あなたは優秀なプログラミングアシスタントです。"
             "提供されたソースコードを把握し、"
@@ -455,116 +667,22 @@ def main() -> None:
             config = types.GenerateContentConfig(
                 system_instruction=system_instruction,
             )
-        # 動的に選択されたモデルを使用
+
         chat = client.chats.create(model=cli_args.model, config=config)
 
-        if cli_args.context:
-            # コンテキスト（ファイルやパイプ入力）が存在する場合
-            initial_prompt_parts = [
-                "以下のソースコード・テキストを読み込んで、今後の指示に対応してください。\n",
-                cli_args.context,
-            ]
-            if cli_args.prompt:
-                prompt_text = cli_args.prompt
-                if cli_args.write_mode:
-                    prompt_text += "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください。"
-                initial_prompt_parts.append(f"\n--- [指示] ---\n{prompt_text}")
-            else:
-                initial_prompt_parts.append(
-                    "\n準備ができたら「データを読み込みました。どのような対応を行いますか？」と簡潔に返答してください。"
-                )
-
-            full_init_prompt = "\n".join(initial_prompt_parts)
-            chat_history.append(f"### User (Initial Context)\n\n{full_init_prompt}")
-
-            logger.info("Gemini にコンテキストを送信中...")
-            response = chat.send_message(full_init_prompt)
-            print(f"\nGemini > {response.text}\n")
-            chat_history.append(f"### Gemini\n\n{response.text}")
-
-            # -w モードかつ初期プロンプト指示があった場合の上書き確認
-            if cli_args.write_mode and cli_args.prompt:
-                handle_write_mode_confirmation(cli_args.target_path, response.text)
-
-        elif cli_args.prompt:
-            prompt_text = cli_args.prompt
-            if cli_args.write_mode:
-                prompt_text += "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください。"
-
-            print(f"You > {prompt_text}")
-            chat_history.append(f"### User\n\n{prompt_text}")
-
-            print("Gemini > ", end="", flush=True)
-            chunks = []
-            # リトライ制御を内包したジェネレータから安全に受領
-            for chunk in send_message_stream_with_retry(chat, prompt_text):
-                if chunk.text:
-                    print(chunk.text, end="", flush=True)
-                    chunks.append(chunk.text)
-            print("\n")
-
-            response_text = "".join(chunks)
-            logger.debug("レスポンス受信完了 - 文字数: %d", len(response_text))
-            chat_history.append(f"### Gemini\n\n{response_text}")
-
-            if cli_args.write_mode:
-                handle_write_mode_confirmation(cli_args.target_path, response_text)
+        # 単発モード（コンテキストまたはプロンプト単体）かインタラクティブモードかの切り分け
+        if cli_args.context or cli_args.prompt:
+            run_single_turn_mode(chat, cli_args, chat_history)
         else:
-            # 通常のチャットモード
-            print("=== Gemini Chat Mode (終了: 'exit' / 保存: '/save <path>') ===\n")
-
-        # 対話ループ
-        while True:
-            user_input = input("You > ").strip()
-
-            if not user_input:
-                continue
-
-            # 終了判定
-            if user_input.lower() in ["exit", "quit", "q"]:
-                logger.info("会話を終了します.")
-                break
-
-            # 途中での保存コマンド (`/save filename.md`)
-            if user_input.startswith("/save"):
-                parts = user_input.split(maxsplit=1)
-                save_path = parts[1] if len(parts) > 1 else output_file
-                if save_path:
-                    save_chat_history(save_path, chat_history)
-                else:
-                    logger.error(
-                        "保存先のファイルパスを指定してください（例: /save result.md）"
-                    )
-                continue
-
-            send_text = user_input
-            if cli_args.write_mode:
-                send_text += "\n\n(※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください)"
-
-            chat_history.append(f"### User\n\n{user_input}")
-
-            print("Gemini > ", end="", flush=True)
-            chunks = []
-            # リトライ制御を内包したジェネレータから安全に受領
-            for chunk in send_message_stream_with_retry(chat, send_text):
-                if chunk.text:
-                    print(chunk.text, end="", flush=True)
-                    chunks.append(chunk.text)
-            print("\n")
-
-            response_text = "".join(chunks)
-            logger.debug("対話レスポンス受信完了 - 文字数: %d", len(response_text))
-            chat_history.append(f"### Gemini\n\n{response_text}")
-
-            # 書き換えモード（-w）の処理: ユーザーに適用を確認して書き込む
-            if cli_args.write_mode:
-                handle_write_mode_confirmation(cli_args.target_path, response_text)
+            run_interactive_loop(chat, cli_args, output_file, chat_history)
 
     # 例外処理・終了時の保存処理
     except KeyboardInterrupt, EOFError:
         logger.info("\n[Ctrl+C] 会話を終了します。")
-    except APIError:
-        logger.exception("Gemini APIでエラーが発生しました")
+        sys.exit(0)
+    except (APIError, ServerError, ClientError) as e:
+        # トレースバックを出さず、標準エラー出力等に警告を出して終了
+        logger.error("Gemini API エラーにより処理を中断しました: %s", e)
         sys.exit(1)
     except FileNotFoundError, ValueError, PermissionError:
         logger.exception("ファイル操作でエラーが発生しました")

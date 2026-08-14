@@ -1,4 +1,5 @@
 import io
+import logging
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -8,6 +9,7 @@ import pytest
 from google.genai.errors import APIError
 
 from code_chat.chat import (
+    _extract_retry_delay,
     _is_retryable_error,
     apply_file_modification,
     handle_commit_msg_generation,
@@ -16,6 +18,7 @@ from code_chat.chat import (
     main,
     save_chat_history,
     send_message_stream_with_retry,
+    send_message_with_retry,
 )
 
 
@@ -321,6 +324,89 @@ def test_handle_commit_msg_generation_unexpected_exception(
     assert "予期せぬエラーが発生しました" in caplog.text
 
 
+@pytest.mark.parametrize(
+    "error_message, expected_delay",
+    [
+        # Gemini API の実際のレスポンス形式: retryDelay: '32s' / '32.5s'
+        ("Resource exhausted. retryDelay: '32s' Please wait.", 32.0),
+        ("Resource exhausted. retryDelay: '32.5s' Please wait.", 32.5),
+        # クォートなし表記: retryDelay: 10s
+        ("Error occurred retryDelay: 10s in stream", 10.0),
+        # retryDelay なし（Match しない）
+        ("Quota exceeded without delay info", None),
+        ("retryDelay: 'abc's", None),  # 秒数が数値でない
+    ],
+)
+def test_extract_retry_delay_valid_and_invalid_patterns(error_message, expected_delay):
+    """_extract_retry_delay が様々なエラーメッセージ形式から正しく秒数を抽出し、不正な場合は None を返すか検証."""
+    ex = Exception(error_message)
+    assert _extract_retry_delay(ex) == expected_delay
+
+
+def test_extract_retry_delay_value_error_handling(monkeypatch):
+    """re.search でマッチしたものの float 変換時に ValueError が発生した場合に None を返す（except ValueError ルート）を検証."""
+    mock_match = MagicMock()
+    mock_match.group.return_value = "not_a_number"
+
+    monkeypatch.setattr("re.search", lambda pattern, string: mock_match)
+
+    ex = Exception("retryDelay: 'not_a_number's")
+    assert _extract_retry_delay(ex) is None
+
+
+def test_send_message_with_retry_success_on_first_try():
+    """正常系: 1回目の試行で正常にレスポンスが返るケースを検証."""
+    mock_chat = MagicMock()
+    mock_response = MagicMock(text="Hello")
+    mock_chat.send_message.return_value = mock_response
+
+    res = send_message_with_retry(mock_chat, "hi")
+
+    assert res == mock_response
+    mock_chat.send_message.assert_called_once_with("hi")
+
+
+@patch("code_chat.chat.time.sleep")
+def test_send_message_with_retry_retry_and_succeed(mock_sleep):
+    """異常系からの回復: 503 エラーが発生した後に2回目で成功するケースを検証."""
+    mock_chat = MagicMock()
+    mock_response = MagicMock(text="Hello after retry")
+
+    # 1回目は 503 エラー、2回目は成功
+    mock_chat.send_message.side_effect = [
+        APIError("503 Service Unavailable", {}),
+        mock_response,
+    ]
+
+    res = send_message_with_retry(mock_chat, "hi", max_retries=3, initial_delay=1.0)
+
+    assert res == mock_response
+    assert mock_chat.send_message.call_count == 2
+    mock_sleep.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "error_message",
+    [
+        "ResourceHasExhausted: Quota exceeded for GenerateRequestsPerDay",
+        "API limit reached: PerDay limit exceeded for this model.",
+        "Error 429: Quota Exceeded (PerDay)",
+    ],
+)
+def test_is_retryable_error_per_day_quota_returns_false(error_message, caplog):
+    """1日あたりのクォータ超過 (RPD) の場合は False を返し、エラーログが出力されることを検証."""
+    ex = Exception(error_message)
+
+    with caplog.at_level(logging.ERROR):
+        result = _is_retryable_error(ex)
+
+    # 判定結果が False であること
+    assert result is False
+
+    # ログメッセージが出力されていること
+    assert "1日あたりの API 利用上限 (RPD) に到達しました。" in caplog.text
+
+
 def test_is_retryable_error_value_error_fallback():
     """異常系: code 属性が数値に変換できない文字列（ValueError）の場合、メッセージ判定へフォールバックするか検証."""
     # code 属性に int() 変換できない文字列を設定
@@ -339,6 +425,50 @@ def test_is_retryable_error_type_error_fallback():
 
     # int(code) で TypeError が発生するが、内部でキャッチされメッセージ("400")から False と判定される
     assert _is_retryable_error(error) is False
+
+
+@patch("code_chat.chat.time.sleep")
+def test_send_message_with_retry_uses_api_retry_delay(mock_sleep):
+    """異常系 (retryDelay 優先): エラーレスポンスに含まれる retryDelay 秒数が sleep に適用されるか検証."""
+    mock_chat = MagicMock()
+    mock_response = MagicMock(text="Success")
+
+    # APIError クラスのインスタンスとして作成し、__str__ を明示的に設定
+    err_with_delay = APIError("429 RESOURCE_EXHAUSTED retryDelay: '30s'", {})
+    err_with_delay.__str__ = lambda: "429 RESOURCE_EXHAUSTED retryDelay: '30s'"
+
+    mock_chat.send_message.side_effect = [err_with_delay, mock_response]
+
+    res = send_message_with_retry(mock_chat, "hi", max_retries=3)
+
+    assert res == mock_response
+    # api_retry_delay + 1.0 秒（30.0 + 1.0 = 31.0）待機されることを検証
+    mock_sleep.assert_called_once_with(31.0)
+
+
+@patch("code_chat.chat.time.sleep")
+def test_send_message_with_retry_exceeds_max_retries(mock_sleep):
+    """異常系 (上限超過): リトライ回数上限を超えて失敗した場合に例外が投げられるか検証."""
+    mock_chat = MagicMock()
+    mock_chat.send_message.side_effect = APIError("503 Service Unavailable", {})
+
+    with pytest.raises(APIError):
+        send_message_with_retry(mock_chat, "hi", max_retries=3, initial_delay=1.0)
+
+    assert mock_chat.send_message.call_count == 3
+    assert mock_sleep.call_count == 2
+
+
+def test_send_message_with_retry_non_retryable_error():
+    """異常系 (リトライ対象外): 400 Bad Request 等のリトライ不可エラーは即座に raise されるか検証."""
+    mock_chat = MagicMock()
+    mock_chat.send_message.side_effect = APIError("400 INVALID_ARGUMENT", {})
+
+    with pytest.raises(APIError):
+        send_message_with_retry(mock_chat, "hi", max_retries=3)
+
+    # 1回目の実行で即座に中断されること
+    assert mock_chat.send_message.call_count == 1
 
 
 def test_send_message_stream_with_retry_success():
@@ -462,6 +592,31 @@ def test_send_message_stream_with_retry_error_after_yielding_chunks():
 
     # リトライされずに呼び出し回数が 1 回であることを検証
     assert mock_chat.send_message_stream.call_count == 1
+
+
+@patch("code_chat.chat.time.sleep")
+def test_send_message_stream_with_retry_uses_api_retry_delay(mock_sleep):
+    """ストリーミング異常系 (retryDelay 優先): エラーレスポンスの retryDelay 秒数が sleep に適用されるか検証."""
+    mock_chat = MagicMock()
+    mock_chunk = MagicMock(text="stream_chunk")
+
+    # 1回目の呼び出しで retryDelay 付きの例外、2回目で正常なイテレータを返す
+    err_with_delay = APIError("429 RESOURCE_EXHAUSTED retryDelay: '30s'", {})
+    err_with_delay.__str__ = lambda: "429 RESOURCE_EXHAUSTED retryDelay: '30s'"
+
+    mock_chat.send_message_stream.side_effect = [
+        err_with_delay,
+        [mock_chunk],
+    ]
+
+    gen = send_message_stream_with_retry(mock_chat, "hi", max_retries=3)
+    chunks = list(gen)
+
+    # 最終的に正常なチャンクが取得できること
+    assert chunks == [mock_chunk]
+
+    # api_retry_delay + 1.0 秒（30.0 + 1.0 = 31.0）で sleep が呼ばれたこと
+    mock_sleep.assert_called_once_with(31.0)
 
 
 def test_main_interactive_mode_exit_command(monkeypatch, mock_gemini_client):
@@ -632,8 +787,8 @@ def test_main_with_context_no_prompt(monkeypatch, mock_gemini_client, mock_args)
     main()
 
     # chat.send_message が適切な初期メッセージで呼び出されたか検証
-    mock_gemini_client["chat"].send_message.assert_called_once()
-    sent_prompt = mock_gemini_client["chat"].send_message.call_args[0][0]
+    mock_gemini_client["chat"].send_message_stream.assert_called_once()
+    sent_prompt = mock_gemini_client["chat"].send_message_stream.call_args[0][0]
 
     assert "以下のソースコード・テキストを読み込んで" in sent_prompt
     assert "データを読み込みました。どのような対応を行いますか？" in sent_prompt
@@ -648,8 +803,13 @@ def test_main_with_context_and_prompt_write_mode(
     mock_args.return_value.write_mode = True
     mock_args.return_value.target_path = "src/main.py"
 
-    # 初期応答をモック
-    mock_response = SimpleNamespace(text="```python\ndef main(): print('updated')\n```")
+    # ストリーミング初期応答（チャンクのイテレータ）をモック化
+    response_text = "```python\ndef main(): print('updated')\n```"
+    mock_chunk = SimpleNamespace(text=response_text)
+    mock_gemini_client["chat"].send_message_stream.return_value = [mock_chunk]
+
+    # 【追加】非ストリーミング（send_message / send_message_with_retry）側の応答も設定
+    mock_response = SimpleNamespace(text=response_text)
     mock_gemini_client["chat"].send_message.return_value = mock_response
 
     # 対話ループを即時終了
@@ -660,12 +820,15 @@ def test_main_with_context_and_prompt_write_mode(
         main()
 
         # handle_write_mode_confirmation が指定引数で呼び出されたかを検証
-        mock_handle_write.assert_called_once_with(
-            "src/main.py", "```python\ndef main(): print('updated')\n```"
-        )
+        mock_handle_write.assert_called_once_with("src/main.py", response_text)
 
     # 送信されたプロンプト内に注記が含まれているか検証
-    sent_prompt = mock_gemini_client["chat"].send_message.call_args[0][0]
+    # （※ send_message か send_message_stream のどちらで呼ばれたかに応じて検証）
+    if mock_gemini_client["chat"].send_message_stream.called:
+        sent_prompt = mock_gemini_client["chat"].send_message_stream.call_args[0][0]
+    else:
+        sent_prompt = mock_gemini_client["chat"].send_message.call_args[0][0]
+
     assert "※指示に従って修正した「完全なコード全体」を省略せずに" in sent_prompt
 
 
@@ -796,18 +959,28 @@ def test_cli_generate_commit_msg_failure(mock_handle, _mock_read_stdin, monkeypa
     mock_handle.assert_called_once()
 
 
-def test_main_unexpected_exception(monkeypatch, mock_args):
-    """main() 実行中に予期せぬ例外が発生した場合、logger.critical を経由して sys.exit(1) で終了するか検証."""
-    # parse_args の段階で意図的に予期せぬ例外を発生させる
-    mock_args.side_effect = RuntimeError("Unexpected fatal system error")
+def test_main_keyboard_interrupt(monkeypatch):
+    # parse_args と get_gemini_client をモック化
+    with patch("code_chat.chat.parse_args") as mock_parse_args:
+        mock_args = MagicMock()
+        mock_args.list_models = False
+        mock_args.generate_commit_msg = False
+        mock_args.debug = False
+        mock_args.log_level = "INFO"
+        mock_args.context = None
+        mock_args.prompt = None
+        mock_args.auto_save = False
+        mock_args.output_path = None
+        mock_parse_args.return_value = mock_args
 
-    monkeypatch.setattr("sys.argv", ["chat.py"])
+        # input() が呼ばれたら KeyboardInterrupt を発生させる
+        monkeypatch.setattr("builtins.input", MagicMock(side_effect=KeyboardInterrupt))
 
-    with pytest.raises(SystemExit) as exc_info:
-        main()
+        # sys.exit(0) で正常終了するか検証
+        with pytest.raises(SystemExit) as exc_info:
+            main()
 
-    # ステータスコード 1 で終了したことを検証
-    assert exc_info.value.code == 1
+        assert exc_info.value.code == 0
 
 
 @pytest.mark.parametrize(
@@ -822,6 +995,20 @@ def test_main_file_operation_exceptions(monkeypatch, mock_args, file_exception):
     """ファイル操作関連の例外 (FileNotFoundError, ValueError, PermissionError) 発生時に sys.exit(1) で終了するか検証."""
     # parse_args 呼び出し時（またはファイル操作処理時）に指定の例外を発生させる
     mock_args.side_effect = file_exception
+
+    monkeypatch.setattr("sys.argv", ["chat.py"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+
+    # ステータスコード 1 で終了したことを検証
+    assert exc_info.value.code == 1
+
+
+def test_main_unexpected_exception(monkeypatch, mock_args):
+    """main() 実行中に予期せぬ例外が発生した場合、logger.critical を経由して sys.exit(1) で終了するか検証."""
+    # parse_args の段階で意図的に予期せぬ例外を発生させる
+    mock_args.side_effect = RuntimeError("Unexpected fatal system error")
 
     monkeypatch.setattr("sys.argv", ["chat.py"])
 

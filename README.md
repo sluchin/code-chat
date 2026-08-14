@@ -152,6 +152,9 @@ uv run pytest tests/test_args.py::test_read_path_content_directory -vv --tb=shor
 # テスト名キーワード指定（名前に "retry" が含まれるテストのみ実行）
 uv run pytest -k "retry" -vv --tb=short
 
+# 標準出力（print文やログ）をキャプチャせずリアルタイム表示して実行
+uv run pytest tests/test_chat.py -s -vv --tb=short
+
 ```
 
 ## トラブルシューティング

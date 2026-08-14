@@ -41,16 +41,17 @@ filterwarnings = [
 
 [tool.pylint.messages_control]
 disable = [
-    "missing-module-docstring",  # モジュール冒頭の docstring 要求を無効化
-    "missing-function-docstring",
-    "redefined-outer-name",      # pytest の fixture 利用で発生する警告を抑止
-    "invalid-name",              # Sphinx の conf.py 等での小文字定数名を許容
-    "redefined-builtin",         # conf.py の copyright 警告を抑止
+    "missing-module-docstring",     # モジュール冒頭の docstring 要求を無効化
+    "missing-function-docstring",   # 関数の docstring 必須チェックを無効化
+    "redefined-outer-name",         # pytest の fixture 利用で発生する警告を抑止
+    "invalid-name",                 # Sphinx の conf.py 等での小文字定数名を許容
+    "redefined-builtin",            # conf.py の copyright 警告を抑止
     "too-many-instance-attributes", # CLI引数クラスの属性数制限を緩和
-    "too-many-locals",           # 関数内のローカル変数数制限を緩和
-    "too-many-branches",         # 条件分岐数制限を緩和
-    "too-many-statements",       # ステートメント数制限を緩和
-    "line-too-long",             # 行長警告は ruff / black に任せる
+    "too-many-locals",              # 関数内のローカル変数数制限を緩和
+    "too-many-branches",            # 条件分岐数制限を緩和
+    "too-many-statements",          # ステートメント数制限を緩和
+    "line-too-long",                # 行長警告は ruff / black に任せる
+    "too-many-lines",               # モジュールあたりの行数制限を緩和
 ]
 
 [tool.pylint.master]
