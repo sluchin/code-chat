@@ -126,3 +126,51 @@ uv run pre-commit run --all-files
 uv run pre-commit autoupdate
 
 ```
+
+## テストの実行
+
+プロジェクトのユニットテストを実行するには、以下のコマンドを使用します。
+
+### 全テストの実行とカバー率の確認
+
+```bash
+uv run pytest
+
+```
+
+### 特定のテストファイルや個別テストの実行
+
+特定のテストファイル（例: `tests/test_args.py`）や個別のテストケースを対象に、詳細ログや短縮トレースバックを出力して実行する場合は以下のコマンドを使用します。
+
+```bash
+# 特定のテストファイル全体を実行
+uv run pytest tests/test_args.py -vv --tb=short
+
+# 特定のテスト関数（テストスイート）を指定して実行
+uv run pytest tests/test_args.py::test_read_path_content_directory -vv --tb=short
+
+# テスト名キーワード指定（名前に "retry" が含まれるテストのみ実行）
+uv run pytest -k "retry" -vv --tb=short
+
+```
+
+## トラブルシューティング
+
+### `uv run pytest` 実行時に `unrecognized arguments: --cov=...` エラーが発生する
+
+`pytest-cov` などの開発用依存パッケージが仮想環境（`.venv`）内にインストールされていない可能性があります。
+以下の手順で開発用依存関係を含めて再同期してください。
+
+```bash
+# 開発用依存関係を含めて同期
+uv sync --dev
+
+```
+
+上記で解消しない場合や、パッケージ名の変更・環境構築時の不整合が発生している場合は、仮想環境を一度再構築・再同期してください。
+
+```bash
+# 仮想環境をクリアして全依存関係を再同期
+uv sync --all-groups --reinstall
+
+```

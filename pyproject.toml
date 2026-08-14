@@ -33,7 +33,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--cov=gemini_app --cov-report=term-missing"
+addopts = "--cov=code_chat --cov-report=term-missing"
 testpaths = ["tests"]
 filterwarnings = [
     "ignore:.*_UnionGenericAlias.*:DeprecationWarning",

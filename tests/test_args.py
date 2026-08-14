@@ -1,11 +1,12 @@
 import io
+import os
 from pathlib import Path
 from unittest import mock
 from unittest.mock import patch
 
 import pytest
 
-from gemini_app.args import parse_args, read_path_content, read_stdin_content
+from code_chat.args import parse_args, read_path_content, read_stdin_content
 
 
 @pytest.fixture(autouse=True)
@@ -131,7 +132,7 @@ def test_read_path_content_other_path_type():
     mock_path.is_file.return_value = False
     mock_path.is_dir.return_value = False
 
-    with patch("gemini_app.chat.Path", return_value=mock_path):
+    with patch("code_chat.chat.Path", return_value=mock_path):
         result = read_path_content("/dev/null")
 
     assert result == ""

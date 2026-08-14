@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from gemini_app.git_utils import get_git_diff
+from code_chat.git_utils import get_git_diff
 
 
 def test_get_git_diff_staged_exists():

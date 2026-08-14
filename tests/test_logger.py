@@ -1,4 +1,65 @@
-from gemini_app.logger import get_logger, setup_logging
+import logging
+import os
+import socket
+from unittest.mock import patch
+
+from code_chat.logger import syslog_context_filter, get_logger, setup_logging
+
+
+def test_syslog_context_filter():
+    """正常系: LogRecord に syslog 属性（syslog_time, hostname, pid, app_name）が付与されるか検証."""
+    # テスト用のダミー LogRecord を作成
+    record = logging.LogRecord(
+        name="test_logger",
+        level=logging.INFO,
+        pathname="test_path.py",
+        lineno=10,
+        msg="Test message",
+        args=(),
+        exc_info=None,
+    )
+
+    # フィルターを実行
+    result = syslog_context_filter(record)
+
+    # 1. 戻り値が True であること（ログの出力が許可されること）
+    assert result is True
+
+    # 2. 追加された各属性値の検証
+    assert hasattr(record, "syslog_time")
+    assert isinstance(record.syslog_time, str)
+    # ISO 8601 形式のタイムスタンプが含まれているか（例: 2026-08-14T...）
+    assert "T" in record.syslog_time
+
+    assert record.hostname == socket.gethostname()
+    assert record.pid == os.getpid()
+
+    # app_name 属性が存在し、文字列であることを確認
+    assert hasattr(record, "app_name")
+    assert isinstance(record.app_name, str)
+
+
+@patch("code_chat.logger.APP_NAME", "custom-app")
+@patch("code_chat.logger.HOSTNAME", "test-host")
+@patch("code_chat.logger.PID", 12345)
+def test_syslog_context_filter_mocked_values():
+    """正常系: モックされたシステム定数が LogRecord に正しくセットされるか検証."""
+    record = logging.LogRecord(
+        name="test_logger",
+        level=logging.INFO,
+        pathname="test_path.py",
+        lineno=10,
+        msg="Test message",
+        args=(),
+        exc_info=None,
+    )
+
+    result = syslog_context_filter(record)
+
+    assert result is True
+    assert record.hostname == "test-host"
+    assert record.pid == 12345
+    assert record.app_name == "custom-app"
 
 
 def test_setup_logging_level(capsys):
