@@ -43,6 +43,7 @@ def setup_logging(level_name: str = "INFO") -> None:
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(formatter)
     handler.addFilter(syslog_context_filter)
+    handler.setLevel(numeric_level)
 
     # ルートロガーのクリアと設定
     root_logger = logging.getLogger()
@@ -52,6 +53,10 @@ def setup_logging(level_name: str = "INFO") -> None:
         root_logger.handlers.clear()
 
     root_logger.addHandler(handler)
+
+    # アプリケーション固有のロガー（code_chat）のレベルも明示的に変更する
+    app_logger = logging.getLogger("code_chat")
+    app_logger.setLevel(numeric_level)
 
     # サードパーティライブラリのログ制御
     if numeric_level == logging.DEBUG:
