@@ -5,6 +5,7 @@ Gemini API と対話を行うためのコマンドラインインターフェー
 ファイルの上書き保存機能や会話ログの自動保存機能を含みます.
 """
 
+import logging
 import re
 import subprocess
 import sys
@@ -146,7 +147,7 @@ def sanitize_code_output(text: str) -> str:
 
     テキストの先頭および末尾に存在する Markdown のコードブロック囲み記号
     （```python や ``` など）を取り除き、POSIX 標準に適合するよう末尾に
-    1 つの改行コード（\\n）を保証した文字列を生成します.
+    1 つの改行コード（\n）を保証した文字列を生成します.
 
     Args:
         text (str): LLM から取得したレスポンス文字列.
@@ -283,22 +284,34 @@ def handle_commit_msg_generation(
         )
         prompt = template.format(diff=diff_text)
 
-        response_stream = send_message_stream_with_retry(
-            chat=client.chats.create(model=model_name), prompt=prompt
-        )
+        try:
+            response_stream = send_message_stream_with_retry(
+                chat=client.chats.create(model=model_name), prompt=prompt
+            )
 
-        for chunk in response_stream:
-            print(chunk.text, end="", flush=True)
-        print()
+            for chunk in response_stream:
+                print(chunk.text, end="", flush=True)
+            print()
 
-    except subprocess.CalledProcessError:
-        logger.exception("Git コマンドの実行に失敗しました")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            error_detail = (
+                str(e) if logger.isEnabledFor(logging.DEBUG) else type(e).__name__
+            )
+            logger.error(
+                "コミットメッセージの生成中にエラーが発生しました: %s",
+                error_detail,
+            )
+            raise
+
+    except subprocess.CalledProcessError as e:
+        logger.error("Git コマンドの実行に失敗しました: %s", e)
         raise
-    except APIError:
-        logger.exception("Gemini API でエラーが発生しました")
+    except (APIError, ServerError, ClientError) as e:
+        # logger.exception ではなく logger.error にすることでトレースバックを抑制
+        logger.error("Gemini API でエラーが発生しました: %s", e)
         raise
-    except Exception:  # pylint: disable=broad-exception-caught
-        logger.exception("予期せぬエラーが発生しました")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("予期せぬエラーが発生しました: %s", e)
         raise
 
 
@@ -451,9 +464,12 @@ def send_message_stream_with_retry(
                 or attempt == max_retries
                 or not _is_retryable_error(e)
             ):
+                error_detail = (
+                    str(e) if logger.isEnabledFor(logging.DEBUG) else type(e).__name__
+                )
                 logger.error(
                     "ストリーミングの受信途中でエラーが発生しました（一部出力済みのためリトライ中断）: %s",
-                    e,
+                    error_detail,
                 )
                 raise
 
@@ -498,10 +514,25 @@ def run_single_turn_mode(chat: Any, cli_args: Any, chat_history: list[str]) -> N
                 "\n準備ができたら「データを読み込みました。どのような対応を行いますか？」と簡潔に返答してください。"
             )
 
+        # API 送信用: ソースコード本文を含むフルプロンプト
         full_init_prompt = "\n".join(initial_prompt_parts)
-        chat_history.append(f"### User (Initial Context)\n\n{full_init_prompt}")
 
-        logger.info("Gemini にコンテキストを送信中...")
+        # 表示用・履歴保存用のファイル名取得
+        file_label = getattr(cli_args, "file", None) or "コンテキストテキスト"
+
+        # autosave / 履歴保存用: コード本文を入れずファイル名とサイズのみ記録
+        prompt_instruction_summary = (
+            f"\n\n[指示]: {cli_args.prompt}" if cli_args.prompt else ""
+        )
+        history_entry = (
+            f"### User (Initial Context)\n\n"
+            f"[ファイル読み込み: {file_label} ({len(cli_args.context)} bytes)]"
+            f"{prompt_instruction_summary}"
+        )
+        chat_history.append(history_entry)
+
+        # コンソール（標準出力）への通知: ファイル名を明記
+        logger.info("ファイル '%s' を Gemini のコンテキストとして送信中...", file_label)
 
         if cli_args.write_mode:
             # Write Mode の場合はストリーミングせず一括取得
@@ -623,7 +654,9 @@ def main() -> None:
         cli_args = parse_args()
 
         # ログレベル制御の判定
-        if cli_args.list_models or cli_args.generate_commit_msg:
+        if not cli_args.debug and (
+            cli_args.list_models or cli_args.generate_commit_msg
+        ):
             # -g オプション指定時は即座に INFO ログを無効化
             suppress_info_logs()
         else:
@@ -640,15 +673,18 @@ def main() -> None:
 
         # サブコマンドの処理分岐
         if cli_args.list_models:
-            handle_list_models(client)
-            sys.exit(0)
+            try:
+                handle_list_models(client)
+                sys.exit(0)
+            except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+                sys.exit(1)
 
         if cli_args.generate_commit_msg:
             try:
                 handle_commit_msg_generation(client, cli_args.model)
+                sys.exit(0)
             except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
                 sys.exit(1)
-            sys.exit(0)
 
         output_file = cli_args.output_path
 
@@ -688,7 +724,11 @@ def main() -> None:
         logger.exception("ファイル操作でエラーが発生しました")
         sys.exit(1)
     except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.critical("予期せぬエラーが発生しました: %s", e, exc_info=True)
+        logger.critical(
+            "予期せぬエラーが発生しました: %s",
+            e,
+            exc_info=logger.isEnabledFor(logging.DEBUG),
+        )
         sys.exit(1)
     finally:
         if chat_history:
