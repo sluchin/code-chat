@@ -269,14 +269,14 @@ def handle_commit_msg_generation(
             print(chunk.text, end="", flush=True)
         print()
 
-    except subprocess.CalledProcessError as e:
-        logger.error("Git コマンドの実行に失敗しました: %s", e)
+    except subprocess.CalledProcessError:
+        logger.exception("Git コマンドの実行に失敗しました")
         raise
-    except APIError as e:
-        logger.error("Gemini API でエラーが発生しました: %s", e)
+    except APIError:
+        logger.exception("Gemini API でエラーが発生しました")
         raise
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.error("予期せぬエラーが発生しました: %s", e)
+    except Exception:  # pylint: disable=broad-exception-caught
+        logger.exception("予期せぬエラーが発生しました")
         raise
 
 
@@ -430,7 +430,10 @@ def main() -> None:
                 sys.exit(1)
 
         if cli_args.generate_commit_msg:
-            handle_commit_msg_generation(client, cli_args.model)
+            try:
+                handle_commit_msg_generation(client, cli_args.model)
+            except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+                sys.exit(1)
             sys.exit(0)
 
         # 保存ファイル
@@ -560,11 +563,11 @@ def main() -> None:
     # 例外処理・終了時の保存処理
     except KeyboardInterrupt, EOFError:
         logger.info("\n[Ctrl+C] 会話を終了します。")
-    except APIError as e:
-        logger.error("Gemini APIでエラーが発生しました: %s", e)
+    except APIError:
+        logger.exception("Gemini APIでエラーが発生しました")
         sys.exit(1)
-    except (FileNotFoundError, ValueError, PermissionError) as e:
-        logger.error("ファイル操作でエラーが発生しました: %s", e)
+    except FileNotFoundError, ValueError, PermissionError:
+        logger.exception("ファイル操作でエラーが発生しました")
         sys.exit(1)
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.critical("予期せぬエラーが発生しました: %s", e, exc_info=True)
