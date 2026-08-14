@@ -1,11 +1,11 @@
 """アプリケーション共通のロガー設定モジュール."""
 
-from datetime import datetime
 import logging
 import os
-from pathlib import Path
 import socket
 import sys
+from datetime import datetime
+from pathlib import Path
 
 # システム固定情報（ホスト名およびプロセスID）
 HOSTNAME = socket.gethostname()
@@ -30,11 +30,8 @@ def setup_logging(level_name: str = "INFO") -> None:
         level_name (str, optional): ログレベル文字列 ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL").
             Defaults to "INFO".
     """
-    # 文字列から logging の数値定数を取得（不正な値の場合は INFO にフォールバック）
     numeric_level = getattr(logging, level_name.upper(), logging.INFO)
 
-    # syslog 風フォーマットの設定
-    # 例: 2026-08-14T11:20:05.987654+09:00 hostname code-chat[12345]: chat.py:42: メッセージ
     LOG_FORMAT = (
         "%(syslog_time)s %(hostname)s %(app_name)s[%(pid)d]: "
         "%(filename)s:%(lineno)d: %(message)s"
@@ -42,32 +39,28 @@ def setup_logging(level_name: str = "INFO") -> None:
 
     formatter = logging.Formatter(fmt=LOG_FORMAT)
 
-    # 標準エラー出力 (sys.stderr) へ出力するハンドラ
+    # ハンドラを作成し、フィルターを追加する（Logger ではなく Handler に追加）
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(formatter)
+    handler.addFilter(syslog_context_filter)
 
-    # ルートロガーに対して基本設定を適用
+    # ルートロガーのクリアと設定
     root_logger = logging.getLogger()
     root_logger.setLevel(numeric_level)
 
-    # 重複出力を防ぐため既存のハンドラとフィルタをクリア
     if root_logger.hasHandlers():
         root_logger.handlers.clear()
-    root_logger.filters.clear()
 
-    # syslog コンテキスト付与用のフィルタを追加 (1度のみ追加され、以降全ログで動的評価される)
-    root_logger.addFilter(syslog_context_filter)
     root_logger.addHandler(handler)
 
-    # サードパーティライブラリのログレベル制御
+    # サードパーティライブラリのログ制御
     if numeric_level == logging.DEBUG:
-        # デバッグモード時は httpx や google_genai の詳細ログを表示
         logging.getLogger("httpx").setLevel(logging.DEBUG)
-        logging.getLogger("google_genai").setLevel(logging.DEBUG)
+        logging.getLogger("google").setLevel(logging.DEBUG)
     else:
-        # 通常時は WARNING 以上（エラー時のみ）にして通信ログや AFC などの INFO ログを抑制
+        # 通信ログ（httpx）の無駄な出力のみを抑え、アプリ本体のログレベルは全伝播させる
         logging.getLogger("httpx").setLevel(logging.WARNING)
-        logging.getLogger("google_genai").setLevel(logging.WARNING)
+        # google_genai の警告ログまで消してしまうのを防ぐため、WARNING で止めずにルートに委ねるか INFO にする
 
 
 def get_logger(name: str) -> logging.Logger:

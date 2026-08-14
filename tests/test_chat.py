@@ -8,13 +8,13 @@ import pytest
 from google.genai.errors import APIError
 
 from code_chat.chat import (
+    _is_retryable_error,
     apply_file_modification,
     handle_commit_msg_generation,
     handle_write_mode_confirmation,
     is_partial_code,
     main,
     save_chat_history,
-    _is_retryable_error,
     send_message_stream_with_retry,
 )
 
@@ -299,7 +299,7 @@ def test_handle_commit_msg_generation_api_error(mock_get_diff, mock_logger):
     """異常系: Gemini API エラー（APIError）発生時に例外が再送出されログが出力されるか検証."""
     mock_client = MagicMock()
     mock_get_diff.return_value = "diff --git a/file.py b/file.py"
-    
+
     # API 呼び出し時に APIError を送出させる
     api_error = APIError("503 Service Unavailable", {})
     mock_client.models.generate_content.side_effect = api_error
@@ -337,9 +337,11 @@ def test_handle_commit_msg_generation_unexpected_exception(mock_get_diff, mock_l
     """異常系: 予期せぬ一般例外（Exception）発生時に例外が再送出されログが出力されるか検証."""
     mock_client = MagicMock()
     mock_get_diff.return_value = "diff --git a/file.py b/file.py"
-    
+
     # 想定外の一般例外（例: RuntimeError や AttributeError など）を発生させる
-    mock_client.models.generate_content.side_effect = RuntimeError("Unexpected internal failure")
+    mock_client.models.generate_content.side_effect = RuntimeError(
+        "Unexpected internal failure"
+    )
 
     with pytest.raises(Exception) as exc_info:
         handle_commit_msg_generation(mock_client, "gemini-2.5-flash")
@@ -394,9 +396,11 @@ def test_send_message_stream_with_retry_exceeds_max_retries(monkeypatch):
     monkeypatch.setattr("time.sleep", sleep_calls.append)
 
     with pytest.raises(APIError) as exc_info:
-        list(send_message_stream_with_retry(
-            mock_chat, "hello", max_retries=3, initial_delay=1.0
-        ))
+        list(
+            send_message_stream_with_retry(
+                mock_chat, "hello", max_retries=3, initial_delay=1.0
+            )
+        )
 
     assert getattr(exc_info.value, "code", None) == 429
     assert mock_chat.send_message_stream.call_count == 3
@@ -415,7 +419,58 @@ def test_send_message_stream_with_retry_non_retryable_error():
         # ジェネレータを評価・消費して例外を発生させる
         list(send_message_stream_with_retry(mock_chat, "hello"))
 
-    #assert getattr(exc_info.value, "code", None) == 400
+    assert getattr(exc_info.value, "code", None) == 400
+    assert mock_chat.send_message_stream.call_count == 1
+
+
+def test_send_message_stream_with_retry_error_during_iteration(monkeypatch):
+    """異常系: イテレーション（データ受信）の最初で 503 エラーが発生し、リトライして成功するか検証."""
+    mock_chat = MagicMock()
+
+    # 1回目のイテレーション（__iter__）で APIError を発生させる例外イテレータ
+    class ErrorStream:  # pylint: disable=too-few-public-methods
+        """テスト用モックストリームクラス.
+
+        イテレーションの開始時（`__iter__` 呼び出し時）に即座に APIError を送出することで、
+        レスポンス取得ループ（`for chunk in response_stream`）の開始直後に発生する
+        通信エラーの挙動をシミュレートします.
+        """
+
+        def __iter__(self):
+            raise APIError("503 Service Unavailable", {})
+
+    mock_chat.send_message_stream.side_effect = [
+        ErrorStream(),
+        ["success_chunk"],
+    ]
+
+    sleep_calls = []
+    monkeypatch.setattr("time.sleep", sleep_calls.append)
+
+    result = list(send_message_stream_with_retry(mock_chat, "hello", max_retries=3))
+
+    assert result == ["success_chunk"]
+    assert len(sleep_calls) == 1  # 1回リトライされたこと
+
+
+def test_send_message_stream_with_retry_error_after_yielding_chunks():
+    """異常系: 途中でチャンクを出力した後にエラーが発生した場合、リトライせずに即座に例外を送出するか検証."""
+    mock_chat = MagicMock()
+
+    # 1つ目のチャンクを出力したあとに例外を投げるジェネレータ
+    def partial_stream():
+        yield "first_chunk"
+        raise APIError("503 Service Unavailable", {})
+
+    mock_chat.send_message_stream.return_value = partial_stream()
+
+    with pytest.raises(APIError):
+        # 途中まで取得してから例外が発生することを確認
+        gen = send_message_stream_with_retry(mock_chat, "hello", max_retries=3)
+        assert next(gen) == "first_chunk"
+        next(gen)  # ここで例外送出
+
+    # リトライされずに呼び出し回数が 1 回であることを検証
     assert mock_chat.send_message_stream.call_count == 1
 
 
