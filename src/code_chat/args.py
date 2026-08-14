@@ -1,6 +1,7 @@
 """Gemini CLI Tool - Argument Parser and Context Collector."""
 
 import argparse
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -72,7 +73,6 @@ def read_path_content(target_path: str) -> str:
         sys.exit(1)
 
     if path.is_file():
-        # 単一ファイルの場合
         try:
             return f"=== File: {path} ===\n" + path.read_text(encoding="utf-8")
         except OSError:
@@ -80,19 +80,27 @@ def read_path_content(target_path: str) -> str:
             sys.exit(1)
 
     if path.is_dir():
-        # ディレクトリの場合
         contents: list[str] = []
-        for p in path.rglob("*"):
-            # 除外対象ディレクトリ配下のファイルはスキップ
-            if any(part in EXCLUDE_DIRS for part in p.parts):
-                continue
 
-            if p.is_file() and p.suffix.lower() in TEXT_EXTENSIONS:
-                try:
-                    text = p.read_text(encoding="utf-8", errors="ignore")
-                    contents.append(f"=== File: {p} ===\n{text}")
-                except OSError as e:
-                    logger.warning("'%s' の読み込みをスキップしました: %s", p, e)
+        # os.walk を使うことで除外ディレクトリ配下の走査を即座にスキップ可能
+        for root, dirs, files in os.walk(path):
+            # EXCLUDE_DIRS に含まれるディレクトリ配下を走査対象から除外
+            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
+
+            for file in files:
+                file_path = Path(root) / file
+                if file_path.suffix.lower() in TEXT_EXTENSIONS:
+                    try:
+                        text = file_path.read_text(
+                            encoding="utf-8", errors="ignore"
+                        )
+                        contents.append(f"=== File: {file_path} ===\n{text}")
+                    except OSError as e:
+                        logger.warning(
+                            "'%s' の読み込みをスキップしました: %s",
+                            file_path,
+                            e,
+                        )
 
         if not contents:
             logger.warning(

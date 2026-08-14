@@ -9,6 +9,7 @@ Gemini API と対話を行うためのコマンドラインインターフェー
 import re
 import sys
 import time
+import subprocess
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
@@ -227,75 +228,141 @@ def handle_write_mode_confirmation(
         logger.info("上書きをキャンセルしました.")
 
 
-def handle_commit_msg_generation(client, model_name: str) -> None:
-    diff_text = get_git_diff()
+def handle_commit_msg_generation(
+    client: Any, model_name: str, lang: str = "en"
+) -> None:
+    """Git の diff（差分）を取得し、Gemini API を用いてコミットメッセージを自動生成します.
 
-    if not diff_text:
-        print(
-            "変更（git diff）が検出されませんでした。ファイルを修正するか `git add` してください。"
+    `git diff --staged`（ステージング済み差分）および `git diff`（未ステージング差分）を
+    読み取り、変更内容が存在する場合に指定された言語で Conventional Commits 形式に沿った
+    適切なコミットメッセージを生成して標準出力に表示します。
+
+    Args:
+        client (Any): Gemini API クライアントインスタンス.
+        model_name (str): 使用する Gemini モデル名.
+        lang (str, optional): コミットメッセージの出力言語（例: "ja", "en"）. デフォルトは "en".
+
+    Raises:
+        subprocess.CalledProcessError: Git コマンドの実行に失敗した場合.
+        APIError: Gemini API 呼び出し時に通信エラーや 503 等が発生した場合.
+        Exception: その他の予期せぬエラーが発生した場合.
+    """
+    try:
+        diff_text = get_git_diff()
+
+        if not diff_text:
+            print(
+                "変更（git diff）が検出されませんでした。ファイルを修正するか `git add` してください。"
+            )
+            return
+
+        # 言語に応じたテンプレートの選択（標準を日本語に設定）
+        template = (
+            COMMIT_PROMPT_TEMPLATE_JA
+            if lang == "ja"
+            else COMMIT_PROMPT_TEMPLATE_EN
         )
-        return
+        prompt = template.format(diff=diff_text)
 
-    prompt = COMMIT_PROMPT_TEMPLATE_EN.format(diff=diff_text)
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+        )
+        print(response.text.strip())
 
-    # Gemini API を呼び出してコミットメッセージを生成
-    # （プロジェクトの API 呼び出し関数に合わせて調整）
-    response = client.models.generate_content(
-        model=model_name,
-        contents=prompt,
-    )
-    print(response.text.strip())
+    except subprocess.CalledProcessError as e:
+        logger.error("Git コマンドの実行に失敗しました: %s", e)
+        raise
+    except APIError as e:
+        logger.error("Gemini API でエラーが発生しました: %s", e)
+        raise
+    except Exception as e: # pylint: disable=broad-exception-caught
+        logger.error("予期せぬエラーが発生しました: %s", e)
+        raise
+
+
+def _is_retryable_error(e: APIError) -> bool:
+    """APIError がリトライ対象（503, 429 一時的エラー等）か判定します.
+
+    エラーオブジェクトの `code` 属性およびエラーメッセージ文字列を参照し、
+    503 Service Unavailable や 429 Too Many Requests などの一時的な通信エラーであるかを評価します.
+
+    Args:
+        e (APIError): 検証対象の Gemini API 例外オブジェクト.
+
+    Returns:
+        bool: リトライ対象のエラーである場合は True、400 Bad Request 等のリトライ不可エラーの場合は False.
+    """
+    code = getattr(e, "code", None)
+    if code is not None:
+        try:
+            if int(code) in (503, 429):
+                return True
+        except (ValueError, TypeError):
+            pass
+
+    # code 属性で判定できない場合はメッセージ文字列から判定
+    err_msg = str(e)
+
+    return "503" in err_msg or "429" in err_msg
 
 
 def send_message_stream_with_retry(
     chat: Any,
     prompt: str,
     max_retries: int = 3,
-    initial_delay: float = 2.0,
+    initial_delay: float = 1.0,
+    backoff_factor: float = 2.0,
 ) -> Iterator[Any]:
-    """503エラー（サーバー混雑）発生時に自動で再試行を行うストリーミング送信処理.
+    """Gemini API へのストリーミングリクエストを送信し、通信エラー発生時にリトライを行います.
 
-    指定されたプロンプトを Gemini チャットセッションへストリーミング送信します.
-    一時的なサーバーエラー（503 UNAVAILABLE）が発生した場合は、
-    指数バックオフを用いて指定回数まで自動でリトライを実行します.
+    イテレーション中の API エラー（503/429等）もキャッチして再試行します。
+    途中でエラーが発生した場合は画面に通知し、リトライ時は最初からメッセージを送り直します.
 
     Args:
-        chat (Any): google.genai.chats.Chat インスタンス.
+        chat (Any): Gemini Chat インスタンス.
         prompt (str): 送信するプロンプト文字列.
         max_retries (int, optional): 最大リトライ回数. Defaults to 3.
-        initial_delay (float, optional): 初回リトライまでの待機時間（秒）. Defaults to 2.0.
+        initial_delay (float, optional): 初回リトライ時の待ち時間（秒）. Defaults to 1.0.
+        backoff_factor (float, optional): 指数バックオフの倍率. Defaults to 2.0.
 
-    Returns:
-        Iterator[Any]: Gemini API から返却されるストリーミングレスポンス（チャンクのイテレータ）.
+    Yields:
+        Any: Gemini API からのレスポンスチャンク.
 
     Raises:
-        APIError: リトライ上限に達した場合、または 503 以外の API エラーが発生した場合.
+        APIError: 最大リトライ回数を超えてエラーが発生した場合.
     """
     delay = initial_delay
-    for attempt in range(max_retries):
+    for attempt in range(1, max_retries + 1):
         try:
-            return chat.send_message_stream(prompt)
+            # ストリームイテレータを取得
+            response_stream = chat.send_message_stream(prompt)
+            
+            # イテレーションを実際に消費して chunk を yield する
+            # （イテレーション中の 503 等もこの try ブロックでキャッチできる）
+            for chunk in response_stream:
+                yield chunk
+            
+            # 正常にすべての chunk を出力し終えたらループを抜ける
+            return
+
         except APIError as e:
-            error_code = getattr(e, "code", None)
-            err_str = str(e)
+            # リトライ対象外のエラー（400 Bad Request 等）は即座に例外を送出
+            if not _is_retryable_error(e):
+                logger.error("リトライ不可な API エラーが発生しました: %s", e)
+                raise
 
-            if (
-                error_code in (503, 429) or "503" in err_str or "429" in err_str
-            ) and attempt < max_retries - 1:
-                logger.warning(
-                    "API制限またはサーバー混雑のため %.1f 秒後に再試行します... (%d/%d)",
-                    delay,
-                    attempt + 1,
-                    max_retries,
-                )
-                time.sleep(delay)
-                delay *= 2.0
-                continue
-            raise
+            logger.warning(
+                "Gemini API 通信エラー (試行 %d/%d): %s", attempt, max_retries, e
+            )
+            if attempt == max_retries:
+                logger.error("最大リトライ回数 (%d 回) に達しました。", max_retries)
+                raise
 
-    # mypy 対策: max_retries が 0 以下などでループに入らなかった場合や、
-    # 静的解析上のフォールバック
-    raise RuntimeError("再試行回数が不正です (max_retries <= 0)")  # pragma: no cover
+            # 画面に出力中だった場合の改行処理
+            print(f"\n[一時的なエラーが発生しました (503/429)。{delay:.1f}秒後に再試行します...]")
+            time.sleep(delay)
+            delay *= backoff_factor
 
 
 def main() -> None:
@@ -412,9 +479,9 @@ def main() -> None:
             chat_history.append(f"### User\n\n{prompt_text}")
 
             print("Gemini > ", end="", flush=True)
-            response_stream = send_message_stream_with_retry(chat, prompt_text)
             chunks = []
-            for chunk in response_stream:
+            # リトライ制御を内包したジェネレータから安全に受領
+            for chunk in send_message_stream_with_retry(chat, prompt_text):
                 if chunk.text:
                     print(chunk.text, end="", flush=True)
                     chunks.append(chunk.text)
@@ -426,7 +493,6 @@ def main() -> None:
 
             if cli_args.write_mode:
                 handle_write_mode_confirmation(cli_args.target_path, response_text)
-
         else:
             # 通常のチャットモード
             print("=== Gemini Chat Mode (終了: 'exit' / 保存: '/save <path>') ===\n")
@@ -462,9 +528,9 @@ def main() -> None:
             chat_history.append(f"### User\n\n{user_input}")
 
             print("Gemini > ", end="", flush=True)
-            response_stream = send_message_stream_with_retry(chat, send_text)
             chunks = []
-            for chunk in response_stream:
+            # リトライ制御を内包したジェネレータから安全に受領
+            for chunk in send_message_stream_with_retry(chat, send_text):
                 if chunk.text:
                     print(chunk.text, end="", flush=True)
                     chunks.append(chunk.text)
@@ -492,7 +558,7 @@ def main() -> None:
         sys.exit(1)
     finally:
         if chat_history:
-            # -s フラグ指定時はタイトルを要約させてファイル名を生成
+            # -s フラグ指定時はタイムスタンプからファイル名生成
             if cli_args.auto_save and not output_file:
                 timestamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
                 output_file = f"{timestamp}_chat.md"
