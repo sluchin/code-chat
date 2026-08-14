@@ -54,7 +54,7 @@ def mock_args():
             debug=False,
             log_level="INFO",
             write_mode=False,
-            model="gemini-2.5-flash",
+            model="gemini-flash-latest",
             context=None,
             prompt=None,
             output_path=None,
@@ -234,26 +234,26 @@ def test_handle_write_mode_confirmation_user_declines(monkeypatch, tmp_path):
     assert target_file.read_text(encoding="utf-8") == "print('old')"
 
 
-def test_handle_commit_msg_generation_success(capsys):
+@patch("code_chat.chat.send_message_stream_with_retry")
+def test_handle_commit_msg_generation_success(mock_send_retry, capsys):
     """git diff が存在し、Gemini API からコミットメッセージが生成されて出力されるケース。"""
     mock_client = MagicMock()
-    mock_response = SimpleNamespace(
+    mock_chunk = SimpleNamespace(
         text="feat: add commit message generation\n\n- Add -g option"
     )
-    mock_client.models.generate_content.return_value = mock_response
+    mock_send_retry.return_value = iter([mock_chunk])
 
     with patch("code_chat.chat.get_git_diff") as mock_get_diff:
         mock_get_diff.return_value = "diff --git a/main.py b/main.py\n+new line"
 
-        handle_commit_msg_generation(mock_client, "gemini-2.5-flash")
+        handle_commit_msg_generation(mock_client, "gemini-flash-latest")
 
-        # API 呼び出しの引数検証
-        mock_client.models.generate_content.assert_called_once()
-        call_kwargs = mock_client.models.generate_content.call_args.kwargs
-        assert call_kwargs["model"] == "gemini-2.5-flash"
-        assert "diff --git a/main.py b/main.py" in call_kwargs["contents"]
+        mock_client.chats.create.assert_called_once_with(model="gemini-flash-latest")
+        mock_send_retry.assert_called_once()
 
-        # 標準出力の検証
+        call_kwargs = mock_send_retry.call_args.kwargs
+        assert "diff --git a/main.py b/main.py" in call_kwargs["prompt"]
+
         captured = capsys.readouterr()
         assert "feat: add commit message generation" in captured.out
 
@@ -265,50 +265,60 @@ def test_handle_commit_msg_generation_no_diff(capsys):
     with patch("code_chat.chat.get_git_diff") as mock_get_diff:
         mock_get_diff.return_value = ""
 
-        handle_commit_msg_generation(mock_client, "gemini-2.5-flash")
+        handle_commit_msg_generation(mock_client, "gemini-flash-latest")
 
-        # API が呼び出されていないこと
-        mock_client.models.generate_content.assert_not_called()
+        mock_client.chats.create.assert_not_called()
 
-        # 警告メッセージが出力されていること
         captured = capsys.readouterr()
         assert "変更（git diff）が検出されませんでした" in captured.out
 
 
-@patch("code_chat.chat.logger")
 @patch("code_chat.chat.get_git_diff")
-def test_handle_commit_msg_generation_called_process_error(mock_get_diff, mock_logger):
+def test_handle_commit_msg_generation_called_process_error(mock_get_diff, caplog):
     """異常系: Git コマンド実行失敗（CalledProcessError）時に例外が再送出されログが出力されるか検証."""
     mock_client = MagicMock()
-    # get_git_diff 内で CalledProcessError が発生するケースをシミュレート
     mock_get_diff.side_effect = subprocess.CalledProcessError(
         returncode=1, cmd=["git", "diff"]
     )
 
     with pytest.raises(subprocess.CalledProcessError):
-        handle_commit_msg_generation(mock_client, "gemini-2.5-flash")
+        handle_commit_msg_generation(mock_client, "gemini-flash-latest")
 
-    # logger.error が正しく呼ばれていることを確認
-    mock_logger.error.assert_called_once()
-    assert "Git コマンドの実行に失敗しました" in mock_logger.error.call_args[0][0]
+    assert "Git コマンドの実行に失敗しました" in caplog.text
 
 
-@patch("code_chat.chat.logger")
+@patch("code_chat.chat.send_message_stream_with_retry")
 @patch("code_chat.chat.get_git_diff")
-def test_handle_commit_msg_generation_api_error(mock_get_diff, mock_logger):
+def test_handle_commit_msg_generation_api_error(mock_get_diff, mock_send_retry, caplog):
     """異常系: Gemini API エラー（APIError）発生時に例外が再送出されログが出力されるか検証."""
     mock_client = MagicMock()
     mock_get_diff.return_value = "diff --git a/file.py b/file.py"
 
-    # API 呼び出し時に APIError を送出させる
     api_error = APIError("503 Service Unavailable", {})
-    mock_client.models.generate_content.side_effect = api_error
+    mock_send_retry.side_effect = api_error
 
     with pytest.raises(APIError):
-        handle_commit_msg_generation(mock_client, "gemini-2.5-flash")
+        handle_commit_msg_generation(mock_client, "gemini-flash-latest")
 
-    mock_logger.error.assert_called_once()
-    assert "Gemini API でエラーが発生しました" in mock_logger.error.call_args[0][0]
+    assert "Gemini API でエラーが発生しました" in caplog.text
+
+
+@patch("code_chat.chat.send_message_stream_with_retry")
+@patch("code_chat.chat.get_git_diff")
+def test_handle_commit_msg_generation_unexpected_exception(
+    mock_get_diff, mock_send_retry, caplog
+):
+    """異常系: 予期せぬ例外（Exception）発生時に例外が再送出されログが出力されるか検証."""
+    mock_client = MagicMock()
+    mock_get_diff.return_value = "diff --git a/file.py b/file.py"
+
+    # API またはストリーム呼び出し時に一般的な Exception (RuntimeError) を送出させる
+    mock_send_retry.side_effect = RuntimeError("予期せぬエラー")
+
+    with pytest.raises(RuntimeError):
+        handle_commit_msg_generation(mock_client, "gemini-flash-latest")
+
+    assert "予期せぬエラーが発生しました" in caplog.text
 
 
 def test_is_retryable_error_value_error_fallback():
@@ -329,26 +339,6 @@ def test_is_retryable_error_type_error_fallback():
 
     # int(code) で TypeError が発生するが、内部でキャッチされメッセージ("400")から False と判定される
     assert _is_retryable_error(error) is False
-
-
-@patch("code_chat.chat.logger")
-@patch("code_chat.chat.get_git_diff")
-def test_handle_commit_msg_generation_unexpected_exception(mock_get_diff, mock_logger):
-    """異常系: 予期せぬ一般例外（Exception）発生時に例外が再送出されログが出力されるか検証."""
-    mock_client = MagicMock()
-    mock_get_diff.return_value = "diff --git a/file.py b/file.py"
-
-    # 想定外の一般例外（例: RuntimeError や AttributeError など）を発生させる
-    mock_client.models.generate_content.side_effect = RuntimeError(
-        "Unexpected internal failure"
-    )
-
-    with pytest.raises(Exception) as exc_info:
-        handle_commit_msg_generation(mock_client, "gemini-2.5-flash")
-
-    assert str(exc_info.value) == "Unexpected internal failure"
-    mock_logger.error.assert_called_once()
-    assert "予期せぬエラーが発生しました" in mock_logger.error.call_args[0][0]
 
 
 def test_send_message_stream_with_retry_success():
@@ -377,12 +367,12 @@ def test_send_message_stream_with_retry_503_retry_and_succeed(monkeypatch):
     monkeypatch.setattr("time.sleep", sleep_calls.append)
 
     result = send_message_stream_with_retry(
-        mock_chat, "hello", max_retries=3, initial_delay=2.0
+        mock_chat, "hello", max_retries=3, initial_delay=2.5
     )
 
     assert list(result) == ["success_chunk"]
     assert mock_chat.send_message_stream.call_count == 2
-    assert sleep_calls == [2.0]  # 初回ディレイが適用されていること
+    assert sleep_calls == [2.5]  # 初回ディレイが適用されていること
 
 
 def test_send_message_stream_with_retry_exceeds_max_retries(monkeypatch):
@@ -780,6 +770,30 @@ def test_main_chat_loop_write_mode_append_instruction(
         "(※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください)"
         in sent_prompt
     )
+
+
+@patch("code_chat.args.read_stdin_content", return_value="")
+@patch("code_chat.chat.handle_commit_msg_generation")
+def test_cli_generate_commit_msg_failure(mock_handle, _mock_read_stdin, monkeypatch):
+    """CLI 実行時にコミットメッセージ生成で例外が発生し、sys.exit(1) で終了することを検証."""
+    # handle_commit_msg_generation で例外を送出させる
+    mock_handle.side_effect = RuntimeError("Unexpected Error")
+
+    # コマンドライン引数をシミュレート (-g フラグなどを指定)
+    # project_name, -g (または --generate-commit-msg) を渡す
+    monkeypatch.setattr("sys.argv", ["code-chat", "-g"])
+
+    # APIキーのチェック等で落ちないよう環境変数をダミー設定
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy_key")
+
+    # sys.exit(1) が実行されると SystemExit 例外が発生する
+    with pytest.raises(SystemExit) as exc_info:
+        main()  # 引数なしで呼び出し
+
+    # 終了ステータスコードが 1 であることを検証
+    assert exc_info.value.code == 1
+    # 確実に呼び出されたか検証
+    mock_handle.assert_called_once()
 
 
 def test_main_unexpected_exception(monkeypatch, mock_args):
