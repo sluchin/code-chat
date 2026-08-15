@@ -37,7 +37,7 @@ Gemini API やローカル LLM を使用してローカルソースコードの�
 ```bash
 # 1. リポジトリの clone と移動
 git clone <repository-url>
-cd gemini-app
+cd code-chat
 
 # 2. 仮想環境の作成と依存ライブラリの同期 (uv.lock に基づいて自動インストール)
 uv sync
@@ -47,7 +47,7 @@ uv run pre-commit install
 
 ```
 
-### 2. gemini-app のインストール (CLIツールとしての利用)
+### 2. code-chat のインストール (CLIツールとしての利用)
 
 `uv tool` を使用すると、環境を汚さずに CLI コマンドとしてグローバルにインストールできます。
 
@@ -56,7 +56,7 @@ uv run pre-commit install
 uv tool install .
 
 # インストール後は直接コマンドとして呼び出し可能
-gemini-app
+cchat
 
 ```
 
@@ -80,14 +80,14 @@ GEMINI_API_KEY=your_api_key_here
 
 ## 実行方法
 
-`uv run` を使用してスクリプトを実行するか、インストールした `gemini-app` コマンドを実行します。
+`uv run` を使用してスクリプトを実行するか、インストールした `cchat` コマンドを実行します。
 
 ```bash
 # uv run 経由で実行
-uv run gemini-app
+uv run cchat
 
 # または直接実行（uv tool install 済みの場合）
-gemini-app
+cchat
 
 ```
 
@@ -98,9 +98,6 @@ gemini-app
 ```bash
 # 単体テストの実行
 uv run pytest
-
-# カバレッジレポート付きで実行
-uv run pytest --cov=gemini_app --cov-report=term-missing
 
 ```
 
