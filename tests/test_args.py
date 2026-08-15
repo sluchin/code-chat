@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from code_chat.args import parse_args, read_path_content, read_stdin_content
+from code_chat_cli.args import parse_args, read_path_content, read_stdin_content
 
 
 @pytest.fixture(autouse=True)
@@ -132,7 +132,7 @@ def test_read_path_content_other_path_type():
     mock_path.is_file.return_value = False
     mock_path.is_dir.return_value = False
 
-    with patch("code_chat.chat.Path", return_value=mock_path):
+    with patch("code_chat_cli.chat.Path", return_value=mock_path):
         result = read_path_content("/dev/null")
 
     assert result == ""

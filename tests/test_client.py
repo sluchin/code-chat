@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from code_chat.client import ClientConfigError, get_gemini_client
+from code_chat_cli.client import ClientConfigError, get_gemini_client
 
 
 def test_get_gemini_client_success(monkeypatch):
@@ -11,7 +11,7 @@ def test_get_gemini_client_success(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
 
     # google.genai.Client のインスタンス化をモック
-    with patch("code_chat.client.genai.Client") as mock_client_cls:
+    with patch("code_chat_cli.client.genai.Client") as mock_client_cls:
         mock_instance = MagicMock()
         mock_client_cls.return_value = mock_instance
 

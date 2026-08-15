@@ -3,7 +3,7 @@ import os
 import socket
 from unittest.mock import patch
 
-from code_chat.logger import syslog_context_filter, get_logger, setup_logging
+from code_chat_cli.logger import syslog_context_filter, get_logger, setup_logging
 
 
 def test_syslog_context_filter():
@@ -39,9 +39,9 @@ def test_syslog_context_filter():
     assert isinstance(record.app_name, str)
 
 
-@patch("code_chat.logger.APP_NAME", "custom-app")
-@patch("code_chat.logger.HOSTNAME", "test-host")
-@patch("code_chat.logger.PID", 12345)
+@patch("code_chat_cli.logger.APP_NAME", "custom-app")
+@patch("code_chat_cli.logger.HOSTNAME", "test-host")
+@patch("code_chat_cli.logger.PID", 12345)
 def test_syslog_context_filter_mocked_values():
     """正常系: モックされたシステム定数が LogRecord に正しくセットされるか検証."""
     record = logging.LogRecord(

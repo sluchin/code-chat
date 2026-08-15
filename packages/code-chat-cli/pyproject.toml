@@ -1,0 +1,52 @@
+[project]
+name = "code-chat-cli"
+version = "0.1.0"
+description = "CLI tool for interacting with and modifying local codebase via LLMs"
+readme = "README.md"
+authors = [
+    { name = "Tetsuya Higashi", email = "996846+sluchin@ users.noreply.github.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "google-genai>=2.16.0",
+    "mypy>=2.3.0",
+    "pylint>=4.0.6",
+    "ruff>=0.16.1",
+    "code-chat-rag",
+]
+
+[tool.uv.sources]
+code-chat-rag = { workspace = true }
+
+[project.scripts]
+code-chat = "code_chat_cli.chat:main"
+cchat = "code_chat_cli.chat:main"
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "furo>=2025.12.19",
+    "pre-commit>=4.6.1",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "sphinx>=9.1.0",
+    "sphinx-autobuild>=2025.8.25",
+]
+
+[tool.pylint.messages_control]
+disable = [
+    "missing-module-docstring",     # モジュール冒頭の docstring 要求を無効化
+    "missing-function-docstring",   # 関数の docstring 必須チェックを無効化
+    "redefined-outer-name",         # pytest の fixture 利用で発生する警告を抑止
+    "invalid-name",                 # Sphinx の conf.py 等での小文字定数名を許容
+    "redefined-builtin",            # conf.py の copyright 警告を抑止
+    "too-many-instance-attributes", # CLI引数クラスの属性数制限を緩和
+    "too-many-locals",              # 関数内のローカル変数数制限を緩和
+    "too-many-branches",            # 条件分岐数制限を緩和
+    "too-many-statements",          # ステートメント数制限を緩和
+    "line-too-long",                # 行長警告は ruff / black に任せる
+    "too-many-lines",               # モジュールあたりの行数制限を緩和
+]

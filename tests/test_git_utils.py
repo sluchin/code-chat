@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from code_chat.git_utils import get_git_diff
+from code_chat_cli.git_utils import get_git_diff
 
 
 def test_get_git_diff_staged_exists():
@@ -63,7 +63,7 @@ def test_get_git_diff_called_process_error():
         assert exc_info.value.returncode == 128
 
 
-@patch("code_chat.git_utils.subprocess.check_output")
+@patch("code_chat_cli.git_utils.subprocess.check_output")
 def test_get_git_diff_file_not_found_error(mock_check_output):
     """git コマンド不在時に FileNotFoundError が発生することを検証."""
     mock_check_output.side_effect = FileNotFoundError("git command not found")

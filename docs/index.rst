@@ -15,4 +15,5 @@ documentation for details.
    :maxdepth: 2
    :caption: Contents:
 
-   api/modules
+   api/code_chat_cli/modules
+   api/code_chat_rag/modules

@@ -27,10 +27,10 @@ except ImportError:
 from google.genai import types
 from google.genai.errors import APIError, ClientError, ServerError
 
-from code_chat.args import parse_args
-from code_chat.client import get_gemini_client
-from code_chat.git_utils import get_git_diff
-from code_chat.logger import get_logger, setup_logging, suppress_info_logs
+from code_chat_cli.args import parse_args
+from code_chat_cli.client import get_gemini_client
+from code_chat_cli.git_utils import get_git_diff
+from code_chat_cli.logger import get_logger, setup_logging, suppress_info_logs
 
 logger = get_logger(__name__)
 
