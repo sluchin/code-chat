@@ -28,9 +28,9 @@ def get_gemini_client() -> genai.Client:
     api_key = os.getenv("GEMINI_API_KEY")
 
     if not api_key:
-        logger.error("環境変数 GEMINI_API_KEY が設定されていません。")
+        logger.error("環境変数 GEMINI_API_KEY が設定されていません.")
         print(
-            "実行前に export GEMINI_API_KEY='your-api-key' を設定してください。",
+            "実行前に export GEMINI_API_KEY='your-api-key' を設定してください.",
             file=sys.stderr,
         )
         raise ClientConfigError("GEMINI_API_KEY is missing")

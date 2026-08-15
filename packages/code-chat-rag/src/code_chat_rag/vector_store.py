@@ -1,9 +1,9 @@
-"""Vector store management and search retrieval module."""
+"""Vector store and search retrieval module."""
 
 from typing import Any
 
 
-class VectorStoreManager:
+class VectorStore:
     """Manages vector embeddings and code retrieval using a vector database."""
 
     def __init__(self, collection_name: str = "code_index") -> None:
@@ -12,7 +12,7 @@ class VectorStoreManager:
     def add_chunks(self, chunks: list[dict[str, Any]]) -> None:
         """Embed and store code chunks into the vector store."""
 
-    def search(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
+    def search(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:  # pylint: disable=unused-argument
         """Search relevant code chunks matching the query.
 
         Args:
@@ -22,5 +22,6 @@ class VectorStoreManager:
         Returns:
             List of matching chunks with similarity scores.
         """
+        # pylint: disable=fixme
         # TODO: Implement ChromaDB / VectorStore similarity search
         return []

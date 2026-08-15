@@ -3,7 +3,7 @@
 from typing import Any
 
 from code_chat_rag.indexer import CodeIndexer
-from code_chat_rag.store import VectorStoreManager
+from code_chat_rag.vector_store import VectorStore
 
 
 class CodeRagService:
@@ -12,7 +12,7 @@ class CodeRagService:
     def __init__(self, repo_path: str) -> None:
         self.repo_path = repo_path
         self.indexer = CodeIndexer(repo_path)
-        self.store = VectorStoreManager()
+        self.store = VectorStore()
 
     def build_index(self) -> int:
         """Parse source code and build the vector search index.
