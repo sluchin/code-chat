@@ -1,3 +1,5 @@
+"""Git コマンドの実行、リポジトリ状態の検証、および差分（diff）情報の取得を行うユーティリティモジュール."""
+
 import subprocess
 from logging import getLogger
 
@@ -22,7 +24,7 @@ def get_git_diff() -> str:
         return diff.strip()
     except subprocess.CalledProcessError:
         logger.error(
-            "git diff の実行に失敗しました。Git リポジトリ内か確認してください."
+            "git diff の実行に失敗しました.Git リポジトリ内か確認してください."
         )
         raise
     except FileNotFoundError:

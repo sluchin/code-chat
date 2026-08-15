@@ -5,24 +5,16 @@ Gemini API と対話を行うためのコマンドラインインターフェー
 ファイルの上書き保存機能や会話ログの自動保存機能を含みます.
 """
 
+import atexit
 import logging
 import re
 import subprocess
 import sys
 import time
-import atexit
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-
-try:
-    import readline
-except ImportError:
-    try:
-        import pyreadline3 as readline  # Windows用
-    except ImportError:
-        readline = None
 
 from google.genai import types
 from google.genai.errors import APIError, ClientError, ServerError
@@ -32,17 +24,33 @@ from code_chat_cli.client import get_gemini_client
 from code_chat_cli.git_utils import get_git_diff
 from code_chat_cli.logger import get_logger, setup_logging, suppress_info_logs
 
+# pylint: disable=invalid-name
+HAVE_READLINE = False
+readline: Any = None
+
+try:
+    import readline
+
+    HAVE_READLINE = True
+except ImportError:
+    try:
+        import pyreadline3 as readline  # type: ignore[no-redef]
+
+        HAVE_READLINE = True
+    except ImportError:
+        pass
+
 logger = get_logger(__name__)
 
 COMMIT_PROMPT_TEMPLATE_JA = """\
-以下の git diff の内容を分析し、適切な Git コミットメッセージを作成してください。
+以下の git diff の内容を分析し、適切な Git コミットメッセージを作成してください.
 
 【制約事項】
-- 1行目は変更内容を簡潔に要約したタイトル（50文字程度）にしてください。
-- 必要に応じて空行を挟み、箇条書きで変更理由や詳細を記述してください。
-- プレフィックス（feat:, fix:, docs:, refactor:, test: など）を使用してください。
-- 記述は日本語で行ってください。
-- 余計な解説やコードブロックの枠（``` など）は含めず、コミットメッセージ本文のみを出力してください。
+- 1行目は変更内容を簡潔に要約したタイトル（50文字程度）にしてください.
+- 必要に応じて空行を挟み、箇条書きで変更理由や詳細を記述してください.
+- プレフィックス（feat:, fix:, docs:, refactor:, test: など）を使用してください.
+- 記述は日本語で行ってください.
+- 余計な解説やコードブロックの枠（``` など）は含めず、コミットメッセージ本文のみを出力してください.
 
 【git diff】
 {diff}
@@ -62,13 +70,13 @@ Analyze the following git diff and generate a concise, professional Git commit m
 """
 
 WRITE_MODE_SYSTEM_INSTRUCTION = """
-あなたはコード自動生成アシスタントです。
-指定されたファイルを完全に置き換えるための実行可能なコードのみを出力してください。
+あなたはコード自動生成アシスタントです.
+指定されたファイルを完全に置き換えるための実行可能なコードのみを出力してください.
 
 【厳格な遵守事項】
-1. Markdown のコードブロック記号（```python や ```）を含めないでください。
-2. 挨拶、解説、説明文、前置き、後書きは一切含めないでください。
-3. 出力の1文字目から最後の文字まで、すべてPythonソースコードとして直接実行可能なテキストのみを出力してください。
+1. Markdown のコードブロック記号（```python や ```）を含めないでください.
+2. 挨拶、解説、説明文、前置き、後書きは一切含めないでください.
+3. 出力の1文字目から最後の文字まで、すべてPythonソースコードとして直接実行可能なテキストのみを出力してください.
 """
 
 
@@ -219,13 +227,15 @@ def handle_write_mode_confirmation(
 
     if is_partial_code(code):
         logger.warning(
-            "出力コード内に省略（'...' や '変更なし' 等）が含まれている可能性があります."
+            "出力コード内に省略（'...' や '変更なし' 等）"
+            "が含まれている可能性があります."
             "そのまま上書きするとコードが破損する恐れがあります."
         )
 
     confirm = (
         input(
-            f"\n[Write Mode] 提案されたコード（{len(code.splitlines())} 行）で '{target_path_str}' を上書きしますか？ (y/N): "
+            f"\n[Write Mode] 提案されたコード（{len(code.splitlines())} 行）で "
+            f"'{target_path_str}' を上書きしますか？ (y/N): "
         )
         .strip()
         .lower()
@@ -283,7 +293,7 @@ def handle_commit_msg_generation(
 
         if not diff_text:
             print(
-                "変更（git diff）が検出されませんでした。ファイルを修正するか `git add` してください。"
+                "変更（git diff）が検出されませんでした.ファイルを修正するか `git add` してください."
             )
             return
 
@@ -358,7 +368,7 @@ def _is_retryable_error(e: Exception) -> bool:
 
     # 1日あたりのクォータ超過 (RPD) は待機しても回復しないためリトライしない
     if "PerDay" in err_str or "GenerateRequestsPerDay" in err_str:
-        logger.error("1日あたりの API 利用上限 (RPD) に到達しました。")
+        logger.error("1日あたりの API 利用上限 (RPD) に到達しました.")
         return False
 
     # APIError, ServerError, ClientError すべてを対象
@@ -502,93 +512,88 @@ def send_message_stream_with_retry(
             time.sleep(sleep_time)
 
 
+def _build_context_prompt(cli_args: Any) -> str:
+    """コンテキスト指定時のプロンプト文字列を構築します."""
+    prompt_text = cli_args.prompt or ""
+    if cli_args.write_mode and prompt_text:
+        prompt_text += "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください."
+
+    parts = [
+        "以下のソースコード・テキストを読み込んで、今後の指示に対応してください.\n",
+        cli_args.context,
+    ]
+    if prompt_text:
+        parts.append(f"\n--- [指示] ---\n{prompt_text}")
+    else:
+        parts.append(
+            "\n準備ができたら「データを読み込みました. どのような対応を行いますか？」と簡潔に返答してください."
+        )
+    return "\n".join(parts)
+
+
+def _fetch_response_text(chat: Any, prompt: str, is_write_mode: bool) -> str:
+    """メッセージを送信し、応答テキストを取得・出力します."""
+    if is_write_mode:
+        response = send_message_with_retry(chat, prompt)
+        response_text = response.text or ""
+        print(response_text)
+        return response_text
+
+    print("Gemini > ", end="", flush=True)
+    chunks = []
+    for chunk in send_message_stream_with_retry(chat, prompt):
+        if chunk.text:
+            print(chunk.text, end="", flush=True)
+            chunks.append(chunk.text)
+    print("\n")
+    return "".join(chunks)
+
+
 def run_single_turn_mode(chat: Any, cli_args: Any, chat_history: list[str]) -> None:
-    """コンテキスト指定時やワンショットプロンプト実行時の単発処理を行います.
-
-    Args:
-        chat (Any): Gemini Chat インスタンス.
-        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
-        chat_history (list[str]): 対話履歴を格納するリスト.
-    """
+    """コンテキスト指定時やワンショットプロンプト実行時の単発処理を行います."""
     if cli_args.context:
-        initial_prompt_parts = [
-            "以下のソースコード・テキストを読み込んで、今後の指示に対応してください。\n",
-            cli_args.context,
-        ]
-        if cli_args.prompt:
-            prompt_text = cli_args.prompt
-            if cli_args.write_mode:
-                prompt_text += "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください。"
-            initial_prompt_parts.append(f"\n--- [指示] ---\n{prompt_text}")
-        else:
-            initial_prompt_parts.append(
-                "\n準備ができたら「データを読み込みました。どのような対応を行いますか？」と簡潔に返答してください。"
-            )
-
-        # API 送信用: ソースコード本文を含むフルプロンプト
-        full_init_prompt = "\n".join(initial_prompt_parts)
-
-        # 表示用・履歴保存用のファイル名取得
-        file_label = getattr(cli_args, "file", None) or "コンテキストテキスト"
-
-        # autosave / 履歴保存用: コード本文を入れずファイル名とサイズのみ記録
-        prompt_instruction_summary = (
-            f"\n\n[指示]: {cli_args.prompt}" if cli_args.prompt else ""
-        )
-        history_entry = (
-            f"### User (Initial Context)\n\n"
-            f"[ファイル読み込み: {file_label} ({len(cli_args.context)} bytes)]"
-            f"{prompt_instruction_summary}"
-        )
-        chat_history.append(history_entry)
-
-        # コンソール（標準出力）への通知: ファイル名を明記
-        logger.info("ファイル '%s' を Gemini のコンテキストとして送信中...", file_label)
-
-        if cli_args.write_mode:
-            # Write Mode の場合はストリーミングせず一括取得
-            # 途中で切れるリスクを回避
-            response = send_message_with_retry(chat, full_init_prompt)
-            response_text = response.text or ""
-            print(response_text)
-        else:
-            # 通常モードはストリーミング表示
-            print("Gemini > ", end="", flush=True)
-            chunks = []
-            for chunk in send_message_stream_with_retry(chat, full_init_prompt):
-                if chunk.text:
-                    print(chunk.text, end="", flush=True)
-                    chunks.append(chunk.text)
-            print("\n")
-            response_text = "".join(chunks)
-
-        chat_history.append(f"### Gemini\n\n{response_text}")
-
-        if cli_args.write_mode and cli_args.prompt:
-            handle_write_mode_confirmation(cli_args.target_path, response_text)
-
+        _handle_context_mode(chat, cli_args, chat_history)
     elif cli_args.prompt:
-        prompt_text = cli_args.prompt
-        if cli_args.write_mode:
-            prompt_text += "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください。"
+        _handle_prompt_mode(chat, cli_args, chat_history)
 
-        print(f"You > {prompt_text}")
-        chat_history.append(f"### User\n\n{prompt_text}")
 
-        print("Gemini > ", end="", flush=True)
-        chunks = []
-        for chunk in send_message_stream_with_retry(chat, prompt_text):
-            if chunk.text:
-                print(chunk.text, end="", flush=True)
-                chunks.append(chunk.text)
-        print("\n")
+def _handle_context_mode(chat: Any, cli_args: Any, chat_history: list[str]) -> None:
+    """コンテキストが存在する場合の処理."""
+    full_init_prompt = _build_context_prompt(cli_args)
+    file_label = getattr(cli_args, "file", None) or "コンテキストテキスト"
 
-        response_text = "".join(chunks)
-        logger.debug("レスポンス受信完了 - 文字数: %d", len(response_text))
-        chat_history.append(f"### Gemini\n\n{response_text}")
+    prompt_summary = f"\n\n[指示]: {cli_args.prompt}" if cli_args.prompt else ""
+    history_entry = (
+        f"### User (Initial Context)\n\n"
+        f"[ファイル読み込み: {file_label} ({len(cli_args.context)} bytes)]"
+        f"{prompt_summary}"
+    )
+    chat_history.append(history_entry)
 
-        if cli_args.write_mode:
-            handle_write_mode_confirmation(cli_args.target_path, response_text)
+    logger.info("ファイル '%s' を Gemini のコンテキストとして送信中...", file_label)
+
+    response_text = _fetch_response_text(chat, full_init_prompt, cli_args.write_mode)
+    chat_history.append(f"### Gemini\n\n{response_text}")
+
+    if cli_args.write_mode and cli_args.prompt:
+        handle_write_mode_confirmation(cli_args.target_path, response_text)
+
+
+def _handle_prompt_mode(chat: Any, cli_args: Any, chat_history: list[str]) -> None:
+    """プロンプトのみの場合の処理."""
+    prompt_text = cli_args.prompt
+    if cli_args.write_mode:
+        prompt_text += "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください."
+
+    print(f"You > {prompt_text}")
+    chat_history.append(f"### User\n\n{prompt_text}")
+
+    response_text = _fetch_response_text(chat, prompt_text, is_write_mode=False)
+    logger.debug("レスポンス受信完了 - 文字数: %d", len(response_text))
+    chat_history.append(f"### Gemini\n\n{response_text}")
+
+    if cli_args.write_mode:
+        handle_write_mode_confirmation(cli_args.target_path, response_text)
 
 
 # 履歴ファイルの保存先指定（例: ホームディレクトリ配下）
@@ -598,7 +603,7 @@ MAX_HISTORY_LENGTH = 1000
 
 def setup_readline_history() -> None:
     """コマンド履歴の読み込みと自動保存を設定します."""
-    if readline is not None:
+    if HAVE_READLINE:
         # 履歴ファイルが存在すれば読み込み
         if HISTORY_FILE.exists() and hasattr(readline, "read_history_file"):
             try:
@@ -613,7 +618,7 @@ def setup_readline_history() -> None:
 
 def save_readline_history() -> None:
     """コマンド履歴をファイルに書き出します."""
-    if readline is not None and hasattr(readline, "write_history_file"):
+    if HAVE_READLINE and hasattr(readline, "write_history_file"):
         try:
             # ディレクトリがない場合は作成して保存
             HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -639,7 +644,7 @@ def run_interactive_loop(
     # readline 履歴の初期化
     setup_readline_history()
     # プログラム終了時（または Ctrl+C 時）に履歴を保存
-    if readline is not None:
+    if HAVE_READLINE:
         atexit.register(save_readline_history)
 
     print("=== Gemini Chat Mode (終了: 'exit' / 保存: '/save <path>') ===\n")
@@ -651,7 +656,7 @@ def run_interactive_loop(
             print()
             logger.info("会話を終了します.")
             sys.exit(0)
-            #break
+            # break
 
         if not user_input:
             continue
@@ -693,85 +698,96 @@ def run_interactive_loop(
             handle_write_mode_confirmation(cli_args.target_path, response_text)
 
 
-def main() -> None:
-    """Gemini CLI のメイン対話処理を実行します.
+def _setup_cli_logging(cli_args: Any) -> None:
+    """CLI 引数に基づいてロギングを設定します."""
+    if not cli_args.debug and (cli_args.list_models or cli_args.generate_commit_msg):
+        suppress_info_logs()
+        return
 
-    引数のパース、ロギング設定、Gemini クライアントの初期化を行い、
-    指定されたサブコマンドまたは対話セッションを実行します.
-    セッション終了時には必要に応じて対話ログをファイルに保存します.
-    """
+    log_level = "DEBUG" if cli_args.debug else cli_args.log_level
+    setup_logging(level_name=log_level)
+
+
+def _handle_subcommands(client: Any, cli_args: Any) -> None:
+    """特定サブコマンドフラグ指定時の独立処理を実行します."""
+    if cli_args.list_models:
+        try:
+            handle_list_models(client)
+            sys.exit(0)
+        except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+            sys.exit(1)
+
+    if cli_args.generate_commit_msg:
+        try:
+            handle_commit_msg_generation(client, cli_args.model)
+            sys.exit(0)
+        except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+            sys.exit(1)
+
+
+def _build_chat_config(is_write_mode: bool) -> types.GenerateContentConfig:
+    """Write Mode に応じた GenerateContentConfig を作成します."""
+    if is_write_mode:
+        return types.GenerateContentConfig(
+            system_instruction=WRITE_MODE_SYSTEM_INSTRUCTION,
+            temperature=0.1,
+        )
+
+    system_instruction = (
+        "あなたは優秀なプログラミングアシスタントです."
+        "提供されたソースコードを把握し、"
+        "ユーザーからの指示に従って修正案の提示やコード解説、レビューを行ってください."
+    )
+    return types.GenerateContentConfig(system_instruction=system_instruction)
+
+
+def _save_history_if_needed(
+    chat_history: list[str], output_file: str | None, auto_save: bool
+) -> None:
+    """必要に応じて対話履歴をファイルに保存します."""
+    if not chat_history:
+        return
+
+    target_path = output_file
+    if auto_save and not target_path:
+        timestamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
+        target_path = f"{timestamp}_chat.md"
+
+    if target_path:
+        save_chat_history(target_path, chat_history)
+
+
+def main() -> None:
+    """Gemini CLI のメイン対話処理を実行します."""
     chat_history: list[str] = []
-    output_file = None
+    output_file: str | None = None
+    auto_save = False
 
     try:
-        # 引数・オプションの解析とプロンプトの組み立て
         cli_args = parse_args()
+        # auto_save 属性が存在しないモック引数にも対応できるように getattr を使用
+        auto_save = getattr(cli_args, "auto_save", False)
+        output_file = getattr(cli_args, "output_path", None)
 
-        # ログレベル制御の判定
-        if not cli_args.debug and (
-            cli_args.list_models or cli_args.generate_commit_msg
-        ):
-            # -g オプション指定時は即座に INFO ログを無効化
-            suppress_info_logs()
-        else:
-            # -D / --debug が指定されていれば DEBUG、
-            # そうでなければ --log-level の値を採用
-            log_level = "DEBUG" if cli_args.debug else cli_args.log_level
-            setup_logging(level_name=log_level)
-
+        _setup_cli_logging(cli_args)
         logger.debug("デバッグモードが有効化されました.")
         logger.info("Gemini CLI ツールを起動します.")
 
-        # クライアント作成
         client = get_gemini_client()
+        _handle_subcommands(client, cli_args)
 
-        # サブコマンドの処理分岐
-        if cli_args.list_models:
-            try:
-                handle_list_models(client)
-                sys.exit(0)
-            except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
-                sys.exit(1)
-
-        if cli_args.generate_commit_msg:
-            try:
-                handle_commit_msg_generation(client, cli_args.model)
-                sys.exit(0)
-            except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
-                sys.exit(1)
-
-        output_file = cli_args.output_path
-
-        system_instruction = (
-            "あなたは優秀なプログラミングアシスタントです。"
-            "提供されたソースコードを把握し、"
-            "ユーザーからの指示に従って修正案の提示やコード解説、レビューを行ってください。"
-        )
-
-        if cli_args.write_mode:
-            config = types.GenerateContentConfig(
-                system_instruction=WRITE_MODE_SYSTEM_INSTRUCTION,
-                temperature=0.1,
-            )
-        else:
-            config = types.GenerateContentConfig(
-                system_instruction=system_instruction,
-            )
-
+        config = _build_chat_config(cli_args.write_mode)
         chat = client.chats.create(model=cli_args.model, config=config)
 
-        # 単発モード（コンテキストまたはプロンプト単体）かインタラクティブモードかの切り分け
         if cli_args.context or cli_args.prompt:
             run_single_turn_mode(chat, cli_args, chat_history)
         else:
             run_interactive_loop(chat, cli_args, output_file, chat_history)
 
-    # 例外処理・終了時の保存処理
     except (KeyboardInterrupt, EOFError):
-        logger.info("\n[Ctrl+C] 会話を終了します。")
+        logger.info("\n[Ctrl+C] 会話を終了します.")
         sys.exit(0)
     except (APIError, ServerError, ClientError) as e:
-        # トレースバックを出さず、標準エラー出力等に警告を出して終了
         logger.error("Gemini API エラーにより処理を中断しました: %s", e)
         sys.exit(1)
     except (FileNotFoundError, ValueError, PermissionError):
@@ -785,14 +801,7 @@ def main() -> None:
         )
         sys.exit(1)
     finally:
-        if chat_history:
-            # -s フラグ指定時はタイムスタンプからファイル名生成
-            if cli_args.auto_save and not output_file:
-                timestamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
-                output_file = f"{timestamp}_chat.md"
-
-            if output_file:
-                save_chat_history(output_file, chat_history)
+        _save_history_if_needed(chat_history, output_file, auto_save)
 
 
 if __name__ == "__main__":  # pragma: no cover

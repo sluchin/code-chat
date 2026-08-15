@@ -1,3 +1,6 @@
+# pylint: disable=too-many-lines, redefined-outer-name
+"""`code_chat_cli.chat` モジュールのCLI引数解析、対話セッション、エラーハンドリングのテスト."""
+
 import io
 import logging
 import subprocess
@@ -6,8 +9,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from google.genai.errors import APIError
-
 from code_chat_cli.chat import (
     _extract_retry_delay,
     _is_retryable_error,
@@ -20,6 +21,7 @@ from code_chat_cli.chat import (
     send_message_stream_with_retry,
     send_message_with_retry,
 )
+from google.genai.errors import APIError
 
 
 @pytest.fixture
@@ -31,7 +33,7 @@ def mock_gemini_client():
 
         # ストリーミングレスポンス（イテレータ）のモック
         mock_chunk = MagicMock()
-        mock_chunk.text = "モックされたAIからの回答です。"
+        mock_chunk.text = "モックされたAIからの回答です."
         mock_chat.send_message_stream.return_value = [mock_chunk]
 
         # 通常送信のレスポンスのモック
@@ -239,7 +241,7 @@ def test_handle_write_mode_confirmation_user_declines(monkeypatch, tmp_path):
 
 @patch("code_chat_cli.chat.send_message_stream_with_retry")
 def test_handle_commit_msg_generation_success(mock_send_retry, capsys):
-    """git diff が存在し、Gemini API からコミットメッセージが生成されて出力されるケース。"""
+    """git diff が存在し、Gemini API からコミットメッセージが生成されて出力されるケース."""
     mock_client = MagicMock()
     mock_chunk = SimpleNamespace(
         text="feat: add commit message generation\n\n- Add -g option"
@@ -262,7 +264,7 @@ def test_handle_commit_msg_generation_success(mock_send_retry, capsys):
 
 
 def test_handle_commit_msg_generation_no_diff(capsys):
-    """git diff が空の場合、API を呼び出さずにメッセージを表示して処理を抜けるケース。"""
+    """git diff が空の場合、API を呼び出さずにメッセージを表示して処理を抜けるケース."""
     mock_client = MagicMock()
 
     with patch("code_chat_cli.chat.get_git_diff") as mock_get_diff:
@@ -404,7 +406,7 @@ def test_is_retryable_error_per_day_quota_returns_false(error_message, caplog):
     assert result is False
 
     # ログメッセージが出力されていること
-    assert "1日あたりの API 利用上限 (RPD) に到達しました。" in caplog.text
+    assert "1日あたりの API 利用上限 (RPD) に到達しました." in caplog.text
 
 
 def test_is_retryable_error_value_error_fallback():
@@ -667,7 +669,7 @@ def test_main_api_error_handling(monkeypatch, mock_gemini_client):
 
 
 def test_main_generate_commit_msg(monkeypatch):
-    """-g オプション指定時に handle_commit_msg_generation が呼ばれて sys.exit(0) すること。"""
+    """-g オプション指定時に handle_commit_msg_generation が呼ばれて sys.exit(0) すること."""
     monkeypatch.setenv("GEMINI_API_KEY", "dummy_key")
 
     mock_args = SimpleNamespace(
@@ -758,15 +760,15 @@ def test_main_write_mode_system_instruction(monkeypatch, mock_gemini_client, moc
     # Write Mode の最重要ルールが含まれているかチェック
     assert "【厳格な遵守事項】" in system_instruction
     assert (
-        "1. Markdown のコードブロック記号（```python や ```）を含めないでください。"
+        "1. Markdown のコードブロック記号（```python や ```）を含めないでください."
         in system_instruction
     )
     assert (
-        "2. 挨拶、解説、説明文、前置き、後書きは一切含めないでください。"
+        "2. 挨拶、解説、説明文、前置き、後書きは一切含めないでください."
         in system_instruction
     )
     assert (
-        "3. 出力の1文字目から最後の文字まで、すべてPythonソースコードとして直接実行可能なテキストのみを出力してください。"
+        "3. 出力の1文字目から最後の文字まで、すべてPythonソースコードとして直接実行可能なテキストのみを出力してください."
         in system_instruction
     )
 
@@ -778,7 +780,7 @@ def test_main_with_context_no_prompt(monkeypatch, mock_gemini_client, mock_args)
     mock_args.return_value.write_mode = False
 
     # 初期応答をモック
-    mock_response = SimpleNamespace(text="データを読み込みました。")
+    mock_response = SimpleNamespace(text="データを読み込みました.")
     mock_gemini_client["chat"].send_message.return_value = mock_response
 
     # 対話ループを抜けるために input で 'exit' を返す
@@ -791,7 +793,7 @@ def test_main_with_context_no_prompt(monkeypatch, mock_gemini_client, mock_args)
     sent_prompt = mock_gemini_client["chat"].send_message_stream.call_args[0][0]
 
     assert "以下のソースコード・テキストを読み込んで" in sent_prompt
-    assert "データを読み込みました。どのような対応を行いますか？" in sent_prompt
+    assert "データを読み込みました. どのような対応を行いますか？" in sent_prompt
 
 
 def test_main_with_context_and_prompt_write_mode(
@@ -816,7 +818,9 @@ def test_main_with_context_and_prompt_write_mode(
     monkeypatch.setattr("builtins.input", lambda _: "exit")
 
     # handle_write_mode_confirmation の実行を確認するためのモック
-    with patch("code_chat_cli.chat.handle_write_mode_confirmation") as mock_handle_write:
+    with patch(
+        "code_chat_cli.chat.handle_write_mode_confirmation"
+    ) as mock_handle_write:
         main()
 
         # handle_write_mode_confirmation が指定引数で呼び出されたかを検証
@@ -960,6 +964,7 @@ def test_cli_generate_commit_msg_failure(mock_handle, _mock_read_stdin, monkeypa
 
 
 def test_main_keyboard_interrupt(monkeypatch):
+    """対話モード中に Ctrl+C (KeyboardInterrupt) が発生した際、終了コード 0 で正常終了するか検証する."""
     # parse_args と get_gemini_client をモック化
     with patch("code_chat_cli.chat.parse_args") as mock_parse_args:
         mock_args = MagicMock()
@@ -1027,7 +1032,7 @@ def test_main_finally_auto_save_enabled(monkeypatch, mock_gemini_client, mock_ar
     mock_args.return_value.output_path = None
 
     # レスポンスのモック
-    mock_chunk = SimpleNamespace(text=" Gemini です。")
+    mock_chunk = SimpleNamespace(text=" Gemini です.")
     mock_gemini_client["chat"].send_message_stream.return_value = [mock_chunk]
 
     # 対話ループをすぐに抜けるため exit を返却
@@ -1052,7 +1057,7 @@ def test_main_finally_output_file_specified(monkeypatch, mock_gemini_client, moc
     mock_args.return_value.auto_save = False
     mock_args.return_value.output_path = "output_result.md"
 
-    mock_chunk = SimpleNamespace(text=" 応答です。")
+    mock_chunk = SimpleNamespace(text=" 応答です.")
     mock_gemini_client["chat"].send_message_stream.return_value = [mock_chunk]
 
     inputs = iter(["exit"])

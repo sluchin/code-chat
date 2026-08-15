@@ -1,9 +1,11 @@
+"""`code_chat_cli.logger` モジュールにおけるログフォーマット、出力レベル設定、およびファイル出力のテスト."""
+
 import logging
 import os
 import socket
 from unittest.mock import patch
 
-from code_chat_cli.logger import syslog_context_filter, get_logger, setup_logging
+from code_chat_cli.logger import get_logger, setup_logging, syslog_context_filter
 
 
 def test_syslog_context_filter():
@@ -19,13 +21,19 @@ def test_syslog_context_filter():
         exc_info=None,
     )
 
+    # 動的属性をあらかじめ定義しておくことで Pylint の E1101 を回避
+    record.syslog_time = ""
+    record.hostname = ""
+    record.pid = 0
+    record.app_name = ""
+
     # フィルターを実行
     result = syslog_context_filter(record)
 
-    # 1. 戻り値が True であること（ログの出力が許可されること）
+    # 戻り値が True であること
     assert result is True
 
-    # 2. 追加された各属性値の検証
+    # 追加された各属性値の検証
     assert hasattr(record, "syslog_time")
     assert isinstance(record.syslog_time, str)
     # ISO 8601 形式のタイムスタンプが含まれているか（例: 2026-08-14T...）

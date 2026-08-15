@@ -1,7 +1,8 @@
+"""`code_chat_cli.client` における API クライアントの初期化、モデルの設定、および通信処理のテスト."""
+
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from code_chat_cli.client import ClientConfigError, get_gemini_client
 
 
