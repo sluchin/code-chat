@@ -7,7 +7,7 @@ def test_version() -> None:
 
 """Tests for code_chat_rag package."""
 
-from code_chat_rag import CodeIndexer, CodeRAGManager, VectorStoreManager, __version__
+from code_chat_rag import CodeIndexer, CodeRagService, VectorStoreManager, __version__
 
 
 def test_package_metadata() -> None:
@@ -35,8 +35,8 @@ def test_vector_store_manager_skeleton() -> None:
 
 
 def test_code_rag_manager_skeleton() -> None:
-    """Verify CodeRAGManager orchestrator integration."""
-    manager = CodeRAGManager(repo_path="/dummy/path")
+    """Verify CodeRagService orchestrator integration."""
+    manager = CodeRagService(repo_path="/dummy/path")
     assert manager.repo_path == "/dummy/path"
 
     # Test indexing build

@@ -6,7 +6,7 @@ from code_chat_rag.indexer import CodeIndexer
 from code_chat_rag.store import VectorStoreManager
 
 
-class CodeRAGManager:
+class CodeRagService:
     """Facade for repository indexing, search retrieval, and context formatting."""
 
     def __init__(self, repo_path: str) -> None:
