@@ -6,8 +6,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from code_chat.constants import EXCLUDE_DIRS, TEXT_EXTENSIONS
-from code_chat.logger import get_logger
+from code_chat_cli.constants import EXCLUDE_DIRS, TEXT_EXTENSIONS
+from code_chat_cli.logger import get_logger
 
 logger = get_logger(__name__)
 

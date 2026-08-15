@@ -22,5 +22,6 @@ help:
 # apidoc と html ビルドを一括実行するターゲット
 .PHONY: apidoc
 apidoc:
-	uv run sphinx-apidoc -f -o api ../src/gemini_app
+	uv run sphinx-apidoc -f -o api/code_chat_cli ../packages/code-chat-cli/src/code_chat_cli
+	uv run sphinx-apidoc -f -o api/code_chat_rag ../packages/code-chat-rag/src/code_chat_rag
 	@$(SPHINXBUILD) -M html "." "$(BUILDDIR)" $(SPHINXOPTS) $(O)

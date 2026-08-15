@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from google.genai.errors import APIError
 
-from code_chat.chat import (
+from code_chat_cli.chat import (
     _extract_retry_delay,
     _is_retryable_error,
     apply_file_modification,
@@ -25,7 +25,7 @@ from code_chat.chat import (
 @pytest.fixture
 def mock_gemini_client():
     """Gemini Client および Chat セッションのモックを作成."""
-    with patch("code_chat.chat.get_gemini_client") as mock_get_client:
+    with patch("code_chat_cli.chat.get_gemini_client") as mock_get_client:
         mock_client = MagicMock()
         mock_chat = MagicMock()
 
@@ -52,7 +52,7 @@ def mock_gemini_client():
 @pytest.fixture
 def mock_args():
     """parse_args の全属性を網羅した SimpleNamespace モック."""
-    with patch("code_chat.chat.parse_args") as mock_parse:
+    with patch("code_chat_cli.chat.parse_args") as mock_parse:
         args = SimpleNamespace(
             debug=False,
             log_level="INFO",
@@ -237,7 +237,7 @@ def test_handle_write_mode_confirmation_user_declines(monkeypatch, tmp_path):
     assert target_file.read_text(encoding="utf-8") == "print('old')"
 
 
-@patch("code_chat.chat.send_message_stream_with_retry")
+@patch("code_chat_cli.chat.send_message_stream_with_retry")
 def test_handle_commit_msg_generation_success(mock_send_retry, capsys):
     """git diff が存在し、Gemini API からコミットメッセージが生成されて出力されるケース。"""
     mock_client = MagicMock()
@@ -246,7 +246,7 @@ def test_handle_commit_msg_generation_success(mock_send_retry, capsys):
     )
     mock_send_retry.return_value = iter([mock_chunk])
 
-    with patch("code_chat.chat.get_git_diff") as mock_get_diff:
+    with patch("code_chat_cli.chat.get_git_diff") as mock_get_diff:
         mock_get_diff.return_value = "diff --git a/main.py b/main.py\n+new line"
 
         handle_commit_msg_generation(mock_client, "gemini-flash-latest")
@@ -265,7 +265,7 @@ def test_handle_commit_msg_generation_no_diff(capsys):
     """git diff が空の場合、API を呼び出さずにメッセージを表示して処理を抜けるケース。"""
     mock_client = MagicMock()
 
-    with patch("code_chat.chat.get_git_diff") as mock_get_diff:
+    with patch("code_chat_cli.chat.get_git_diff") as mock_get_diff:
         mock_get_diff.return_value = ""
 
         handle_commit_msg_generation(mock_client, "gemini-flash-latest")
@@ -276,7 +276,7 @@ def test_handle_commit_msg_generation_no_diff(capsys):
         assert "変更（git diff）が検出されませんでした" in captured.out
 
 
-@patch("code_chat.chat.get_git_diff")
+@patch("code_chat_cli.chat.get_git_diff")
 def test_handle_commit_msg_generation_called_process_error(mock_get_diff, caplog):
     """異常系: Git コマンド実行失敗（CalledProcessError）時に例外が再送出されログが出力されるか検証."""
     mock_client = MagicMock()
@@ -290,8 +290,8 @@ def test_handle_commit_msg_generation_called_process_error(mock_get_diff, caplog
     assert "Git コマンドの実行に失敗しました" in caplog.text
 
 
-@patch("code_chat.chat.send_message_stream_with_retry")
-@patch("code_chat.chat.get_git_diff")
+@patch("code_chat_cli.chat.send_message_stream_with_retry")
+@patch("code_chat_cli.chat.get_git_diff")
 def test_handle_commit_msg_generation_api_error(mock_get_diff, mock_send_retry, caplog):
     """異常系: Gemini API エラー（APIError）発生時に例外が再送出されログが出力されるか検証."""
     mock_client = MagicMock()
@@ -306,8 +306,8 @@ def test_handle_commit_msg_generation_api_error(mock_get_diff, mock_send_retry, 
     assert "Gemini API でエラーが発生しました" in caplog.text
 
 
-@patch("code_chat.chat.send_message_stream_with_retry")
-@patch("code_chat.chat.get_git_diff")
+@patch("code_chat_cli.chat.send_message_stream_with_retry")
+@patch("code_chat_cli.chat.get_git_diff")
 def test_handle_commit_msg_generation_unexpected_exception(
     mock_get_diff, mock_send_retry, caplog
 ):
@@ -366,7 +366,7 @@ def test_send_message_with_retry_success_on_first_try():
     mock_chat.send_message.assert_called_once_with("hi")
 
 
-@patch("code_chat.chat.time.sleep")
+@patch("code_chat_cli.chat.time.sleep")
 def test_send_message_with_retry_retry_and_succeed(mock_sleep):
     """異常系からの回復: 503 エラーが発生した後に2回目で成功するケースを検証."""
     mock_chat = MagicMock()
@@ -427,7 +427,7 @@ def test_is_retryable_error_type_error_fallback():
     assert _is_retryable_error(error) is False
 
 
-@patch("code_chat.chat.time.sleep")
+@patch("code_chat_cli.chat.time.sleep")
 def test_send_message_with_retry_uses_api_retry_delay(mock_sleep):
     """異常系 (retryDelay 優先): エラーレスポンスに含まれる retryDelay 秒数が sleep に適用されるか検証."""
     mock_chat = MagicMock()
@@ -446,7 +446,7 @@ def test_send_message_with_retry_uses_api_retry_delay(mock_sleep):
     mock_sleep.assert_called_once_with(31.0)
 
 
-@patch("code_chat.chat.time.sleep")
+@patch("code_chat_cli.chat.time.sleep")
 def test_send_message_with_retry_exceeds_max_retries(mock_sleep):
     """異常系 (上限超過): リトライ回数上限を超えて失敗した場合に例外が投げられるか検証."""
     mock_chat = MagicMock()
@@ -594,7 +594,7 @@ def test_send_message_stream_with_retry_error_after_yielding_chunks():
     assert mock_chat.send_message_stream.call_count == 1
 
 
-@patch("code_chat.chat.time.sleep")
+@patch("code_chat_cli.chat.time.sleep")
 def test_send_message_stream_with_retry_uses_api_retry_delay(mock_sleep):
     """ストリーミング異常系 (retryDelay 優先): エラーレスポンスの retryDelay 秒数が sleep に適用されるか検証."""
     mock_chat = MagicMock()
@@ -640,7 +640,7 @@ def test_main_non_interactive_pipe_mode(monkeypatch, mock_gemini_client, mock_ar
     monkeypatch.setattr("sys.stdin", io.StringIO(""))
     monkeypatch.setattr("sys.argv", ["chat.py", "-p", "パイプからの入力メッセージ"])
 
-    with patch("code_chat.chat.time.sleep"):
+    with patch("code_chat_cli.chat.time.sleep"):
         main()
 
     # send_message_stream が正しく呼ばれたか検証
@@ -660,7 +660,7 @@ def test_main_api_error_handling(monkeypatch, mock_gemini_client):
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     monkeypatch.setattr("sys.argv", ["chat.py"])
 
-    with patch("code_chat.chat.time.sleep"), pytest.raises(SystemExit) as exc_info:
+    with patch("code_chat_cli.chat.time.sleep"), pytest.raises(SystemExit) as exc_info:
         main()
 
     assert exc_info.value.code == 1
@@ -678,10 +678,10 @@ def test_main_generate_commit_msg(monkeypatch):
     )
 
     with (
-        patch("code_chat.chat.parse_args", return_value=mock_args),
-        patch("code_chat.chat.suppress_info_logs", MagicMock()),
-        patch("code_chat.chat.setup_logging", MagicMock()),
-        patch("code_chat.chat.handle_commit_msg_generation") as mock_handle_gen,
+        patch("code_chat_cli.chat.parse_args", return_value=mock_args),
+        patch("code_chat_cli.chat.suppress_info_logs", MagicMock()),
+        patch("code_chat_cli.chat.setup_logging", MagicMock()),
+        patch("code_chat_cli.chat.handle_commit_msg_generation") as mock_handle_gen,
         patch("google.genai.Client", MagicMock()),
     ):
         with pytest.raises(SystemExit) as exc_info:
@@ -816,7 +816,7 @@ def test_main_with_context_and_prompt_write_mode(
     monkeypatch.setattr("builtins.input", lambda _: "exit")
 
     # handle_write_mode_confirmation の実行を確認するためのモック
-    with patch("code_chat.chat.handle_write_mode_confirmation") as mock_handle_write:
+    with patch("code_chat_cli.chat.handle_write_mode_confirmation") as mock_handle_write:
         main()
 
         # handle_write_mode_confirmation が指定引数で呼び出されたかを検証
@@ -858,7 +858,7 @@ def test_main_save_command_with_path(monkeypatch, mock_args):
     inputs = iter(["/save custom_log.md", "exit"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
-    with patch("code_chat.chat.save_chat_history") as mock_save:
+    with patch("code_chat_cli.chat.save_chat_history") as mock_save:
         main()
 
         # save_chat_history が "custom_log.md" 引数で呼び出されたことを検証
@@ -876,7 +876,7 @@ def test_main_save_command_with_default_output_path(monkeypatch, mock_args):
     inputs = iter(["/save", "exit"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
-    with patch("code_chat.chat.save_chat_history") as mock_save:
+    with patch("code_chat_cli.chat.save_chat_history") as mock_save:
         main()
 
         # output_file ("default_output.md") を使って保存されたことを検証
@@ -894,7 +894,7 @@ def test_main_save_command_no_path_specified(monkeypatch, mock_args):
     inputs = iter(["/save", "exit"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
-    with patch("code_chat.chat.save_chat_history") as mock_save:
+    with patch("code_chat_cli.chat.save_chat_history") as mock_save:
         main()
 
         # save_path が None のため save_chat_history は呼ばれないことを検証
@@ -920,7 +920,7 @@ def test_main_chat_loop_write_mode_append_instruction(
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     # handle_write_mode_confirmation の呼び出しを抑制
-    with patch("code_chat.chat.handle_write_mode_confirmation"):
+    with patch("code_chat_cli.chat.handle_write_mode_confirmation"):
         main()
 
     # chat.send_message_stream に渡された第1引数（index 0）を検証
@@ -935,8 +935,8 @@ def test_main_chat_loop_write_mode_append_instruction(
     )
 
 
-@patch("code_chat.args.read_stdin_content", return_value="")
-@patch("code_chat.chat.handle_commit_msg_generation")
+@patch("code_chat_cli.args.read_stdin_content", return_value="")
+@patch("code_chat_cli.chat.handle_commit_msg_generation")
 def test_cli_generate_commit_msg_failure(mock_handle, _mock_read_stdin, monkeypatch):
     """CLI 実行時にコミットメッセージ生成で例外が発生し、sys.exit(1) で終了することを検証."""
     # handle_commit_msg_generation で例外を送出させる
@@ -961,7 +961,7 @@ def test_cli_generate_commit_msg_failure(mock_handle, _mock_read_stdin, monkeypa
 
 def test_main_keyboard_interrupt(monkeypatch):
     # parse_args と get_gemini_client をモック化
-    with patch("code_chat.chat.parse_args") as mock_parse_args:
+    with patch("code_chat_cli.chat.parse_args") as mock_parse_args:
         mock_args = MagicMock()
         mock_args.list_models = False
         mock_args.generate_commit_msg = False
@@ -1034,7 +1034,7 @@ def test_main_finally_auto_save_enabled(monkeypatch, mock_gemini_client, mock_ar
     inputs = iter(["exit"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
-    with patch("code_chat.chat.save_chat_history") as mock_save:
+    with patch("code_chat_cli.chat.save_chat_history") as mock_save:
         main()
 
         # save_chat_history が呼び出されたか検証
@@ -1058,7 +1058,7 @@ def test_main_finally_output_file_specified(monkeypatch, mock_gemini_client, moc
     inputs = iter(["exit"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
-    with patch("code_chat.chat.save_chat_history") as mock_save:
+    with patch("code_chat_cli.chat.save_chat_history") as mock_save:
         main()
 
         # save_chat_history が指定した "output_result.md" で呼び出されたか検証
