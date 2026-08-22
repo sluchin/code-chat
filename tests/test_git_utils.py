@@ -1,4 +1,4 @@
-"""`code_chat_cli.git_utils` モジュールにおける Git コマンド実行、差分取得、およびリポジトリ情報の検証テスト."""
+"""`code_chat_cli.git_utils` モジュールにおける Git コマンド実行, 差分取得, およびリポジトリ情報の検証テスト."""
 
 import subprocess
 from subprocess import CalledProcessError
@@ -9,7 +9,7 @@ from code_chat_cli.git_utils import get_git_diff
 
 
 def test_get_git_diff_staged_exists():
-    """ステージング済みの差分がある場合、--cached の結果を返すこと."""
+    """ステージング済みの差分がある場合, --cached の結果を返すこと."""
     with patch("subprocess.check_output") as mock_check_output:
         # 1回目の呼び出し (--cached) で差分を返す
         mock_check_output.return_value = "diff --git a/file.py b/file.py\n+staged code"
@@ -23,9 +23,9 @@ def test_get_git_diff_staged_exists():
 
 
 def test_get_git_diff_unstaged_fallback():
-    """ステージング済みの差分がなく、作業ツリーに差分がある場合、git diff の結果を返すこと."""
+    """ステージング済みの差分がなく, 作業ツリーに差分がある場合, git diff の結果を返すこと."""
     with patch("subprocess.check_output") as mock_check_output:
-        # 1回目の呼び出し (--cached) は空文字列、2回目の呼び出し (通常の git diff) で差分を返す
+        # 1回目の呼び出し (--cached) は空文字列, 2回目の呼び出し (通常の git diff) で差分を返す
         mock_check_output.side_effect = [
             "",
             "diff --git a/file.py b/file.py\n+unstaged code",
@@ -42,7 +42,7 @@ def test_get_git_diff_unstaged_fallback():
 
 
 def test_get_git_diff_no_diff():
-    """ステージング済み・作業ツリーともに差分がない場合、空文字列を返すこと."""
+    """ステージング済み・作業ツリーともに差分がない場合, 空文字列を返すこと."""
     with patch("subprocess.check_output") as mock_check_output:
         mock_check_output.side_effect = ["", ""]
 
@@ -52,7 +52,7 @@ def test_get_git_diff_no_diff():
 
 
 def test_get_git_diff_called_process_error():
-    """git diff コマンドが失敗した場合、CalledProcessError が再送出されること."""
+    """git diff コマンドが失敗した場合, CalledProcessError が再送出されること."""
     with patch("subprocess.check_output") as mock_check_output:
         mock_check_output.side_effect = subprocess.CalledProcessError(
             returncode=128, cmd=["git", "diff", "--cached"]

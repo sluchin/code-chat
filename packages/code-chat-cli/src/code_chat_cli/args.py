@@ -87,7 +87,7 @@ class CliArgs:
 def read_path_content(target_path: str) -> str:
     """指定されたパス（単一ファイルまたはディレクトリ）からコンテンツを読み込む.
 
-    ディレクトリが指定された場合は再帰的に探索し、対象の拡張子を持つファイルの内容を
+    ディレクトリが指定された場合は再帰的に探索し, 対象の拡張子を持つファイルの内容を
     除外ディレクトリを回避しながら結合して返します.
 
     Args:
@@ -97,7 +97,7 @@ def read_path_content(target_path: str) -> str:
         読み込まれたファイル内容のテキスト. 該当ファイルが存在しない場合は空文字列.
 
     Raises:
-        SystemExit: 指定されたパスが存在しない場合、またはファイルの読み込みに失敗した場合に
+        SystemExit: 指定されたパスが存在しない場合, またはファイルの読み込みに失敗した場合に
             ステータスコード 1 で終了します.
     """
     path = Path(target_path)
@@ -159,9 +159,9 @@ def read_stdin_content() -> str:
 
 # pylint: disable=too-many-locals,too-many-statements
 def parse_args(args: list[str] | None = None) -> CliArgs:
-    """コマンドライン引数を解析し、コンテキストを取得して返す.
+    """コマンドライン引数を解析し, コンテキストを取得して返す.
 
-    標準入力および `-f`/`--file` オプション経由で指定されたコンテキスト情報を収集し、
+    標準入力および `-f`/`--file` オプション経由で指定されたコンテキスト情報を収集し,
     解析済みデータクラス `CliArgs` にまとめて返却します.
 
     Args:

@@ -39,7 +39,7 @@ def setup_logging(level_name: str = "INFO") -> None:
 
     formatter = logging.Formatter(fmt=LOG_FORMAT)
 
-    # ハンドラを作成し、フィルターを追加する（Logger ではなく Handler に追加）
+    # ハンドラを作成し, フィルターを追加する（Logger ではなく Handler に追加）
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(formatter)
     handler.addFilter(syslog_context_filter)
@@ -63,9 +63,9 @@ def setup_logging(level_name: str = "INFO") -> None:
         logging.getLogger("httpx").setLevel(logging.DEBUG)
         logging.getLogger("google").setLevel(logging.DEBUG)
     else:
-        # 通信ログ（httpx）の無駄な出力のみを抑え、アプリ本体のログレベルは全伝播させる
+        # 通信ログ（httpx）の無駄な出力のみを抑え, アプリ本体のログレベルは全伝播させる
         logging.getLogger("httpx").setLevel(logging.WARNING)
-        # google_genai の警告ログまで消してしまうのを防ぐため、WARNING で止めずにルートに委ねるか INFO にする
+        # google_genai の警告ログまで消してしまうのを防ぐため, WARNING で止めずにルートに委ねるか INFO にする
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -81,7 +81,7 @@ def get_logger(name: str) -> logging.Logger:
 
 
 def suppress_info_logs() -> None:
-    """コミットメッセージ生成時など、標準出力のノイズを減らすため INFO ログを抑制する."""
+    """コミットメッセージ生成時など, 標準出力のノイズを減らすため INFO ログを抑制する."""
     logging.getLogger().setLevel(logging.WARNING)
     logging.getLogger("code_chat_cli").setLevel(logging.WARNING)
     logging.getLogger("google_genai").setLevel(logging.WARNING)

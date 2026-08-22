@@ -1,6 +1,6 @@
 """Gemini API を使用してローカルコードの参照・対話を行うCLIチャットツール.
 
-このモジュールは、指定されたファイルやパイプ入力をコンテキストとして読み込み、
+このモジュールは, 指定されたファイルやパイプ入力をコンテキストとして読み込み,
 Gemini API と対話を行うためのコマンドラインインターフェースを提供します.
 ファイルの上書き保存機能や会話ログの自動保存機能を含みます.
 """
@@ -43,14 +43,14 @@ except ImportError:
 logger = get_logger(__name__)
 
 COMMIT_PROMPT_TEMPLATE_JA = """\
-以下の git diff の内容を分析し、適切な Git コミットメッセージを作成してください.
+以下の git diff の内容を分析し, 適切な Git コミットメッセージを作成してください.
 
 【制約事項】
 - 1行目は変更内容を簡潔に要約したタイトル（50文字程度）にしてください.
-- 必要に応じて空行を挟み、箇条書きで変更理由や詳細を記述してください.
+- 必要に応じて空行を挟み, 箇条書きで変更理由や詳細を記述してください.
 - プレフィックス（feat:, fix:, docs:, refactor:, test: など）を使用してください.
 - 記述は日本語で行ってください.
-- 余計な解説やコードブロックの枠（``` など）は含めず、コミットメッセージ本文のみを出力してください.
+- 余計な解説やコードブロックの枠（``` など）は含めず, コミットメッセージ本文のみを出力してください.
 
 【git diff】
 {diff}
@@ -75,8 +75,8 @@ WRITE_MODE_SYSTEM_INSTRUCTION = """
 
 【厳格な遵守事項】
 1. Markdown のコードブロック記号（```python や ```）を含めないでください.
-2. 挨拶、解説、説明文、前置き、後書きは一切含めないでください.
-3. 出力の1文字目から最後の文字まで、すべてPythonソースコードとして直接実行可能なテキストのみを出力してください.
+2. 挨拶, 解説, 説明文, 前置き, 後書きは一切含めないでください.
+3. 出力の1文字目から最後の文字まで, すべてPythonソースコードとして直接実行可能なテキストのみを出力してください.
 """
 
 
@@ -87,7 +87,7 @@ def is_partial_code(code: str) -> bool:
         code (str): 検証対象のソースコード文字列.
 
     Returns:
-        bool: 省略表現が含まれている場合は True、それ以外は False.
+        bool: 省略表現が含まれている場合は True, それ以外は False.
     """
     patterns = [
         # 行全体またはインデント後の行頭が省略コメントになっているパターン
@@ -113,7 +113,7 @@ def apply_file_modification(target_path: str, new_code: str) -> None:
     """指定された単一ファイルへ修正後コードを書き込みます.
 
     元のファイルと同じディレクトリに `.bak` 拡張子を付けたバックアップファイルを
-    生成した上で、指定パスのファイルを新しい内容で上書きします.
+    生成した上で, 指定パスのファイルを新しい内容で上書きします.
 
     Args:
         target_path (str): 上書き対象のファイルパス.
@@ -121,7 +121,7 @@ def apply_file_modification(target_path: str, new_code: str) -> None:
     """
     path = Path(target_path)
     if not path.is_file():
-        logger.error("'%s' は存在しないか、単一ファイルではありません.", target_path)
+        logger.error("'%s' は存在しないか, 単一ファイルではありません.", target_path)
         return
 
     try:
@@ -142,7 +142,7 @@ def apply_file_modification(target_path: str, new_code: str) -> None:
 def save_chat_history(file_path: str, history: list[str]) -> None:
     """対話ログを指定されたファイルパスへ保存します.
 
-    指定されたパスの親ディレクトリが存在しない場合は自動的に生成し、
+    指定されたパスの親ディレクトリが存在しない場合は自動的に生成し,
     会話履歴を Markdown 形式で書き込みます.
 
     Args:
@@ -160,10 +160,10 @@ def save_chat_history(file_path: str, history: list[str]) -> None:
 
 
 def sanitize_code_output(text: str) -> str:
-    """LLM の応答テキストからコードブロック記号を除去し、整形済みコードを返します.
+    """LLM の応答テキストからコードブロック記号を除去し, 整形済みコードを返します.
 
     テキストの先頭および末尾に存在する Markdown のコードブロック囲み記号
-    （```python や ``` など）を取り除き、POSIX 標準に適合するよう末尾に
+    （```python や ``` など）を取り除き, POSIX 標準に適合するよう末尾に
     1 つの改行コード（\n）を保証した文字列を生成します.
 
     Args:
@@ -189,7 +189,7 @@ def handle_write_mode_confirmation(
 ) -> None:
     """Write Mode 時に抽出したコードでファイルを更新します.
 
-    抽出したコードの妥当性を検証し、ユーザーに確認を求めた上でファイルの上書きを行います.
+    抽出したコードの妥当性を検証し, ユーザーに確認を求めた上でファイルの上書きを行います.
 
     Args:
         target_path_str (str | None): 書き換え対象のファイルパス.
@@ -212,7 +212,7 @@ def handle_write_mode_confirmation(
 
     if not target_path.is_file():
         logger.error(
-            "'%s' は存在しないか、通常のファイルではありません.", target_path_str
+            "'%s' は存在しないか, 通常のファイルではありません.", target_path_str
         )
         return
 
@@ -272,10 +272,10 @@ def handle_list_models(client: Any) -> None:
 def handle_commit_msg_generation(
     client: Any, model_name: str, lang: str = "en"
 ) -> None:
-    """Git の diff（差分）を取得し、Gemini API を用いてコミットメッセージを自動生成します.
+    """Git の diff（差分）を取得し, Gemini API を用いてコミットメッセージを自動生成します.
 
     `git diff --staged`（ステージング済み差分）および `git diff`（未ステージング差分）を
-    読み取り、変更内容が存在する場合に指定された言語で Conventional Commits 形式に沿った
+    読み取り, 変更内容が存在する場合に指定された言語で Conventional Commits 形式に沿った
     適切なコミットメッセージを生成して標準出力に表示します.
 
     Args:
@@ -362,7 +362,7 @@ def _is_retryable_error(e: Exception) -> bool:
         e (Exception): 検証対象の Gemini API 例外オブジェクト.
 
     Returns:
-        bool: リトライ対象のエラーである場合は True、400 Bad Request 等のリトライ不可エラーの場合は False.
+        bool: リトライ対象のエラーである場合は True, 400 Bad Request 等のリトライ不可エラーの場合は False.
     """
     err_str = str(e)
 
@@ -391,7 +391,7 @@ def send_message_with_retry(
     initial_delay: float = 1.0,
     backoff_factor: float = 2.0,
 ) -> Any:
-    """Gemini API へのリクエストを送信し、通信エラー発生時にリトライを行います.
+    """Gemini API へのリクエストを送信し, 通信エラー発生時にリトライを行います.
 
     Args:
         chat (Any): Gemini Chat インスタンス.
@@ -447,10 +447,10 @@ def send_message_stream_with_retry(
     initial_delay: float = 1.0,
     backoff_factor: float = 2.0,
 ) -> Iterator[Any]:
-    """Gemini API へのストリーミングリクエストを送信し、通信エラー発生時にリトライを行います.
+    """Gemini API へのストリーミングリクエストを送信し, 通信エラー発生時にリトライを行います.
 
     イテレーション中の API エラー（503/429等）もキャッチして再試行します.
-    途中でエラーが発生した場合は画面に通知し、リトライ時は最初からメッセージを送り直します.
+    途中でエラーが発生した場合は画面に通知し, リトライ時は最初からメッセージを送り直します.
 
     Args:
         chat (Any): Gemini Chat インスタンス.
@@ -478,7 +478,7 @@ def send_message_stream_with_retry(
             return  # 正常終了
 
         except Exception as e:  # pylint: disable=broad-exception-caught
-            # 既にユーザーに画面出力が開始されている途中で切れた場合は、
+            # 既にユーザーに画面出力が開始されている途中で切れた場合は,
             # 出力の重複を防ぐためリトライせずにエラーを送出する
             if (
                 has_yielded_content
@@ -494,7 +494,7 @@ def send_message_stream_with_retry(
                 )
                 raise
 
-            # API側から retryDelay の指定があれば優先、なければ指数バックオフ
+            # API側から retryDelay の指定があれば優先, なければ指数バックオフ
             api_retry_delay = _extract_retry_delay(e)
             if api_retry_delay is not None:
                 sleep_time = api_retry_delay + 1.0
@@ -519,7 +519,7 @@ def _build_context_prompt(cli_args: Any) -> str:
         prompt_text += "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください."
 
     parts = [
-        "以下のソースコード・テキストを読み込んで、今後の指示に対応してください.\n",
+        "以下のソースコード・テキストを読み込んで, 今後の指示に対応してください.\n",
         cli_args.context,
     ]
     if prompt_text:
@@ -532,7 +532,7 @@ def _build_context_prompt(cli_args: Any) -> str:
 
 
 def _fetch_response_text(chat: Any, prompt: str, is_write_mode: bool) -> str:
-    """メッセージを送信し、応答テキストを取得・出力します."""
+    """メッセージを送信し, 応答テキストを取得・出力します."""
     if is_write_mode:
         response = send_message_with_retry(chat, prompt)
         response_text = response.text or ""
@@ -632,7 +632,7 @@ def run_interactive_loop(
 ) -> None:
     """対話型チャットループを実行します.
 
-    ユーザーからの標準入力を受け取り、Gemini と連続して対話を行います.
+    ユーザーからの標準入力を受け取り, Gemini と連続して対話を行います.
     終了コマンドや保存コマンドのハンドリングも含みます.
 
     Args:
@@ -735,8 +735,8 @@ def _build_chat_config(is_write_mode: bool) -> types.GenerateContentConfig:
 
     system_instruction = (
         "あなたは優秀なプログラミングアシスタントです."
-        "提供されたソースコードを把握し、"
-        "ユーザーからの指示に従って修正案の提示やコード解説、レビューを行ってください."
+        "提供されたソースコードを把握し, "
+        "ユーザーからの指示に従って修正案の提示やコード解説, レビューを行ってください."
     )
     return types.GenerateContentConfig(system_instruction=system_instruction)
 

@@ -17,7 +17,7 @@ class ClientConfigError(Exception):
 def get_gemini_client() -> genai.Client:
     """環境変数 GEMINI_API_KEY から API キーを取得して Gemini クライアントを作成する.
 
-    環境変数が未設定の場合は、標準エラー出力にエラーメッセージを出力して処理を終了します.
+    環境変数が未設定の場合は, 標準エラー出力にエラーメッセージを出力して処理を終了します.
 
     Returns:
         genai.Client: 初期化された Gemini API クライアントインスタンス.

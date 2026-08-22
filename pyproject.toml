@@ -19,7 +19,10 @@ pythonpath = [
 ]
 filterwarnings = [
     # 該当する DeprecationWarning をメッセージの部分一致で無視
-    "ignore:.*UnionGenericAlias.*:DeprecationWarning",
+    #"ignore:.*UnionGenericAlias.*:DeprecationWarning",
+    #"ignore::DeprecationWarning:langchain_community.*",
+    #"ignore::DeprecationWarning:chromadb.*",
+    "ignore::DeprecationWarning",
 ]
 
 [tool.pylint.master]
