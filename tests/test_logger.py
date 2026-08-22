@@ -1,4 +1,4 @@
-"""`code_chat_cli.logger` モジュールにおけるログフォーマット、出力レベル設定、およびファイル出力のテスト."""
+"""`code_chat_cli.logger` モジュールにおけるログフォーマット, 出力レベル設定, およびファイル出力のテスト."""
 
 import logging
 import os
@@ -42,7 +42,7 @@ def test_syslog_context_filter():
     assert record.hostname == socket.gethostname()
     assert record.pid == os.getpid()
 
-    # app_name 属性が存在し、文字列であることを確認
+    # app_name 属性が存在し, 文字列であることを確認
     assert hasattr(record, "app_name")
     assert isinstance(record.app_name, str)
 

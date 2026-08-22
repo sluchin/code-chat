@@ -16,7 +16,7 @@ def mock_stdin(monkeypatch):
 
 
 def test_read_path_content_single_file(tmp_path):
-    """単一ファイルが正常に読み込まれ、ヘッダーが付与された文字列が返るか検証."""
+    """単一ファイルが正常に読み込まれ, ヘッダーが付与された文字列が返るか検証."""
     file_path = tmp_path / "sample.py"
     file_path.write_text("print('hello')", encoding="utf-8")
 
@@ -26,7 +26,7 @@ def test_read_path_content_single_file(tmp_path):
 
 
 def test_read_path_content_not_exists():
-    """存在しないパスを指定した場合、sys.exit(1) で終了するか検証."""
+    """存在しないパスを指定した場合, sys.exit(1) で終了するか検証."""
     with pytest.raises(SystemExit) as exc_info:
         read_path_content("non_existent_file.txt")
 
@@ -34,7 +34,7 @@ def test_read_path_content_not_exists():
 
 
 def test_read_path_content_file_read_error(tmp_path):
-    """単一ファイルの読み込み時に例外が発生した場合、sys.exit(1) で終了するか検証."""
+    """単一ファイルの読み込み時に例外が発生した場合, sys.exit(1) で終了するか検証."""
     file_path = tmp_path / "error_file.txt"
     file_path.write_text("content", encoding="utf-8")
 
@@ -48,7 +48,7 @@ def test_read_path_content_file_read_error(tmp_path):
 
 
 def test_read_path_content_directory_file_read_error(tmp_path):
-    """ディレクトリ内の特定ファイル読み込み時に例外が発生した場合、ログを出力してそのファイルをスキップするか検証."""
+    """ディレクトリ内の特定ファイル読み込み時に例外が発生した場合, ログを出力してそのファイルをスキップするか検証."""
     valid_file = tmp_path / "valid.py"
     valid_file.write_text("print('ok')", encoding="utf-8")
 
@@ -70,7 +70,7 @@ def test_read_path_content_directory_file_read_error(tmp_path):
 
 
 def test_read_path_content_directory(tmp_path):
-    """ディレクトリ指定時、対象拡張子のみ読み込まれ除外対象ディレクトリがスキップされるか検証."""
+    """ディレクトリ指定時, 対象拡張子のみ読み込まれ除外対象ディレクトリがスキップされるか検証."""
     valid_file1 = tmp_path / "valid.py"
     valid_file1.write_text("code", encoding="utf-8")
 
@@ -97,7 +97,7 @@ def test_read_path_content_directory(tmp_path):
 
 
 def test_read_path_content_empty_directory(tmp_path):
-    """対象ファイルが存在しないディレクトリを指定した場合、空文字列が返るか検証."""
+    """対象ファイルが存在しないディレクトリを指定した場合, 空文字列が返るか検証."""
     empty_dir = tmp_path / "empty_dir"
     empty_dir.mkdir()
 
@@ -107,7 +107,7 @@ def test_read_path_content_empty_directory(tmp_path):
 
 
 def test_read_path_content_other_path_type():
-    """ファイルでもディレクトリでもない特殊なパス（ソケット等）の場合、空文字列が返るか検証."""
+    """ファイルでもディレクトリでもない特殊なパス（ソケット等）の場合, 空文字列が返るか検証."""
     mock_path = mock.MagicMock()
     mock_path.exists.return_value = True
     mock_path.is_file.return_value = False
@@ -120,7 +120,7 @@ def test_read_path_content_other_path_type():
 
 
 def test_read_stdin_content_pipe(monkeypatch):
-    """パイプ入力等の場合（isatty가 False）、入力テキストが返るか検証."""
+    """パイプ入力等の場合（isatty가 False）, 入力テキストが返るか検証."""
     monkeypatch.setattr("sys.stdin", io.StringIO("パイプからの入力内容"))
     monkeypatch.setattr("sys.stdin.isatty", lambda: False)
 
@@ -130,7 +130,7 @@ def test_read_stdin_content_pipe(monkeypatch):
 
 
 def test_read_stdin_content_tty(monkeypatch):
-    """端末（tty）入力の場合（isatty True）、空文字列が返るか検証."""
+    """端末（tty）入力の場合（isatty True）, 空文字列が返るか検証."""
     monkeypatch.setattr("sys.stdin", io.StringIO("入力文字列"))
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
 
@@ -140,7 +140,7 @@ def test_read_stdin_content_tty(monkeypatch):
 
 
 def test_parse_args_default(monkeypatch):
-    """引数を何も指定しない場合、デフォルト値（INFO）が設定されるか検証."""
+    """引数を何も指定しない場合, デフォルト値（INFO）が設定されるか検証."""
     monkeypatch.setattr("sys.argv", ["chat.py"])
     args = parse_args()
 
@@ -195,7 +195,7 @@ def test_parse_args_invalid_log_level(monkeypatch):
 
 
 def test_parse_args_with_stdin_context(monkeypatch):
-    """標準入力（パイプ等）から入力がある場合、context に [標準入力] ヘッダー付きで格納されるか検証."""
+    """標準入力（パイプ等）から入力がある場合, context に [標準入力] ヘッダー付きで格納されるか検証."""
     monkeypatch.setattr("sys.argv", ["chat.py"])
 
     monkeypatch.setattr("sys.stdin", io.StringIO("パイプからのテストデータ"))
@@ -208,7 +208,7 @@ def test_parse_args_with_stdin_context(monkeypatch):
 
 
 def test_parse_args_with_file_context(monkeypatch, tmp_path):
-    """-f / --file オプション指定時、context にファイル内容が格納されるか検証."""
+    """-f / --file オプション指定時, context にファイル内容が格納されるか検証."""
     test_file = tmp_path / "test.txt"
     test_file.write_text("ファイルの中身", encoding="utf-8")
 
@@ -231,7 +231,7 @@ def test_parse_args_rag_index_subcommand(monkeypatch):
 
 
 def test_parse_args_rag_ask_subcommand(monkeypatch):
-    """ask サブコマンドの指定、query、--repo-path、--top-k の解析を検証."""
+    """ask サブコマンドの指定, query, --repo-path, --top-k の解析を検証."""
     monkeypatch.setattr(
         "sys.argv",
         ["cchat", "ask", "how to build?", "-r", "/tmp/repo", "-k", "10"],

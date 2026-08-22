@@ -1,5 +1,5 @@
-# pylint: disable=too-many-lines, redefined-outer-name
-"""`code_chat_cli.chat` モジュールのCLI引数解析、対話セッション、エラーハンドリングのテスト."""
+# pylint: disable=too-many-lines, disable=redefined-outer-name
+"""`code_chat_cli.chat` モジュールのCLI引数解析, 対話セッション, エラーハンドリングのテスト."""
 
 import io
 import logging
@@ -88,7 +88,7 @@ def mock_args():
     ],
 )
 def test_is_partial_code_returns_true(code_input):
-    """省略表現やプレースホルダーコメントが含まれている場合、True が返るか検証."""
+    """省略表現やプレースホルダーコメントが含まれている場合, True が返るか検証."""
     sample_code = f"""
 def main():
     {code_input}
@@ -98,7 +98,7 @@ def main():
 
 
 def test_is_partial_code_returns_false():
-    """省略表現が含まれない完全なソースコードの場合、False が返るか検証."""
+    """省略表現が含まれない完全なソースコードの場合, False が返るか検証."""
     complete_code = """
 def add(a: int, b: int) -> int:
     # 2つの数値の和を計算する
@@ -108,14 +108,14 @@ def add(a: int, b: int) -> int:
 
 
 def test_apply_file_modification_success(tmp_path):
-    """正常系: .bak バックアップが作成され、元ファイルが新しい内容で上書きされるか検証."""
+    """正常系: .bak バックアップが作成され, 元ファイルが新しい内容で上書きされるか検証."""
     target_file = tmp_path / "sample.py"
     target_file.write_text("original_code", encoding="utf-8")
 
     new_code = "updated_code"
     apply_file_modification(str(target_file), new_code)
 
-    # バックアップファイル (.py.bak) が作成され、元の内容が保存されていること
+    # バックアップファイル (.py.bak) が作成され, 元の内容が保存されていること
     bak_file = tmp_path / "sample.py.bak"
     assert bak_file.exists()
     assert bak_file.read_text(encoding="utf-8") == "original_code"
@@ -125,7 +125,7 @@ def test_apply_file_modification_success(tmp_path):
 
 
 def test_apply_file_modification_not_a_file(tmp_path):
-    """異常系: パスが存在しない、またはディレクトリの場合、早期リターンして何も処理しないか検証."""
+    """異常系: パスが存在しない, またはディレクトリの場合, 早期リターンして何も処理しないか検証."""
     non_existent_file = tmp_path / "non_existent.py"
 
     # 存在しないパスを指定（ログを出力して終了）
@@ -137,13 +137,13 @@ def test_apply_file_modification_not_a_file(tmp_path):
 
 
 def test_apply_file_modification_exception(tmp_path):
-    """異常系: 書き込み時に Exception が発生した場合、except ブロックでキャッチされログが出力されるか検証."""
+    """異常系: 書き込み時に Exception が発生した場合, except ブロックでキャッチされログが出力されるか検証."""
     target_file = tmp_path / "sample.py"
     target_file.write_text("original_code", encoding="utf-8")
 
     # read_text または write_text で例外を発生させる
     with patch.object(Path, "write_text", side_effect=OSError("Write error")):
-        # 例外を発生させても関数内部で catch されるため、エラー無く終了することを確認
+        # 例外を発生させても関数内部で catch されるため, エラー無く終了することを確認
         apply_file_modification(str(target_file), "new_code")
 
 
@@ -161,7 +161,7 @@ def test_save_chat_history_success(tmp_path):
 
 
 def test_save_chat_history_creates_parent_directory(tmp_path):
-    """親ディレクトリが存在しない場合、自動的に生成されて保存されるか検証."""
+    """親ディレクトリが存在しない場合, 自動的に生成されて保存されるか検証."""
     nested_file = tmp_path / "logs" / "nested" / "history.md"
     history = ["Message 1", "Message 2"]
 
@@ -173,30 +173,30 @@ def test_save_chat_history_creates_parent_directory(tmp_path):
 
 
 def test_save_chat_history_exception(tmp_path):
-    """異常系: ファイル書き込み時に Exception が発生した場合、except ブロックでキャッチされるか検証."""
+    """異常系: ファイル書き込み時に Exception が発生した場合, except ブロックでキャッチされるか検証."""
     save_file = tmp_path / "error_history.md"
     history = ["Message 1"]
 
     # write_text 実行時に IOError を発生させる
     with patch.object(Path, "write_text", side_effect=OSError("Disk full")):
-        # 例外が発生しても外部に送出されず、安全に終了することを検証
+        # 例外が発生しても外部に送出されず, 安全に終了することを検証
         save_chat_history(str(save_file), history)
 
 
 def test_handle_write_mode_confirmation_none_target_path():
-    """target_path_str が None の場合、早期リターンすること（エラーログのみ）."""
+    """target_path_str が None の場合, 早期リターンすること（エラーログのみ）."""
     # パス未指定時は何も実行せず終了
     handle_write_mode_confirmation(None, "```python\nprint('hello')\n```")
 
 
 def test_handle_write_mode_confirmation_invalid_file(tmp_path):
-    """存在しないファイルまたはディレクトリが指定された場合、早期リターンすること."""
+    """存在しないファイルまたはディレクトリが指定された場合, 早期リターンすること."""
     non_existent = tmp_path / "non_existent.py"
     handle_write_mode_confirmation(str(non_existent), "```python\nprint('hello')\n```")
 
 
 def test_handle_write_mode_confirmation_no_code_extracted(tmp_path):
-    """レスポンスからコードが抽出できない場合、早期リターンすること."""
+    """レスポンスからコードが抽出できない場合, 早期リターンすること."""
     target_file = tmp_path / "target.py"
     target_file.write_text("print('old')", encoding="utf-8")
 
@@ -208,7 +208,7 @@ def test_handle_write_mode_confirmation_no_code_extracted(tmp_path):
 
 
 def test_handle_write_mode_confirmation_user_accepts(monkeypatch, tmp_path):
-    """ユーザーが 'y' と入力した場合、apply_file_modification が呼び出されて上書きされるか検証."""
+    """ユーザーが 'y' と入力した場合, apply_file_modification が呼び出されて上書きされるか検証."""
     target_file = tmp_path / "target.py"
     target_file.write_text("print('old')", encoding="utf-8")
 
@@ -224,7 +224,7 @@ def test_handle_write_mode_confirmation_user_accepts(monkeypatch, tmp_path):
 
 
 def test_handle_write_mode_confirmation_user_declines(monkeypatch, tmp_path):
-    """ユーザーが 'n' など 'y' 以外を入力した場合、上書きがキャンセルされるか検証."""
+    """ユーザーが 'n' など 'y' 以外を入力した場合, 上書きがキャンセルされるか検証."""
     target_file = tmp_path / "target.py"
     target_file.write_text("print('old')", encoding="utf-8")
 
@@ -241,7 +241,7 @@ def test_handle_write_mode_confirmation_user_declines(monkeypatch, tmp_path):
 
 @patch("code_chat_cli.chat.send_message_stream_with_retry")
 def test_handle_commit_msg_generation_success(mock_send_retry, capsys):
-    """git diff が存在し、Gemini API からコミットメッセージが生成されて出力されるケース."""
+    """git diff が存在し, Gemini API からコミットメッセージが生成されて出力されるケース."""
     mock_client = MagicMock()
     mock_chunk = SimpleNamespace(
         text="feat: add commit message generation\n\n- Add -g option"
@@ -264,7 +264,7 @@ def test_handle_commit_msg_generation_success(mock_send_retry, capsys):
 
 
 def test_handle_commit_msg_generation_no_diff(capsys):
-    """git diff が空の場合、API を呼び出さずにメッセージを表示して処理を抜けるケース."""
+    """git diff が空の場合, API を呼び出さずにメッセージを表示して処理を抜けるケース."""
     mock_client = MagicMock()
 
     with patch("code_chat_cli.chat.get_git_diff") as mock_get_diff:
@@ -340,7 +340,7 @@ def test_handle_commit_msg_generation_unexpected_exception(
     ],
 )
 def test_extract_retry_delay_valid_and_invalid_patterns(error_message, expected_delay):
-    """_extract_retry_delay が様々なエラーメッセージ形式から正しく秒数を抽出し、不正な場合は None を返すか検証."""
+    """_extract_retry_delay が様々なエラーメッセージ形式から正しく秒数を抽出し, 不正な場合は None を返すか検証."""
     ex = Exception(error_message)
     assert _extract_retry_delay(ex) == expected_delay
 
@@ -374,7 +374,7 @@ def test_send_message_with_retry_retry_and_succeed(mock_sleep):
     mock_chat = MagicMock()
     mock_response = MagicMock(text="Hello after retry")
 
-    # 1回目は 503 エラー、2回目は成功
+    # 1回目は 503 エラー, 2回目は成功
     mock_chat.send_message.side_effect = [
         APIError("503 Service Unavailable", {}),
         mock_response,
@@ -396,7 +396,7 @@ def test_send_message_with_retry_retry_and_succeed(mock_sleep):
     ],
 )
 def test_is_retryable_error_per_day_quota_returns_false(error_message, caplog):
-    """1日あたりのクォータ超過 (RPD) の場合は False を返し、エラーログが出力されることを検証."""
+    """1日あたりのクォータ超過 (RPD) の場合は False を返し, エラーログが出力されることを検証."""
     ex = Exception(error_message)
 
     with caplog.at_level(logging.ERROR):
@@ -410,22 +410,22 @@ def test_is_retryable_error_per_day_quota_returns_false(error_message, caplog):
 
 
 def test_is_retryable_error_value_error_fallback():
-    """異常系: code 属性が数値に変換できない文字列（ValueError）の場合、メッセージ判定へフォールバックするか検証."""
+    """異常系: code 属性が数値に変換できない文字列（ValueError）の場合, メッセージ判定へフォールバックするか検証."""
     # code 属性に int() 変換できない文字列を設定
     error = APIError("503 Service Unavailable", {})
     error.code = "INVALID_CODE"
 
-    # int(code) で ValueError が発生するが、内部でキャッチされメッセージ文字列("503")から True と判定される
+    # int(code) で ValueError が発生するが, 内部でキャッチされメッセージ文字列("503")から True と判定される
     assert _is_retryable_error(error) is True
 
 
 def test_is_retryable_error_type_error_fallback():
-    """異常系: code 属性が int() 変換不可な型（TypeError）の場合、メッセージ判定へフォールバックするか検証."""
+    """異常系: code 属性が int() 変換不可な型（TypeError）の場合, メッセージ判定へフォールバックするか検証."""
     # code 属性に int() 変換できないリスト型を設定
     error = APIError("400 Bad Request", {})
     error.code = [503]
 
-    # int(code) で TypeError が発生するが、内部でキャッチされメッセージ("400")から False と判定される
+    # int(code) で TypeError が発生するが, 内部でキャッチされメッセージ("400")から False と判定される
     assert _is_retryable_error(error) is False
 
 
@@ -435,7 +435,7 @@ def test_send_message_with_retry_uses_api_retry_delay(mock_sleep):
     mock_chat = MagicMock()
     mock_response = MagicMock(text="Success")
 
-    # APIError クラスのインスタンスとして作成し、__str__ を明示的に設定
+    # APIError クラスのインスタンスとして作成し, __str__ を明示的に設定
     err_with_delay = APIError("429 RESOURCE_EXHAUSTED retryDelay: '30s'", {})
     err_with_delay.__str__ = lambda: "429 RESOURCE_EXHAUSTED retryDelay: '30s'"
 
@@ -485,7 +485,7 @@ def test_send_message_stream_with_retry_success():
 
 
 def test_send_message_stream_with_retry_503_retry_and_succeed(monkeypatch):
-    """異常系 -> 正常系: 503 エラーが発生し、リトライ後に成功するか検証."""
+    """異常系 -> 正常系: 503 エラーが発生し, リトライ後に成功するか検証."""
     mock_chat = MagicMock()
     mock_stream = iter(["success_chunk"])
 
@@ -531,7 +531,7 @@ def test_send_message_stream_with_retry_exceeds_max_retries(monkeypatch):
 
 
 def test_send_message_stream_with_retry_non_retryable_error():
-    """異常系: 503/429 以外のエラー（例: 400 Bad Request）が発生した場合、リトライせず即座に例外を送出するか検証."""
+    """異常系: 503/429 以外のエラー（例: 400 Bad Request）が発生した場合, リトライせず即座に例外を送出するか検証."""
     mock_chat = MagicMock()
     error_400 = APIError("400 Bad Request", {})
     error_400.code = 400
@@ -546,14 +546,14 @@ def test_send_message_stream_with_retry_non_retryable_error():
 
 
 def test_send_message_stream_with_retry_error_during_iteration(monkeypatch):
-    """異常系: イテレーション（データ受信）の最初で 503 エラーが発生し、リトライして成功するか検証."""
+    """異常系: イテレーション（データ受信）の最初で 503 エラーが発生し, リトライして成功するか検証."""
     mock_chat = MagicMock()
 
     # 1回目のイテレーション（__iter__）で APIError を発生させる例外イテレータ
     class ErrorStream:  # pylint: disable=too-few-public-methods
         """テスト用モックストリームクラス.
 
-        イテレーションの開始時（`__iter__` 呼び出し時）に即座に APIError を送出することで、
+        イテレーションの開始時（`__iter__` 呼び出し時）に即座に APIError を送出することで,
         レスポンス取得ループ（`for chunk in response_stream`）の開始直後に発生する
         通信エラーの挙動をシミュレートします.
         """
@@ -576,7 +576,7 @@ def test_send_message_stream_with_retry_error_during_iteration(monkeypatch):
 
 
 def test_send_message_stream_with_retry_error_after_yielding_chunks():
-    """異常系: 途中でチャンクを出力した後にエラーが発生した場合、リトライせずに即座に例外を送出するか検証."""
+    """異常系: 途中でチャンクを出力した後にエラーが発生した場合, リトライせずに即座に例外を送出するか検証."""
     mock_chat = MagicMock()
 
     # 1つ目のチャンクを出力したあとに例外を投げるジェネレータ
@@ -602,7 +602,7 @@ def test_send_message_stream_with_retry_uses_api_retry_delay(mock_sleep):
     mock_chat = MagicMock()
     mock_chunk = MagicMock(text="stream_chunk")
 
-    # 1回目の呼び出しで retryDelay 付きの例外、2回目で正常なイテレータを返す
+    # 1回目の呼び出しで retryDelay 付きの例外, 2回目で正常なイテレータを返す
     err_with_delay = APIError("429 RESOURCE_EXHAUSTED retryDelay: '30s'", {})
     err_with_delay.__str__ = lambda: "429 RESOURCE_EXHAUSTED retryDelay: '30s'"
 
@@ -652,7 +652,7 @@ def test_main_non_interactive_pipe_mode(monkeypatch, mock_gemini_client, mock_ar
 
 
 def test_main_api_error_handling(monkeypatch, mock_gemini_client):
-    """API 送信時に APIError が発生した場合、sys.exit(1) で終了するか検証."""
+    """API 送信時に APIError が発生した場合, sys.exit(1) で終了するか検証."""
     err = APIError.__new__(APIError)
     err.args = ("Rate limit exceeded",)
     mock_gemini_client["chat"].send_message_stream.side_effect = err
@@ -721,7 +721,7 @@ def test_main_list_models_option(monkeypatch, mock_gemini_client, mock_args, cap
 
 
 def test_main_list_models_exception(monkeypatch, mock_gemini_client, mock_args):
-    """--list-models 指定時に API エラー等の例外が発生した場合、sys.exit(1) で終了するか検証."""
+    """--list-models 指定時に API エラー等の例外が発生した場合, sys.exit(1) で終了するか検証."""
     mock_args.return_value.list_models = True
 
     # models.list() 呼び出し時に Exception を発生させる
@@ -739,12 +739,12 @@ def test_main_list_models_exception(monkeypatch, mock_gemini_client, mock_args):
 
 
 def test_main_write_mode_system_instruction(monkeypatch, mock_gemini_client, mock_args):
-    """write_mode が True の場合、system_instruction に Write Mode 用の指示が追加されるか検証."""
+    """write_mode が True の場合, system_instruction に Write Mode 用の指示が追加されるか検証."""
     # write_mode を True に設定
     mock_args.return_value.write_mode = True
     mock_args.return_value.prompt = "コードを修正してください"
 
-    # 対話ループ（while True）を 1 回で抜けるため、2 回目の input() で EOFError を発生させる
+    # 対話ループ（while True）を 1 回で抜けるため, 2 回目の input() で EOFError を発生させる
     inputs = iter(["exit"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
@@ -764,17 +764,17 @@ def test_main_write_mode_system_instruction(monkeypatch, mock_gemini_client, moc
         in system_instruction
     )
     assert (
-        "2. 挨拶、解説、説明文、前置き、後書きは一切含めないでください."
+        "2. 挨拶, 解説, 説明文, 前置き, 後書きは一切含めないでください."
         in system_instruction
     )
     assert (
-        "3. 出力の1文字目から最後の文字まで、すべてPythonソースコードとして直接実行可能なテキストのみを出力してください."
+        "3. 出力の1文字目から最後の文字まで, すべてPythonソースコードとして直接実行可能なテキストのみを出力してください."
         in system_instruction
     )
 
 
 def test_main_with_context_no_prompt(monkeypatch, mock_gemini_client, mock_args):
-    """context あり、prompt なしのルートを通過するか検証."""
+    """context あり, prompt なしのルートを通過するか検証."""
     mock_args.return_value.context = "--- [ファイル内容] ---\ndef main(): pass"
     mock_args.return_value.prompt = None
     mock_args.return_value.write_mode = False
@@ -799,7 +799,7 @@ def test_main_with_context_no_prompt(monkeypatch, mock_gemini_client, mock_args)
 def test_main_with_context_and_prompt_write_mode(
     monkeypatch, mock_gemini_client, mock_args
 ):
-    """context あり、prompt あり、write_mode=True（handle_write_mode_confirmation通過）のルートを検証."""
+    """context あり, prompt あり, write_mode=True（handle_write_mode_confirmation通過）のルートを検証."""
     mock_args.return_value.context = "--- [ファイル内容] ---\ndef main(): pass"
     mock_args.return_value.prompt = "コードをリファクタリングしてください"
     mock_args.return_value.write_mode = True
@@ -837,28 +837,28 @@ def test_main_with_context_and_prompt_write_mode(
 
 
 def test_main_chat_loop_empty_input(monkeypatch, mock_gemini_client, mock_args):
-    """対話ループで空文字（Enterのみ）を入力した場合、continue でループが継続されるか検証."""
+    """対話ループで空文字（Enterのみ）を入力した場合, continue でループが継続されるか検証."""
     # 初期プロンプトやコンテキストがないインタラクティブモードを設定
     mock_args.return_value.context = None
     mock_args.return_value.prompt = None
 
-    # 1回目に空文字 ""、2回目に "exit" を返すイテレータを作成
+    # 1回目に空文字 "", 2回目に "exit" を返すイテレータを作成
     inputs = iter(["", "exit"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     main()
 
-    # 空文字の時は API 送信が行われないため、send_message_stream の呼び出し回数は 0 回であることを確認
+    # 空文字の時は API 送信が行われないため, send_message_stream の呼び出し回数は 0 回であることを確認
     assert mock_gemini_client["chat"].send_message_stream.call_count == 0
 
 
 def test_main_save_command_with_path(monkeypatch, mock_args):
-    """対話ループ内で /save <filepath> を入力した場合、指定パスへ履歴が保存されるか検証."""
+    """対話ループ内で /save <filepath> を入力した場合, 指定パスへ履歴が保存されるか検証."""
     mock_args.return_value.context = None
     mock_args.return_value.prompt = None
     mock_args.return_value.output_path = None
 
-    # 1回目に "/save custom_log.md"、2回目に "exit" を入力
+    # 1回目に "/save custom_log.md", 2回目に "exit" を入力
     inputs = iter(["/save custom_log.md", "exit"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
@@ -871,12 +871,12 @@ def test_main_save_command_with_path(monkeypatch, mock_args):
 
 
 def test_main_save_command_with_default_output_path(monkeypatch, mock_args):
-    """対話ループ内で引数なしの /save を入力し、output_path が設定されている場合に保存されるか検証."""
+    """対話ループ内で引数なしの /save を入力し, output_path が設定されている場合に保存されるか検証."""
     mock_args.return_value.context = None
     mock_args.return_value.prompt = None
     mock_args.return_value.output_path = "default_output.md"
 
-    # 1回目に "/save"（引数なし）、2回目に "exit" を入力
+    # 1回目に "/save"（引数なし）, 2回目に "exit" を入力
     inputs = iter(["/save", "exit"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
@@ -889,12 +889,12 @@ def test_main_save_command_with_default_output_path(monkeypatch, mock_args):
 
 
 def test_main_save_command_no_path_specified(monkeypatch, mock_args):
-    """対話ループ内で引数なしの /save を入力し、output_path も None の場合、エラーログが出力され保存されないか検証."""
+    """対話ループ内で引数なしの /save を入力し, output_path も None の場合, エラーログが出力され保存されないか検証."""
     mock_args.return_value.context = None
     mock_args.return_value.prompt = None
     mock_args.return_value.output_path = None
 
-    # 1回目に "/save"（引数なし、output_path も None）、2回目に "exit" を入力
+    # 1回目に "/save"（引数なし, output_path も None）, 2回目に "exit" を入力
     inputs = iter(["/save", "exit"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
@@ -908,7 +908,7 @@ def test_main_save_command_no_path_specified(monkeypatch, mock_args):
 def test_main_chat_loop_write_mode_append_instruction(
     monkeypatch, mock_gemini_client, mock_args
 ):
-    """対話ループ内で write_mode=True の時、送信メッセージ末尾に指示テキストが追加されるか検証."""
+    """対話ループ内で write_mode=True の時, 送信メッセージ末尾に指示テキストが追加されるか検証."""
     # write_mode を True に設定
     mock_args.return_value.context = None
     mock_args.return_value.prompt = None
@@ -919,7 +919,7 @@ def test_main_chat_loop_write_mode_append_instruction(
     mock_chunk = SimpleNamespace(text="```python\nprint('hello')\n```")
     mock_gemini_client["chat"].send_message_stream.return_value = [mock_chunk]
 
-    # 1回目にプロンプト入力、2回目に "exit" を入力
+    # 1回目にプロンプト入力, 2回目に "exit" を入力
     inputs = iter(["関数を追加してください", "exit"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
@@ -942,7 +942,7 @@ def test_main_chat_loop_write_mode_append_instruction(
 @patch("code_chat_cli.args.read_stdin_content", return_value="")
 @patch("code_chat_cli.chat.handle_commit_msg_generation")
 def test_cli_generate_commit_msg_failure(mock_handle, _mock_read_stdin, monkeypatch):
-    """CLI 実行時にコミットメッセージ生成で例外が発生し、sys.exit(1) で終了することを検証."""
+    """CLI 実行時にコミットメッセージ生成で例外が発生し, sys.exit(1) で終了することを検証."""
     # handle_commit_msg_generation で例外を送出させる
     mock_handle.side_effect = RuntimeError("Unexpected Error")
 
@@ -964,7 +964,7 @@ def test_cli_generate_commit_msg_failure(mock_handle, _mock_read_stdin, monkeypa
 
 
 def test_main_keyboard_interrupt(monkeypatch):
-    """対話モード中に Ctrl+C (KeyboardInterrupt) が発生した際、終了コード 0 で正常終了するか検証する."""
+    """インタラクティブモードで KeyboardInterrupt (Ctrl+C) が発生した際, 正常終了 (exit code 0) することを発証する."""
     # parse_args と get_gemini_client をモック化
     with patch("code_chat_cli.chat.parse_args") as mock_parse_args:
         mock_args = MagicMock()
@@ -1011,7 +1011,7 @@ def test_main_file_operation_exceptions(monkeypatch, mock_args, file_exception):
 
 
 def test_main_unexpected_exception(monkeypatch, mock_args):
-    """main() 実行中に予期せぬ例外が発生した場合、logger.critical を経由して sys.exit(1) で終了するか検証."""
+    """main() 実行中に予期せぬ例外が発生した場合, logger.critical を経由して sys.exit(1) で終了するか検証."""
     # parse_args の段階で意図的に予期せぬ例外を発生させる
     mock_args.side_effect = RuntimeError("Unexpected fatal system error")
 
@@ -1025,7 +1025,7 @@ def test_main_unexpected_exception(monkeypatch, mock_args):
 
 
 def test_main_finally_auto_save_enabled(monkeypatch, mock_gemini_client, mock_args):
-    """auto_save=True かつ output_path 未指定の時、タイムスタンプ形式のファイル名で自動保存されるか検証."""
+    """auto_save=True かつ output_path 未指定の時, タイムスタンプ形式のファイル名で自動保存されるか検証."""
     mock_args.return_value.context = None
     mock_args.return_value.prompt = "こんにちは"
     mock_args.return_value.auto_save = True
@@ -1051,7 +1051,7 @@ def test_main_finally_auto_save_enabled(monkeypatch, mock_gemini_client, mock_ar
 
 
 def test_main_finally_output_file_specified(monkeypatch, mock_gemini_client, mock_args):
-    """output_path が明示的に指定されている時、指定されたファイル名で保存されるか検証."""
+    """output_path が明示的に指定されている時, 指定されたファイル名で保存されるか検証."""
     mock_args.return_value.context = None
     mock_args.return_value.prompt = "テスト"
     mock_args.return_value.auto_save = False

@@ -1,4 +1,4 @@
-"""`code_chat_cli.chat` における readline のセットアップ、コミットメッセージ生成、およびログ出力のテスト."""
+"""`code_chat_cli.chat` における readline のセットアップ, コミットメッセージ生成, およびログ出力のテスト."""
 
 import importlib
 import logging
@@ -96,7 +96,7 @@ def test_run_single_turn_mode_history_entry():
     assert len(chat_history) > 0
     history_entry = chat_history[0]
 
-    # バイト計算に合わせて 20 bytes に変更、または動的に判定
+    # バイト計算に合わせて 20 bytes に変更, または動的に判定
     context_bytes = len(cli_args.context.encode("utf-8"))
     expected_metadata = f"[ファイル読み込み: src/main.py ({context_bytes} bytes)]"
 
@@ -107,7 +107,7 @@ def test_run_single_turn_mode_history_entry():
 
 
 def test_main_generate_commit_msg_failure_exits_with_code_1():
-    """-g オプション実行時にエラーが発生した場合、exit(1) で終了するか検証."""
+    """-g オプション実行時にエラーが発生した場合, exit(1) で終了するか検証."""
     test_args = ["code_chat_cli", "-g"]
 
     with (
@@ -131,7 +131,7 @@ def test_main_generate_commit_msg_failure_exits_with_code_1():
 
 
 def test_main_unexpected_exception_exc_info_logging(caplog):
-    """予期せぬ例外が発生した際、debugモードの設定に応じて exc_info が切り替わるか検証."""
+    """予期せぬ例外が発生した際, debugモードの設定に応じて exc_info が切り替わるか検証."""
     test_args = ["code_chat_cli"]
 
     with (
@@ -197,7 +197,7 @@ def test_main_eof_error_exit():
 
 
 def test_readline_import_fallback_pyreadline3_success():
-    """readline がなく、pyreadline3 がインポートできるケース."""
+    """readline がなく, pyreadline3 がインポートできるケース."""
     orig_import = __import__
 
     def mock_import(name, *args, **kwargs):

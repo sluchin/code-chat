@@ -1,4 +1,4 @@
-"""`code_chat_cli.client` における API クライアントの初期化、モデルの設定、および通信処理のテスト."""
+"""`code_chat_cli.client` における API クライアントの初期化, モデルの設定, および通信処理のテスト."""
 
 from unittest.mock import MagicMock, patch
 
@@ -7,7 +7,7 @@ from code_chat_cli.client import ClientConfigError, get_gemini_client
 
 
 def test_get_gemini_client_success(monkeypatch):
-    """環境変数 GEMINI_API_KEY が設定されている場合、正常に genai.Client が返されるか検証."""
+    """環境変数 GEMINI_API_KEY が設定されている場合, 正常に genai.Client が返されるか検証."""
     # 環境変数をセット
     monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
 
@@ -24,7 +24,7 @@ def test_get_gemini_client_success(monkeypatch):
 
 
 def test_get_gemini_client_missing_api_key(monkeypatch):
-    """環境変数 GEMINI_API_KEY が未設定の場合、ClientConfigError が発生するか検証."""
+    """環境変数 GEMINI_API_KEY が未設定の場合, ClientConfigError が発生するか検証."""
     # 環境変数を削除
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
