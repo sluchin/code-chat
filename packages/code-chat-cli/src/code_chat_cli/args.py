@@ -68,6 +68,10 @@ class CliArgs:
     generate_commit_msg: bool
     """コミットメッセージ生成."""
 
+    review: bool
+
+    staged: bool
+
     context: str
     """読み込まれた標準入力およびファイルコンテキストの結合文字列."""
 
@@ -262,6 +266,17 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
         action="store_true",
         help="git diff (--cached) からコミットメッセージ案を生成します",
     )
+    parser.add_argument(
+        "-r",
+        "--review",
+        action="store_true",
+        help="git diff または指定ファイルの内容をコードレビューします.",
+    )
+    parser.add_argument(
+        "--staged",
+        action="store_true",
+        help="--review または --generate-commit-msg 実行時に staged 状態の差分を対象にします.",
+    )
 
     # RAG サブコマンド
     subparsers = parser.add_subparsers(dest="command", help="RAG サブコマンド")
@@ -323,6 +338,8 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
         log_level=raw_args.log_level,
         list_models=raw_args.list_models,
         generate_commit_msg=raw_args.generate_commit_msg,
+        review=raw_args.review,
+        staged=raw_args.staged,
         context=context_str,
         command=raw_args.command,
         repo_path=getattr(raw_args, "repo_path", "."),

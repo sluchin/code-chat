@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "CLI tool for interacting with and modifying local codebase via LLMs"
 readme = "README.md"
 authors = [
-    { name = "Tetsuya Higashi", email = "996846+sluchin@ users.noreply.github.com" }
+    { name = "Tetsuya Higashi", email = "996846+sluchin@users.noreply.github.com" }
 ]
 requires-python = ">=3.14"
 dependencies = [
