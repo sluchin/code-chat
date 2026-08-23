@@ -5,9 +5,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from code_chat_cli.chat import (
+from code_chat_cli.chat import _handle_subcommands
+from code_chat_cli.commands.review import (
     _collect_directory_files,
-    _handle_subcommands,
     handle_code_review,
 )
 
