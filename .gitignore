@@ -3,6 +3,12 @@
 .env.*
 *.pem
 
+# ビルドおよびパッケージング生成物
+*.egg-info/
+.eggs/
+dist/
+build/
+
 # Python / uv 仮想環境・キャッシュ
 .venv/
 __pycache__/

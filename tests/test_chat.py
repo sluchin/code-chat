@@ -67,6 +67,8 @@ def mock_args():
             auto_save=False,
             list_models=False,
             generate_commit_msg=False,
+            review=False,
+            staged=False,
         )
         mock_parse.return_value = args
         yield mock_parse
@@ -1069,3 +1071,51 @@ def test_main_finally_output_file_specified(monkeypatch, mock_gemini_client, moc
         # save_chat_history が指定した "output_result.md" で呼び出されたか検証
         mock_save.assert_called_once()
         assert mock_save.call_args[0][0] == "output_result.md"
+
+
+@pytest.mark.parametrize("exception_type", [KeyboardInterrupt, EOFError])
+def test_main_keyboard_interrupt_handling(
+    exception_type: type[BaseException],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """run_interactive_loop 実行時に KeyboardInterrupt や EOFError が発生した際,
+       except ブロックを通って sys.exit(0) で正常終了することを検証する.
+
+    Args:
+        exception_type (type[BaseException]): 送出させる例外クラス.
+        monkeypatch (pytest.MonkeyPatch): pytest のモックフィクスチャ.
+    """
+    # 最小限の引数設定
+    test_args = ["chat.py"]
+    monkeypatch.setattr("sys.argv", test_args)
+
+    # CLI 引数のモック
+    mock_args = MagicMock()
+    mock_args.debug = False
+    mock_args.log_level = "INFO"
+    mock_args.write_mode = False
+    mock_args.model = "gemini-flash-latest"
+    mock_args.context = None
+    mock_args.prompt = None
+    mock_args.output_path = None
+    mock_args.auto_save = False
+
+    # 各モックの適用
+    with (
+        patch("code_chat_cli.chat.parse_args", return_value=mock_args),
+        patch("code_chat_cli.chat._setup_cli_logging"),
+        patch("code_chat_cli.chat.get_gemini_client"),
+        patch("code_chat_cli.chat._handle_subcommands"),
+        patch("code_chat_cli.chat._build_chat_config"),
+        # run_interactive_loop が呼び出された際に指定の例外を送出させる
+        patch(
+            "code_chat_cli.chat.run_interactive_loop",
+            side_effect=exception_type,
+        ),
+        patch("code_chat_cli.chat._save_history_if_needed"),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        main()
+
+    # sys.exit(0) で正常終了したことを検証
+    assert exc_info.value.code == 0

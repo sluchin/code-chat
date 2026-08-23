@@ -7,6 +7,7 @@ Gemini API と対話を行うためのコマンドラインインターフェー
 
 import atexit
 import logging
+import os
 import re
 import subprocess
 import sys
@@ -21,6 +22,7 @@ from google.genai.errors import APIError, ClientError, ServerError
 
 from code_chat_cli.args import parse_args
 from code_chat_cli.client import get_gemini_client
+from code_chat_cli.constants import TEXT_EXTENSIONS
 from code_chat_cli.git_utils import get_git_diff
 from code_chat_cli.logger import get_logger, setup_logging, suppress_info_logs
 
@@ -77,6 +79,19 @@ WRITE_MODE_SYSTEM_INSTRUCTION = """
 1. Markdown のコードブロック記号（```python や ```）を含めないでください.
 2. 挨拶, 解説, 説明文, 前置き, 後書きは一切含めないでください.
 3. 出力の1文字目から最後の文字まで, すべてPythonソースコードとして直接実行可能なテキストのみを出力してください.
+"""
+
+REVIEW_PROMPT_TEMPLATE = """\
+あなたはプロのソフトウェアエンジニアです. 以下のコード差分（diff）またはファイル内容を詳細にレビューしてください.
+
+### レビュー観点
+1. **潜在的なバグ・不具合**: ヌルポインタ, エッジケースの考慮漏れ, リソースリークなど
+2. **パフォーマンス・効率性**: 不要なループや不必要な処理
+3. **コード品質・可読性**: 命名規則, 複雑度の高い処理の簡略化
+4. **セキュリティ**: 脆弱性や安全でない実装
+
+### レビュー対象
+{code}
 """
 
 
@@ -334,6 +349,118 @@ def handle_commit_msg_generation(
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("予期せぬエラーが発生しました: %s", e)
         raise
+
+
+def _collect_directory_files(target_dir: Path) -> str:
+    """指定ディレクトリ配下のテキストファイルを走査・収集します.
+
+    指定されたディレクトリ配下を再帰的に検索し、指定の拡張子を持つ
+    テキストファイルの内容を単一の文字列に結合して返します.
+    特定の大規模・生成ディレクトリ（.git, node_modules等）は除外されます.
+
+    Args:
+        target_dir (Path): 走査対象のディレクトリパス.
+
+    Returns:
+        str: 収集されたファイル群の内容を結合したテキスト.
+    """
+    ignored_dirs = {".git", "__pycache__", ".venv", ".chroma_db", "node_modules"}
+    collected_files: list[str] = []
+
+    for root, dirs, files in os.walk(target_dir):
+        dirs[:] = [d for d in dirs if d not in ignored_dirs]
+        for file in files:
+            file_p = Path(root) / file
+            if file_p.suffix.lower() not in TEXT_EXTENSIONS:
+                continue
+            try:
+                content = file_p.read_text(encoding="utf-8")
+                collected_files.append(f"=== File: {file_p} ===\n{content}")
+            except (OSError, UnicodeDecodeError) as e:
+                print(
+                    f"スキップ (読み込み失敗): {file_p} - {e}",
+                    file=sys.stderr,
+                )
+
+    return "\n\n".join(collected_files)
+
+
+def _get_git_diff(staged: bool) -> str | None:
+    """git diff から変更差分を取得します.
+
+    Args:
+        staged (bool): True の場合 `--cached` (ステージング済み) 差分を取得する.
+
+    Returns:
+        str | None: 取得した差分文字列. 実行失敗時または git コマンドが
+            存在しない場合は None を返す.
+    """
+    cmd = ["git", "diff", "--cached"] if staged else ["git", "diff"]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            print(
+                f"エラー: git diff の実行に失敗しました:\n{result.stderr}",
+                file=sys.stderr,
+            )
+            return None
+        return result.stdout.strip()
+    except FileNotFoundError:
+        print("エラー: git コマンドが見つかりません.", file=sys.stderr)
+        return None
+
+
+def handle_code_review(
+    client: Any,
+    model_name: str,
+    staged: bool = False,
+    file_path: str | None = None,
+) -> None:
+    """コード差分または指定ファイルを解析し, LLM によるコードレビュー結果を表示する.
+
+    Args:
+        client (Any): Gemini API クライアントインスタンス.
+        model_name (str): 使用する Gemini モデル名.
+        staged (bool, optional): True の場合, git diff の --cached
+            (ステージング済み) 差分を対象にする. Defaults to False.
+        file_path (str | None, optional): レビュー対象のファイルまたは
+            ディレクトリのパス. 指定された場合は git diff ではなく
+            ファイル内容全体をレビューする. Defaults to None.
+    """
+    target_code: str | None = ""
+
+    if file_path:
+        path = Path(file_path)
+        if not path.exists():
+            print(f"エラー: 指定されたパスが存在しません: {file_path}", file=sys.stderr)
+            return
+
+        if path.is_dir():
+            target_code = _collect_directory_files(path)
+        else:
+            try:
+                content = path.read_text(encoding="utf-8")
+                target_code = f"=== File: {path} ===\n{content}"
+            except (OSError, UnicodeDecodeError) as e:
+                print(f"エラー: ファイルの読み込みに失敗しました: {e}", file=sys.stderr)
+                return
+    else:
+        target_code = _get_git_diff(staged)
+
+    if not target_code:
+        print("レビュー対象のコードまたは変更点が見つかりませんでした.")
+        return
+
+    prompt = REVIEW_PROMPT_TEMPLATE.format(code=target_code)
+
+    print("コードレビューを実行中...\n")
+    response = client.models.generate_content_stream(
+        model=model_name,
+        contents=prompt,
+    )
+    for chunk in response:
+        print(chunk.text, end="", flush=True)
+    print()
 
 
 def _extract_retry_delay(e: Exception) -> float | None:
@@ -652,7 +779,7 @@ def run_interactive_loop(
     while True:
         try:
             user_input = input("You > ").strip()
-        except (KeyboardInterrupt, EOFError):
+        except KeyboardInterrupt, EOFError:
             print()
             logger.info("会話を終了します.")
             sys.exit(0)
@@ -710,16 +837,28 @@ def _setup_cli_logging(cli_args: Any) -> None:
 
 def _handle_subcommands(client: Any, cli_args: Any) -> None:
     """特定サブコマンドフラグ指定時の独立処理を実行します."""
-    if cli_args.list_models:
+    if getattr(cli_args, "list_models", False):
         try:
             handle_list_models(client)
             sys.exit(0)
         except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
             sys.exit(1)
 
-    if cli_args.generate_commit_msg:
+    if getattr(cli_args, "generate_commit_msg", False):
         try:
             handle_commit_msg_generation(client, cli_args.model)
+            sys.exit(0)
+        except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+            sys.exit(1)
+
+    if getattr(cli_args, "review", False):
+        try:
+            handle_code_review(
+                client,
+                cli_args.model,
+                staged=getattr(cli_args, "staged", False),
+                file_path=getattr(cli_args, "target_path", None),
+            )
             sys.exit(0)
         except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
             sys.exit(1)
@@ -738,7 +877,9 @@ def _build_chat_config(is_write_mode: bool) -> types.GenerateContentConfig:
         "提供されたソースコードを把握し, "
         "ユーザーからの指示に従って修正案の提示やコード解説, レビューを行ってください."
     )
-    return types.GenerateContentConfig(system_instruction=system_instruction)
+    return types.GenerateContentConfig(
+        system_instruction=system_instruction,
+    )
 
 
 def _save_history_if_needed(
@@ -784,13 +925,13 @@ def main() -> None:
         else:
             run_interactive_loop(chat, cli_args, output_file, chat_history)
 
-    except (KeyboardInterrupt, EOFError):
+    except KeyboardInterrupt, EOFError:
         logger.info("\n[Ctrl+C] 会話を終了します.")
         sys.exit(0)
     except (APIError, ServerError, ClientError) as e:
         logger.error("Gemini API エラーにより処理を中断しました: %s", e)
         sys.exit(1)
-    except (FileNotFoundError, ValueError, PermissionError):
+    except FileNotFoundError, ValueError, PermissionError:
         logger.exception("ファイル操作でエラーが発生しました")
         sys.exit(1)
     except Exception as e:  # pylint: disable=broad-exception-caught

@@ -1,3 +1,28 @@
+[project]
+name = "code-chat"
+version = "0.1.0"
+readme = "README.md"
+authors = [
+    { name = "Tetsuya Higashi", email = "996846+sluchin@users.noreply.github.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "code-chat-cli",
+]
+
+[project.scripts]
+code-chat = "code_chat_cli.chat:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["packages/code-chat-cli/src/code_chat_cli"]
+
+[tool.uv.sources]
+code-chat-cli = { workspace = true }
+
 [tool.uv.workspace]
 members = ["packages/*"]
 
@@ -18,10 +43,6 @@ pythonpath = [
     "packages/code-chat-rag/src",
 ]
 filterwarnings = [
-    # 該当する DeprecationWarning をメッセージの部分一致で無視
-    #"ignore:.*UnionGenericAlias.*:DeprecationWarning",
-    #"ignore::DeprecationWarning:langchain_community.*",
-    #"ignore::DeprecationWarning:chromadb.*",
     "ignore::DeprecationWarning",
 ]
 
