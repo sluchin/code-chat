@@ -15,13 +15,14 @@ from code_chat_cli.api import (
     send_message_with_retry,
 )
 from code_chat_cli.chat import (
-    apply_file_modification,
-    handle_write_mode_confirmation,
-    is_partial_code,
     main,
 )
+from code_chat_cli.file_writer import (
+    _is_partial_code,
+    apply_file_modification,
+    handle_write_mode_confirmation,
+)
 from code_chat_cli.history import (
-    # setup_readline_history,
     save_chat_history,
 )
 from google.genai.errors import APIError
@@ -99,7 +100,7 @@ def main():
     {code_input}
     return 0
 """
-    assert is_partial_code(sample_code) is True
+    assert _is_partial_code(sample_code) is True
 
 
 def test_is_partial_code_returns_false():
@@ -109,7 +110,7 @@ def add(a: int, b: int) -> int:
     # 2つの数値の和を計算する
     return a + b
 """
-    assert is_partial_code(complete_code) is False
+    assert _is_partial_code(complete_code) is False
 
 
 def test_apply_file_modification_success(tmp_path):
