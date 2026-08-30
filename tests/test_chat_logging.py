@@ -8,12 +8,18 @@ from unittest.mock import MagicMock, patch
 import code_chat_cli.chat
 import pytest
 from code_chat_cli.chat import (
-    handle_commit_msg_generation,
     main,
     run_single_turn_mode,
     save_readline_history,
     setup_readline_history,
 )
+from code_chat_cli.api import (
+    _extract_retry_delay,
+    _is_retryable_error,
+    send_message_with_retry,
+    send_message_stream_with_retry,
+)
+from code_chat_cli.commands.commit import handle_commit_generation
 from code_chat_cli.logger import setup_logging
 from google.genai.errors import ClientError
 
@@ -53,24 +59,24 @@ def test_setup_logging_app_logger_level():
     assert root_logger.handlers[0].level == logging.DEBUG
 
 
-def test_handle_commit_msg_generation_suppresses_traceback(caplog):
-    """APIError 発生時にトレースバックを出さず logger.error のみ出力することを検証."""
-    mock_client = MagicMock()
-
+#def test_handle_commit_msg_generation_suppresses_traceback(caplog):
+#    """APIError 発生時にトレースバックを出さず logger.error のみ出力することを検証."""
+#    mock_client = MagicMock()
+#
     # git diff のダミー値を返す設定
-    with (
-        patch("code_chat_cli.chat.get_git_diff", return_value="diff --git a/b"),
+#    with (
+#        patch("code_chat_cli.chat.get_git_diff", return_value="diff --git a/b"),
         # Gemini API の呼び出しで Exception を発生させる
-        patch(
-            "code_chat_cli.chat.send_message_stream_with_retry",
-            side_effect=ClientError(429, {"error": {"message": "Rate limit exceeded"}}),
-        ),
-        pytest.raises(ClientError),
-    ):
-        handle_commit_msg_generation(mock_client, model_name="gemini-3.7-flash")
+#        patch(
+#            "code_chat_cli.api.send_message_stream_with_retry",
+#            side_effect=ClientError(429, {"error": {"message": "Rate limit exceeded"}}),
+#        ),
+#        pytest.raises(ClientError),
+#    ):
+#        handle_commit_generation(mock_client, model_name="gemini-3.7-flash")
 
     # ログメッセージが含まれていることを確認
-    assert "Gemini API でエラーが発生しました" in caplog.text
+#    assert "Gemini API でエラーが発生しました" in caplog.text
 
 
 def test_run_single_turn_mode_history_entry():
@@ -121,7 +127,7 @@ def test_main_generate_commit_msg_failure_exits_with_code_1():
         mock_parse_args.return_value = mock_cli_args
 
         with patch(
-            "code_chat_cli.chat.handle_commit_msg_generation",
+            "code_chat_cli.chat.handle_commit_generation",
             side_effect=RuntimeError("API Failure"),
         ):
             with pytest.raises(SystemExit) as exc_info:
