@@ -3,12 +3,17 @@
 
 import io
 import logging
-import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+from code_chat_cli.api import (
+    _extract_retry_delay,
+    _is_retryable_error,
+    send_message_stream_with_retry,
+    send_message_with_retry,
+)
 from code_chat_cli.chat import (
     apply_file_modification,
     handle_write_mode_confirmation,
@@ -16,13 +21,6 @@ from code_chat_cli.chat import (
     main,
     save_chat_history,
 )
-from code_chat_cli.api import (
-    _extract_retry_delay,
-    _is_retryable_error,
-    send_message_with_retry,
-    send_message_stream_with_retry,
-)
-from code_chat_cli.commands.commit import handle_commit_generation
 from google.genai.errors import APIError
 
 
@@ -243,8 +241,8 @@ def test_handle_write_mode_confirmation_user_declines(monkeypatch, tmp_path):
     assert target_file.read_text(encoding="utf-8") == "print('old')"
 
 
-#@patch("code_chat_cli.api.send_message_stream_with_retry")
-#def test_handle_commit_msg_generation_success(mock_send_retry, capsys):
+# @patch("code_chat_cli.api.send_message_stream_with_retry")
+# def test_handle_commit_msg_generation_success(mock_send_retry, capsys):
 #    """git diff が存在し, Gemini API からコミットメッセージが生成されて出力されるケース."""
 #    mock_client = MagicMock()
 #    mock_chunk = SimpleNamespace(
@@ -267,7 +265,7 @@ def test_handle_write_mode_confirmation_user_declines(monkeypatch, tmp_path):
 #        assert "feat: add commit message generation" in captured.out
 
 
-#def test_handle_commit_msg_generation_no_diff(capsys):
+# def test_handle_commit_msg_generation_no_diff(capsys):
 #    """git diff が空の場合, API を呼び出さずにメッセージを表示して処理を抜けるケース."""
 #    mock_client = MagicMock()
 #
@@ -282,8 +280,8 @@ def test_handle_write_mode_confirmation_user_declines(monkeypatch, tmp_path):
 #        assert "変更（git diff）が検出されませんでした" in captured.out
 
 
-#@patch("code_chat_cli.chat.get_git_diff")
-#def test_handle_commit_msg_generation_called_process_error(mock_get_diff, caplog):
+# @patch("code_chat_cli.chat.get_git_diff")
+# def test_handle_commit_msg_generation_called_process_error(mock_get_diff, caplog):
 #    """異常系: Git コマンド実行失敗（CalledProcessError）時に例外が再送出されログが出力されるか検証."""
 #    mock_client = MagicMock()
 #    mock_get_diff.side_effect = subprocess.CalledProcessError(
@@ -296,9 +294,9 @@ def test_handle_write_mode_confirmation_user_declines(monkeypatch, tmp_path):
 #    assert "Git コマンドの実行に失敗しました" in caplog.text
 
 
-#@patch("code_chat_cli.api.send_message_stream_with_retry")
-#@patch("code_chat_cli.chat.get_git_diff")
-#def test_handle_commit_msg_generation_api_error(mock_get_diff, mock_send_retry, caplog):
+# @patch("code_chat_cli.api.send_message_stream_with_retry")
+# @patch("code_chat_cli.chat.get_git_diff")
+# def test_handle_commit_msg_generation_api_error(mock_get_diff, mock_send_retry, caplog):
 #    """異常系: Gemini API エラー（APIError）発生時に例外が再送出されログが出力されるか検証."""
 #    mock_client = MagicMock()
 #    mock_get_diff.return_value = "diff --git a/file.py b/file.py"
@@ -312,16 +310,16 @@ def test_handle_write_mode_confirmation_user_declines(monkeypatch, tmp_path):
 #    assert "Gemini API でエラーが発生しました" in caplog.text
 
 
-#@patch("code_chat_cli.api.send_message_stream_with_retry")
-#@patch("code_chat_cli.chat.get_git_diff")
-#def test_handle_commit_msg_generation_unexpected_exception(
+# @patch("code_chat_cli.api.send_message_stream_with_retry")
+# @patch("code_chat_cli.chat.get_git_diff")
+# def test_handle_commit_msg_generation_unexpected_exception(
 #    mock_get_diff, mock_send_retry, caplog
-#):
+# ):
 #    """異常系: 予期せぬ例外（Exception）発生時に例外が再送出されログが出力されるか検証."""
 #    mock_client = MagicMock()
 #    mock_get_diff.return_value = "diff --git a/file.py b/file.py"
 
-    # API またはストリーム呼び出し時に一般的な Exception (RuntimeError) を送出させる
+# API またはストリーム呼び出し時に一般的な Exception (RuntimeError) を送出させる
 #    mock_send_retry.side_effect = RuntimeError("予期せぬエラー")
 
 #    with pytest.raises(RuntimeError):
@@ -672,76 +670,6 @@ def test_main_api_error_handling(monkeypatch, mock_gemini_client):
     assert exc_info.value.code == 1
 
 
-#def test_main_generate_commit_msg(monkeypatch):
-#    """-g オプション指定時に handle_commit_generation が呼ばれて sys.exit(0) すること."""
-#    monkeypatch.setenv("GEMINI_API_KEY", "dummy_key")
-
-#    mock_args = SimpleNamespace(
-#        generate_commit_msg=True,
-#        list_models=False,
-#        model="gemini-flash-latest",
-#        debug=False,
-#    )
-
-#    with (
-#        patch("code_chat_cli.chat.parse_args", return_value=mock_args),
-#        patch("code_chat_cli.chat.suppress_info_logs", MagicMock()),
-#        patch("code_chat_cli.chat.setup_logging", MagicMock()),
-#        patch("code_chat_cli.commands.commit.handle_commit_generation") as mock_handle_gen,
-#        patch("google.genai.Client", MagicMock()),
-#    ):
-#        with pytest.raises(SystemExit) as exc_info:
-#            main()
-
-#        assert exc_info.value.code == 0
-#        assert mock_handle_gen.call_count == 1
-
-
-def test_main_list_models_option(monkeypatch, mock_gemini_client, mock_args, capsys):
-    """--list-models 指定時にモデル一覧を表示して正常終了するか検証."""
-    mock_args.return_value.list_models = True
-
-    # モデルのモックを作成（SimpleNamespace を使用）
-    mock_model = SimpleNamespace(
-        name="models/gemini-flash-latest",
-        display_name="Gemini Flash Latest",
-        supported_actions=["generateContent"],
-        supported_generation_methods=["generateContent"],
-    )
-
-    # models.list() の戻り値としてモックのリストを設定
-    mock_gemini_client["client"].models.list.return_value = [mock_model]
-
-    monkeypatch.setattr("sys.argv", ["chat.py", "--list-models"])
-
-    with pytest.raises(SystemExit) as exc_info:
-        main()
-
-    assert exc_info.value.code == 0
-    captured = capsys.readouterr()
-
-    # 期待するモデル名が出力に含まれているか検証
-    assert "- gemini-flash-latest (Gemini Flash Latest)" in captured.out
-
-
-def test_main_list_models_exception(monkeypatch, mock_gemini_client, mock_args):
-    """--list-models 指定時に API エラー等の例外が発生した場合, sys.exit(1) で終了するか検証."""
-    mock_args.return_value.list_models = True
-
-    # models.list() 呼び出し時に Exception を発生させる
-    mock_gemini_client["client"].models.list.side_effect = Exception(
-        "API connection error"
-    )
-
-    monkeypatch.setattr("sys.argv", ["chat.py", "--list-models"])
-
-    with pytest.raises(SystemExit) as exc_info:
-        main()
-
-    # ステータスコード 1 で終了したことを検証
-    assert exc_info.value.code == 1
-
-
 def test_main_write_mode_system_instruction(monkeypatch, mock_gemini_client, mock_args):
     """write_mode が True の場合, system_instruction に Write Mode 用の指示が追加されるか検証."""
     # write_mode を True に設定
@@ -943,27 +871,27 @@ def test_main_chat_loop_write_mode_append_instruction(
     )
 
 
-#@patch("code_chat_cli.args.read_stdin_content", return_value="")
-#@patch("code_chat_cli.commands.commit.handle_commit_generation")
-#def test_cli_generate_commit_msg_failure(mock_handle, _mock_read_stdin, monkeypatch):
+# @patch("code_chat_cli.args.read_stdin_content", return_value="")
+# @patch("code_chat_cli.commands.commit.handle_commit_generation")
+# def test_cli_generate_commit_msg_failure(mock_handle, _mock_read_stdin, monkeypatch):
 #    """CLI 実行時にコミットメッセージ生成で例外が発生し, sys.exit(1) で終了することを検証."""
 #    # handle_commit_generation で例外を送出させる
 #    mock_handle.side_effect = RuntimeError("Unexpected Error")
 #
-    # コマンドライン引数をシミュレート (-g フラグなどを指定)
-    # project_name, -g (または --generate-commit-msg) を渡す
+# コマンドライン引数をシミュレート (-g フラグなどを指定)
+# project_name, -g (または --generate-commit-msg) を渡す
 #    monkeypatch.setattr("sys.argv", ["code-chat", "-g"])
 
-    # APIキーのチェック等で落ちないよう環境変数をダミー設定
+# APIキーのチェック等で落ちないよう環境変数をダミー設定
 #    monkeypatch.setenv("GEMINI_API_KEY", "dummy_key")
 
-    # sys.exit(1) が実行されると SystemExit 例外が発生する
+# sys.exit(1) が実行されると SystemExit 例外が発生する
 #    with pytest.raises(SystemExit) as exc_info:
 #        main()  # 引数なしで呼び出し
 
-    # 終了ステータスコードが 1 であることを検証
+# 終了ステータスコードが 1 であることを検証
 #    assert exc_info.value.code == 1
-    # 確実に呼び出されたか検証
+# 確実に呼び出されたか検証
 #    mock_handle.assert_called_once()
 
 

@@ -8,10 +8,8 @@ Gemini API と対話を行うためのコマンドラインインターフェー
 import atexit
 import logging
 import re
-import subprocess
 import sys
 import time
-from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -19,21 +17,17 @@ from typing import Any
 from google.genai import types
 from google.genai.errors import APIError, ClientError, ServerError
 
+from code_chat_cli.api import (
+    send_message_stream_with_retry,
+    send_message_with_retry,
+)
 from code_chat_cli.args import parse_args
 from code_chat_cli.client import get_gemini_client
-from code_chat_cli.api import (
-    _extract_retry_delay,
-    _is_retryable_error,
-    send_message_with_retry,
-    send_message_stream_with_retry,
-)
-from code_chat_cli.commands.review import handle_code_review
 from code_chat_cli.commands.commit import handle_commit_generation
-from code_chat_cli.git_utils import get_git_diff
+from code_chat_cli.commands.models import handle_list_models
+from code_chat_cli.commands.review import handle_code_review
 from code_chat_cli.logger import get_logger, setup_logging, suppress_info_logs
 from code_chat_cli.prompts import (
-    COMMIT_PROMPT_TEMPLATE_EN,
-    COMMIT_PROMPT_TEMPLATE_JA,
     WRITE_MODE_SYSTEM_INSTRUCTION,
 )
 
@@ -223,26 +217,6 @@ def handle_write_mode_confirmation(
         apply_file_modification(target_path_str, code)
     else:
         logger.info("上書きをキャンセルしました.")
-
-
-def handle_list_models(client: Any) -> None:
-    """利用可能な Gemini モデル一覧を取得して標準出力に表示します.
-
-    Args:
-        client (Any): Gemini API クライアントインスタンス.
-
-    Raises:
-        Exception: モデル一覧の取得時にエラーが発生した場合.
-    """
-    try:
-        print("利用可能なモデル一覧:")
-        for model in client.models.list():
-            if "generateContent" in model.supported_actions:
-                model_id = model.name.replace("models/", "")
-                print(f"- {model_id} ({model.display_name})")
-    except Exception:  # pylint: disable=broad-exception-caught
-        logger.exception("モデル一覧の取得に失敗しました")
-        raise
 
 
 def _build_context_prompt(cli_args: Any) -> str:
