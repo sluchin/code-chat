@@ -19,6 +19,9 @@ from code_chat_cli.chat import (
     handle_write_mode_confirmation,
     is_partial_code,
     main,
+)
+from code_chat_cli.history import (
+    # setup_readline_history,
     save_chat_history,
 )
 from google.genai.errors import APIError
@@ -830,7 +833,7 @@ def test_main_save_command_no_path_specified(monkeypatch, mock_args):
     inputs = iter(["/save", "exit"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
-    with patch("code_chat_cli.chat.save_chat_history") as mock_save:
+    with patch("code_chat_cli.history.save_chat_history") as mock_save:
         main()
 
         # save_path が None のため save_chat_history は呼ばれないことを検証
@@ -971,7 +974,7 @@ def test_main_finally_auto_save_enabled(monkeypatch, mock_gemini_client, mock_ar
     inputs = iter(["exit"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
-    with patch("code_chat_cli.chat.save_chat_history") as mock_save:
+    with patch("code_chat_cli.history.save_chat_history") as mock_save:
         main()
 
         # save_chat_history が呼び出されたか検証
@@ -995,7 +998,7 @@ def test_main_finally_output_file_specified(monkeypatch, mock_gemini_client, moc
     inputs = iter(["exit"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
-    with patch("code_chat_cli.chat.save_chat_history") as mock_save:
+    with patch("code_chat_cli.history.save_chat_history") as mock_save:
         main()
 
         # save_chat_history が指定した "output_result.md" で呼び出されたか検証
@@ -1042,7 +1045,7 @@ def test_main_keyboard_interrupt_handling(
             "code_chat_cli.chat.run_interactive_loop",
             side_effect=exception_type,
         ),
-        patch("code_chat_cli.chat._save_history_if_needed"),
+        patch("code_chat_cli.history.save_history_if_needed"),
         pytest.raises(SystemExit) as exc_info,
     ):
         main()

@@ -10,18 +10,12 @@ import pytest
 from code_chat_cli.chat import (
     main,
     run_single_turn_mode,
+)
+from code_chat_cli.history import (
     save_readline_history,
     setup_readline_history,
 )
-from code_chat_cli.api import (
-    _extract_retry_delay,
-    _is_retryable_error,
-    send_message_with_retry,
-    send_message_stream_with_retry,
-)
-from code_chat_cli.commands.commit import handle_commit_generation
 from code_chat_cli.logger import setup_logging
-from google.genai.errors import ClientError
 
 
 def test_readline_import_primary_success():
@@ -29,7 +23,7 @@ def test_readline_import_primary_success():
     with patch.dict("sys.modules", {"readline": MagicMock()}):
         importlib.reload(code_chat_cli.chat)
 
-    assert code_chat_cli.chat.readline is not None
+    assert code_chat_cli.history.readline is not None
 
 
 def test_readline_import_both_failed():
@@ -42,9 +36,9 @@ def test_readline_import_both_failed():
         return orig_import(name, *args, **kwargs)
 
     with patch("builtins.__import__", side_effect=mock_import):
-        importlib.reload(code_chat_cli.chat)
+        importlib.reload(code_chat_cli.history)
 
-    assert code_chat_cli.chat.readline is None
+    assert code_chat_cli.history.readline is None
 
 
 def test_setup_logging_app_logger_level():
@@ -59,14 +53,14 @@ def test_setup_logging_app_logger_level():
     assert root_logger.handlers[0].level == logging.DEBUG
 
 
-#def test_handle_commit_msg_generation_suppresses_traceback(caplog):
+# def test_handle_commit_msg_generation_suppresses_traceback(caplog):
 #    """APIError 発生時にトレースバックを出さず logger.error のみ出力することを検証."""
 #    mock_client = MagicMock()
 #
-    # git diff のダミー値を返す設定
+# git diff のダミー値を返す設定
 #    with (
 #        patch("code_chat_cli.chat.get_git_diff", return_value="diff --git a/b"),
-        # Gemini API の呼び出しで Exception を発生させる
+# Gemini API の呼び出しで Exception を発生させる
 #        patch(
 #            "code_chat_cli.api.send_message_stream_with_retry",
 #            side_effect=ClientError(429, {"error": {"message": "Rate limit exceeded"}}),
@@ -75,7 +69,7 @@ def test_setup_logging_app_logger_level():
 #    ):
 #        handle_commit_generation(mock_client, model_name="gemini-3.7-flash")
 
-    # ログメッセージが含まれていることを確認
+# ログメッセージが含まれていることを確認
 #    assert "Gemini API でエラーが発生しました" in caplog.text
 
 
@@ -217,10 +211,10 @@ def test_readline_import_fallback_pyreadline3_success():
         patch("builtins.__import__", side_effect=mock_import),
         patch.dict("sys.modules", {"pyreadline3": mock_pyreadline3}),
     ):
-        importlib.reload(code_chat_cli.chat)
+        importlib.reload(code_chat_cli.history)
 
-    assert code_chat_cli.chat.HAVE_READLINE is True
-    assert code_chat_cli.chat.readline is mock_pyreadline3
+    assert code_chat_cli.history.HAVE_READLINE is True
+    assert code_chat_cli.history.readline is mock_pyreadline3
 
 
 def test_setup_readline_history_os_error():
@@ -232,9 +226,9 @@ def test_setup_readline_history_os_error():
     mock_history_file.exists.return_value = True
 
     with (
-        patch("code_chat_cli.chat.HAVE_READLINE", True),
-        patch("code_chat_cli.chat.readline", mock_readline),
-        patch("code_chat_cli.chat.HISTORY_FILE", mock_history_file),
+        patch("code_chat_cli.history.HAVE_READLINE", True),
+        patch("code_chat_cli.history.readline", mock_readline),
+        patch("code_chat_cli.history.HISTORY_FILE", mock_history_file),
     ):
         setup_readline_history()
         mock_readline.read_history_file.assert_called_once()
@@ -248,9 +242,9 @@ def test_save_readline_history_os_error():
     mock_history_file = MagicMock()
 
     with (
-        patch("code_chat_cli.chat.HAVE_READLINE", True),
-        patch("code_chat_cli.chat.readline", mock_readline),
-        patch("code_chat_cli.chat.HISTORY_FILE", mock_history_file),
+        patch("code_chat_cli.history.HAVE_READLINE", True),
+        patch("code_chat_cli.history.readline", mock_readline),
+        patch("code_chat_cli.history.HISTORY_FILE", mock_history_file),
     ):
         save_readline_history()
         mock_readline.write_history_file.assert_called_once()
