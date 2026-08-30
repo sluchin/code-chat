@@ -1,10 +1,15 @@
+"""Gemini API 通信およびリトライ処理を行うモジュール."""
+
 import logging
 import re
 import time
+from collections.abc import Iterator
+from typing import Any
 
 from google.genai.errors import APIError, ClientError, ServerError
 
 from code_chat_cli.logger import get_logger
+
 logger = get_logger(__name__)
 
 
