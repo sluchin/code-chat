@@ -21,7 +21,14 @@ from google.genai.errors import APIError, ClientError, ServerError
 
 from code_chat_cli.args import parse_args
 from code_chat_cli.client import get_gemini_client
+from code_chat_cli.api import (
+    _extract_retry_delay,
+    _is_retryable_error,
+    send_message_with_retry,
+    send_message_stream_with_retry,
+)
 from code_chat_cli.commands.review import handle_code_review
+from code_chat_cli.commands.commit import handle_commit_generation
 from code_chat_cli.git_utils import get_git_diff
 from code_chat_cli.logger import get_logger, setup_logging, suppress_info_logs
 from code_chat_cli.prompts import (
@@ -238,249 +245,6 @@ def handle_list_models(client: Any) -> None:
         raise
 
 
-def handle_commit_msg_generation(
-    client: Any, model_name: str, lang: str = "en"
-) -> None:
-    """Git の diff（差分）を取得し, Gemini API を用いてコミットメッセージを自動生成します.
-
-    `git diff --staged`（ステージング済み差分）および `git diff`（未ステージング差分）を
-    読み取り, 変更内容が存在する場合に指定された言語で Conventional Commits 形式に沿った
-    適切なコミットメッセージを生成して標準出力に表示します.
-
-    Args:
-        client (Any): Gemini API クライアントインスタンス.
-        model_name (str): 使用する Gemini モデル名.
-        lang (str, optional): コミットメッセージの出力言語（例: "ja", "en"）. デフォルトは "en".
-
-    Raises:
-        subprocess.CalledProcessError: Git コマンドの実行に失敗した場合.
-        APIError: Gemini API 呼び出し時に通信エラーや 503 等が発生した場合.
-        Exception: その他の予期せぬエラーが発生した場合.
-    """
-    try:
-        diff_text = get_git_diff()
-
-        if not diff_text:
-            print(
-                "変更（git diff）が検出されませんでした.ファイルを修正するか `git add` してください."
-            )
-            return
-
-        # 言語に応じたテンプレートの選択（標準を日本語に設定）
-        template = (
-            COMMIT_PROMPT_TEMPLATE_JA if lang == "ja" else COMMIT_PROMPT_TEMPLATE_EN
-        )
-        prompt = template.format(diff=diff_text)
-
-        try:
-            response_stream = send_message_stream_with_retry(
-                chat=client.chats.create(model=model_name), prompt=prompt
-            )
-
-            for chunk in response_stream:
-                print(chunk.text, end="", flush=True)
-            print()
-
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            error_detail = (
-                str(e) if logger.isEnabledFor(logging.DEBUG) else type(e).__name__
-            )
-            logger.error(
-                "コミットメッセージの生成中にエラーが発生しました: %s",
-                error_detail,
-            )
-            raise
-
-    except subprocess.CalledProcessError as e:
-        logger.error("Git コマンドの実行に失敗しました: %s", e)
-        raise
-    except (APIError, ServerError, ClientError) as e:
-        error_detail = (
-            str(e) if logger.isEnabledFor(logging.DEBUG) else type(e).__name__
-        )
-        logger.error("Gemini API でエラーが発生しました: %s", error_detail)
-        raise
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.error("予期せぬエラーが発生しました: %s", e)
-        raise
-
-
-def _extract_retry_delay(e: Exception) -> float | None:
-    """APIのエラー詳細情報 (RetryInfo) から推奨待機時間 (秒) を抽出します.
-
-    Args:
-        e (Exception): 発生した例外オブジェクト.
-
-    Returns:
-        float | None: 抽出された推奨待機秒数. 抽出できない場合は None.
-    """
-    err_str = str(e)
-    match = re.search(r"retryDelay[\"']?\s*:\s*[\"']?(\d+(?:\.\d+)?)s", err_str)
-    if match:
-        try:
-            return float(match.group(1))
-        except ValueError:
-            pass
-    return None
-
-
-def _is_retryable_error(e: Exception) -> bool:
-    """リトライ対象のエラー（503/429等）かどうかを判定します.
-
-    Args:
-        e (Exception): 検証対象の Gemini API 例外オブジェクト.
-
-    Returns:
-        bool: リトライ対象のエラーである場合は True, 400 Bad Request 等のリトライ不可エラーの場合は False.
-    """
-    err_str = str(e)
-
-    # 1日あたりのクォータ超過 (RPD) は待機しても回復しないためリトライしない
-    if "PerDay" in err_str or "GenerateRequestsPerDay" in err_str:
-        logger.error("1日あたりの API 利用上限 (RPD) に到達しました.")
-        return False
-
-    # APIError, ServerError, ClientError すべてを対象
-    if isinstance(e, (APIError, ServerError, ClientError)):
-        code = getattr(e, "code", None) or getattr(e, "status_code", None)
-        if code in (503, 429):
-            return True
-
-    err_msg = str(e).upper()
-    return any(
-        keyword in err_msg
-        for keyword in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED")
-    )
-
-
-def send_message_with_retry(
-    chat: Any,
-    prompt: str,
-    max_retries: int = 3,
-    initial_delay: float = 1.0,
-    backoff_factor: float = 2.0,
-) -> Any:
-    """Gemini API へのリクエストを送信し, 通信エラー発生時にリトライを行います.
-
-    Args:
-        chat (Any): Gemini Chat インスタンス.
-        prompt (str): 送信するプロンプト文字列.
-        max_retries (int, optional): 最大リトライ回数. デフォルトは 3.
-        initial_delay (float, optional): 初回リトライ時の待ち時間（秒）. デフォルトは 1.0.
-        backoff_factor (float, optional): 指数バックオフの倍率. デフォルトは 2.0.
-
-    Returns:
-        Any: Gemini API からのレスポンス.
-
-    Raises:
-        Exception: 最大リトライ回数を超えてエラーが発生した場合.
-        AssertionError: 内部状態の不整合により例外オブジェクトが保持されなかった場合.
-    """
-    delay = initial_delay
-    last_exception: Exception | None = None
-
-    for attempt in range(1, max_retries + 1):
-        try:
-            return chat.send_message(prompt)
-
-        except Exception as e:  # noqa: BLE001 # pylint: disable=broad-exception-caught
-            last_exception = e
-            if attempt == max_retries or not _is_retryable_error(e):
-                break
-
-            api_retry_delay = _extract_retry_delay(e)
-            if api_retry_delay is not None:
-                sleep_time = api_retry_delay + 1.0
-            else:
-                sleep_time = delay
-                delay *= backoff_factor
-
-            logger.warning(
-                "Gemini API で一時的なエラーが発生しました (%d/%d): %s. %.1f秒後に再試行します...",
-                attempt,
-                max_retries,
-                e,
-                sleep_time,
-            )
-            time.sleep(sleep_time)
-
-    # ここに到達した時点で last_exception は必ず存在する
-    assert last_exception is not None  # 型チェッカーへの明示
-    raise last_exception
-
-
-def send_message_stream_with_retry(
-    chat: Any,
-    prompt: str,
-    max_retries: int = 3,
-    initial_delay: float = 1.0,
-    backoff_factor: float = 2.0,
-) -> Iterator[Any]:
-    """Gemini API へのストリーミングリクエストを送信し, 通信エラー発生時にリトライを行います.
-
-    イテレーション中の API エラー（503/429等）もキャッチして再試行します.
-    途中でエラーが発生した場合は画面に通知し, リトライ時は最初からメッセージを送り直します.
-
-    Args:
-        chat (Any): Gemini Chat インスタンス.
-        prompt (str): 送信するプロンプト文字列.
-        max_retries (int, optional): 最大リトライ回数. デフォルトは 3.
-        initial_delay (float, optional): 初回リトライ時の待ち時間（秒）. デフォルトは 1.0.
-        backoff_factor (float, optional): 指数バックオフの倍率. デフォルトは 2.0.
-
-    Yields:
-        Any: Gemini API からのレスポンスチャンク.
-
-    Raises:
-        APIError: 最大リトライ回数を超えてエラーが発生した場合.
-    """
-    delay = initial_delay
-
-    for attempt in range(1, max_retries + 1):
-        has_yielded_content = False
-
-        try:
-            response_stream = chat.send_message_stream(prompt)
-            for chunk in response_stream:
-                has_yielded_content = True  # チャンクをひとつでも送出したら True に変更
-                yield chunk
-            return  # 正常終了
-
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            # 既にユーザーに画面出力が開始されている途中で切れた場合は,
-            # 出力の重複を防ぐためリトライせずにエラーを送出する
-            if (
-                has_yielded_content
-                or attempt == max_retries
-                or not _is_retryable_error(e)
-            ):
-                error_detail = (
-                    str(e) if logger.isEnabledFor(logging.DEBUG) else type(e).__name__
-                )
-                logger.error(
-                    "ストリーミングの受信途中でエラーが発生しました（一部出力済みのためリトライ中断）: %s",
-                    error_detail,
-                )
-                raise
-
-            # API側から retryDelay の指定があれば優先, なければ指数バックオフ
-            api_retry_delay = _extract_retry_delay(e)
-            if api_retry_delay is not None:
-                sleep_time = api_retry_delay + 1.0
-            else:
-                sleep_time = delay
-                delay *= backoff_factor
-
-            logger.warning(
-                "Gemini API で一時的なエラーが発生しました (%d/%d): %s. %.1f秒後に再試行します...",
-                attempt,
-                max_retries,
-                e,
-                sleep_time,
-            )
-            time.sleep(sleep_time)
-
-
 def _build_context_prompt(cli_args: Any) -> str:
     """コンテキスト指定時のプロンプト文字列を構築します."""
     prompt_text = cli_args.prompt or ""
@@ -688,7 +452,7 @@ def _handle_subcommands(client: Any, cli_args: Any) -> None:
 
     if getattr(cli_args, "generate_commit_msg", False):
         try:
-            handle_commit_msg_generation(client, cli_args.model)
+            handle_commit_generation(client, cli_args.model)
             sys.exit(0)
         except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
             sys.exit(1)
