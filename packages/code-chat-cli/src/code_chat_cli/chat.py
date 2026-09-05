@@ -42,88 +42,12 @@ from code_chat_cli.prompts import (
 logger = get_logger(__name__)
 
 
-def _build_context_prompt(cli_args: Any) -> str:
-    """コンテキスト指定時のプロンプト文字列を構築します."""
-    prompt_text = cli_args.prompt or ""
-    if cli_args.write_mode and prompt_text:
-        prompt_text += "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください."
-
-    parts = [
-        "以下のソースコード・テキストを読み込んで, 今後の指示に対応してください.\n",
-        cli_args.context,
-    ]
-    if prompt_text:
-        parts.append(f"\n--- [指示] ---\n{prompt_text}")
-    else:
-        parts.append(
-            "\n準備ができたら「データを読み込みました. どのような対応を行いますか？」と簡潔に返答してください."
-        )
-    return "\n".join(parts)
-
-
-def _fetch_response_text(chat: Any, prompt: str, is_write_mode: bool) -> str:
-    """メッセージを送信し, 応答テキストを取得・出力します."""
-    if is_write_mode:
-        response = send_message_with_retry(chat, prompt)
-        response_text = response.text or ""
-        print(response_text)
-        return response_text
-
-    print("Gemini > ", end="", flush=True)
-    chunks = []
-    for chunk in send_message_stream_with_retry(chat, prompt):
-        if chunk.text:
-            print(chunk.text, end="", flush=True)
-            chunks.append(chunk.text)
-    print("\n")
-    return "".join(chunks)
-
-
 def run_single_turn_mode(chat: Any, cli_args: Any, chat_history: list[str]) -> None:
     """コンテキスト指定時やワンショットプロンプト実行時の単発処理を行います."""
     if cli_args.context:
         _handle_context_mode(chat, cli_args, chat_history)
     elif cli_args.prompt:
         _handle_prompt_mode(chat, cli_args, chat_history)
-
-
-def _handle_context_mode(chat: Any, cli_args: Any, chat_history: list[str]) -> None:
-    """コンテキストが存在する場合の処理."""
-    full_init_prompt = _build_context_prompt(cli_args)
-    file_label = getattr(cli_args, "file", None) or "コンテキストテキスト"
-
-    prompt_summary = f"\n\n[指示]: {cli_args.prompt}" if cli_args.prompt else ""
-    history_entry = (
-        f"### User (Initial Context)\n\n"
-        f"[ファイル読み込み: {file_label} ({len(cli_args.context)} bytes)]"
-        f"{prompt_summary}"
-    )
-    chat_history.append(history_entry)
-
-    logger.info("ファイル '%s' を Gemini のコンテキストとして送信中...", file_label)
-
-    response_text = _fetch_response_text(chat, full_init_prompt, cli_args.write_mode)
-    chat_history.append(f"### Gemini\n\n{response_text}")
-
-    if cli_args.write_mode and cli_args.prompt:
-        handle_write_mode_confirmation(cli_args.target_path, response_text)
-
-
-def _handle_prompt_mode(chat: Any, cli_args: Any, chat_history: list[str]) -> None:
-    """プロンプトのみの場合の処理."""
-    prompt_text = cli_args.prompt
-    if cli_args.write_mode:
-        prompt_text += "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください."
-
-    print(f"You > {prompt_text}")
-    chat_history.append(f"### User\n\n{prompt_text}")
-
-    response_text = _fetch_response_text(chat, prompt_text, is_write_mode=False)
-    logger.debug("レスポンス受信完了 - 文字数: %d", len(response_text))
-    chat_history.append(f"### Gemini\n\n{response_text}")
-
-    if cli_args.write_mode:
-        handle_write_mode_confirmation(cli_args.target_path, response_text)
 
 
 def run_interactive_loop(
@@ -195,6 +119,82 @@ def run_interactive_loop(
 
         if cli_args.write_mode:
             handle_write_mode_confirmation(cli_args.target_path, response_text)
+
+
+def _build_context_prompt(cli_args: Any) -> str:
+    """コンテキスト指定時のプロンプト文字列を構築します."""
+    prompt_text = cli_args.prompt or ""
+    if cli_args.write_mode and prompt_text:
+        prompt_text += "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください."
+
+    parts = [
+        "以下のソースコード・テキストを読み込んで, 今後の指示に対応してください.\n",
+        cli_args.context,
+    ]
+    if prompt_text:
+        parts.append(f"\n--- [指示] ---\n{prompt_text}")
+    else:
+        parts.append(
+            "\n準備ができたら「データを読み込みました. どのような対応を行いますか？」と簡潔に返答してください."
+        )
+    return "\n".join(parts)
+
+
+def _fetch_response_text(chat: Any, prompt: str, is_write_mode: bool) -> str:
+    """メッセージを送信し, 応答テキストを取得・出力します."""
+    if is_write_mode:
+        response = send_message_with_retry(chat, prompt)
+        response_text = response.text or ""
+        print(response_text)
+        return response_text
+
+    print("Gemini > ", end="", flush=True)
+    chunks = []
+    for chunk in send_message_stream_with_retry(chat, prompt):
+        if chunk.text:
+            print(chunk.text, end="", flush=True)
+            chunks.append(chunk.text)
+    print("\n")
+    return "".join(chunks)
+
+
+def _handle_context_mode(chat: Any, cli_args: Any, chat_history: list[str]) -> None:
+    """コンテキストが存在する場合の処理."""
+    full_init_prompt = _build_context_prompt(cli_args)
+    file_label = getattr(cli_args, "file", None) or "コンテキストテキスト"
+
+    prompt_summary = f"\n\n[指示]: {cli_args.prompt}" if cli_args.prompt else ""
+    history_entry = (
+        f"### User (Initial Context)\n\n"
+        f"[ファイル読み込み: {file_label} ({len(cli_args.context)} bytes)]"
+        f"{prompt_summary}"
+    )
+    chat_history.append(history_entry)
+
+    logger.info("ファイル '%s' を Gemini のコンテキストとして送信中...", file_label)
+
+    response_text = _fetch_response_text(chat, full_init_prompt, cli_args.write_mode)
+    chat_history.append(f"### Gemini\n\n{response_text}")
+
+    if cli_args.write_mode and cli_args.prompt:
+        handle_write_mode_confirmation(cli_args.target_path, response_text)
+
+
+def _handle_prompt_mode(chat: Any, cli_args: Any, chat_history: list[str]) -> None:
+    """プロンプトのみの場合の処理."""
+    prompt_text = cli_args.prompt
+    if cli_args.write_mode:
+        prompt_text += "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください."
+
+    print(f"You > {prompt_text}")
+    chat_history.append(f"### User\n\n{prompt_text}")
+
+    response_text = _fetch_response_text(chat, prompt_text, is_write_mode=False)
+    logger.debug("レスポンス受信完了 - 文字数: %d", len(response_text))
+    chat_history.append(f"### Gemini\n\n{response_text}")
+
+    if cli_args.write_mode:
+        handle_write_mode_confirmation(cli_args.target_path, response_text)
 
 
 def _setup_cli_logging(cli_args: Any) -> None:

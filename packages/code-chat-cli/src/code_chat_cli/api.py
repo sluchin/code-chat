@@ -13,54 +13,6 @@ from code_chat_cli.logger import get_logger
 logger = get_logger(__name__)
 
 
-def _extract_retry_delay(e: Exception) -> float | None:
-    """APIのエラー詳細情報 (RetryInfo) から推奨待機時間 (秒) を抽出します.
-
-    Args:
-        e (Exception): 発生した例外オブジェクト.
-
-    Returns:
-        float | None: 抽出された推奨待機秒数. 抽出できない場合は None.
-    """
-    err_str = str(e)
-    match = re.search(r"retryDelay[\"']?\s*:\s*[\"']?(\d+(?:\.\d+)?)s", err_str)
-    if match:
-        try:
-            return float(match.group(1))
-        except ValueError:
-            pass
-    return None
-
-
-def _is_retryable_error(e: Exception) -> bool:
-    """リトライ対象のエラー（503/429等）かどうかを判定します.
-
-    Args:
-        e (Exception): 検証対象の Gemini API 例外オブジェクト.
-
-    Returns:
-        bool: リトライ対象のエラーである場合は True, 400 Bad Request 等のリトライ不可エラーの場合は False.
-    """
-    err_str = str(e)
-
-    # 1日あたりのクォータ超過 (RPD) は待機しても回復しないためリトライしない
-    if "PerDay" in err_str or "GenerateRequestsPerDay" in err_str:
-        logger.error("1日あたりの API 利用上限 (RPD) に到達しました.")
-        return False
-
-    # APIError, ServerError, ClientError すべてを対象
-    if isinstance(e, (APIError, ServerError, ClientError)):
-        code = getattr(e, "code", None) or getattr(e, "status_code", None)
-        if code in (503, 429):
-            return True
-
-    err_msg = str(e).upper()
-    return any(
-        keyword in err_msg
-        for keyword in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED")
-    )
-
-
 def send_message_with_retry(
     chat: Any,
     prompt: str,
@@ -187,3 +139,51 @@ def send_message_stream_with_retry(
                 sleep_time,
             )
             time.sleep(sleep_time)
+
+
+def _extract_retry_delay(e: Exception) -> float | None:
+    """APIのエラー詳細情報 (RetryInfo) から推奨待機時間 (秒) を抽出します.
+
+    Args:
+        e (Exception): 発生した例外オブジェクト.
+
+    Returns:
+        float | None: 抽出された推奨待機秒数. 抽出できない場合は None.
+    """
+    err_str = str(e)
+    match = re.search(r"retryDelay[\"']?\s*:\s*[\"']?(\d+(?:\.\d+)?)s", err_str)
+    if match:
+        try:
+            return float(match.group(1))
+        except ValueError:
+            pass
+    return None
+
+
+def _is_retryable_error(e: Exception) -> bool:
+    """リトライ対象のエラー（503/429等）かどうかを判定します.
+
+    Args:
+        e (Exception): 検証対象の Gemini API 例外オブジェクト.
+
+    Returns:
+        bool: リトライ対象のエラーである場合は True, 400 Bad Request 等のリトライ不可エラーの場合は False.
+    """
+    err_str = str(e)
+
+    # 1日あたりのクォータ超過 (RPD) は待機しても回復しないためリトライしない
+    if "PerDay" in err_str or "GenerateRequestsPerDay" in err_str:
+        logger.error("1日あたりの API 利用上限 (RPD) に到達しました.")
+        return False
+
+    # APIError, ServerError, ClientError すべてを対象
+    if isinstance(e, (APIError, ServerError, ClientError)):
+        code = getattr(e, "code", None) or getattr(e, "status_code", None)
+        if code in (503, 429):
+            return True
+
+    err_msg = str(e).upper()
+    return any(
+        keyword in err_msg
+        for keyword in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED")
+    )
