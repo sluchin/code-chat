@@ -10,6 +10,59 @@ from code_chat_cli.constants import TEXT_EXTENSIONS
 from code_chat_cli.prompts import REVIEW_PROMPT_TEMPLATE
 
 
+def handle_code_review(
+    client: Any,
+    model_name: str,
+    staged: bool = False,
+    file_path: str | None = None,
+) -> None:
+    """コード差分または指定ファイルを解析し, LLM によるコードレビュー結果を表示する.
+
+    Args:
+        client (Any): Gemini API クライアントインスタンス.
+        model_name (str): 使用する Gemini モデル名.
+        staged (bool, optional): True の場合, git diff の --cached
+            (ステージング済み) 差分を対象にする. Defaults to False.
+        file_path (str | None, optional): レビュー対象のファイルまたは
+            ディレクトリのパス. 指定された場合は git diff ではなく
+            ファイル内容全体をレビューする. Defaults to None.
+    """
+    target_code: str | None = ""
+
+    if file_path:
+        path = Path(file_path)
+        if not path.exists():
+            print(f"エラー: 指定されたパスが存在しません: {file_path}", file=sys.stderr)
+            return
+
+        if path.is_dir():
+            target_code = _collect_directory_files(path)
+        else:
+            try:
+                content = path.read_text(encoding="utf-8")
+                target_code = f"=== File: {path} ===\n{content}"
+            except (OSError, UnicodeDecodeError) as e:
+                print(f"エラー: ファイルの読み込みに失敗しました: {e}", file=sys.stderr)
+                return
+    else:
+        target_code = _get_git_diff(staged)
+
+    if not target_code:
+        print("レビュー対象のコードまたは変更点が見つかりませんでした.")
+        return
+
+    prompt = REVIEW_PROMPT_TEMPLATE.format(code=target_code)
+
+    print("コードレビューを実行中...\n")
+    response = client.models.generate_content_stream(
+        model=model_name,
+        contents=prompt,
+    )
+    for chunk in response:
+        print(chunk.text, end="", flush=True)
+    print()
+
+
 def _collect_directory_files(target_dir: Path) -> str:
     """指定ディレクトリ配下のテキストファイルを走査・収集します.
 
@@ -67,56 +120,3 @@ def _get_git_diff(staged: bool) -> str | None:
     except FileNotFoundError:
         print("エラー: git コマンドが見つかりません.", file=sys.stderr)
         return None
-
-
-def handle_code_review(
-    client: Any,
-    model_name: str,
-    staged: bool = False,
-    file_path: str | None = None,
-) -> None:
-    """コード差分または指定ファイルを解析し, LLM によるコードレビュー結果を表示する.
-
-    Args:
-        client (Any): Gemini API クライアントインスタンス.
-        model_name (str): 使用する Gemini モデル名.
-        staged (bool, optional): True の場合, git diff の --cached
-            (ステージング済み) 差分を対象にする. Defaults to False.
-        file_path (str | None, optional): レビュー対象のファイルまたは
-            ディレクトリのパス. 指定された場合は git diff ではなく
-            ファイル内容全体をレビューする. Defaults to None.
-    """
-    target_code: str | None = ""
-
-    if file_path:
-        path = Path(file_path)
-        if not path.exists():
-            print(f"エラー: 指定されたパスが存在しません: {file_path}", file=sys.stderr)
-            return
-
-        if path.is_dir():
-            target_code = _collect_directory_files(path)
-        else:
-            try:
-                content = path.read_text(encoding="utf-8")
-                target_code = f"=== File: {path} ===\n{content}"
-            except (OSError, UnicodeDecodeError) as e:
-                print(f"エラー: ファイルの読み込みに失敗しました: {e}", file=sys.stderr)
-                return
-    else:
-        target_code = _get_git_diff(staged)
-
-    if not target_code:
-        print("レビュー対象のコードまたは変更点が見つかりませんでした.")
-        return
-
-    prompt = REVIEW_PROMPT_TEMPLATE.format(code=target_code)
-
-    print("コードレビューを実行中...\n")
-    response = client.models.generate_content_stream(
-        model=model_name,
-        contents=prompt,
-    )
-    for chunk in response:
-        print(chunk.text, end="", flush=True)
-    print()
