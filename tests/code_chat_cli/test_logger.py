@@ -5,7 +5,23 @@ import os
 import socket
 from unittest.mock import patch
 
-from code_chat_cli.logger import get_logger, setup_logging, syslog_context_filter
+from code_chat_cli.logger import (
+    get_logger,
+    setup_logging,
+    syslog_context_filter,
+)
+
+
+def test_setup_logging_app_logger_level():
+    """setup_logging が app_logger と handler のレベルを正しく更新するか検証."""
+    setup_logging("DEBUG")
+
+    app_logger = logging.getLogger("code_chat_cli")
+    root_logger = logging.getLogger()
+
+    assert app_logger.level == logging.DEBUG
+    assert len(root_logger.handlers) > 0
+    assert root_logger.handlers[0].level == logging.DEBUG
 
 
 def test_syslog_context_filter():
