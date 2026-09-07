@@ -18,7 +18,7 @@ class CodeRagService:
         self,
         repo_path: str | None = None,
         persist_directory: str = "./.chroma_db",
-        model_name: str = "gpt-4o-mini",
+        model_name: str = "gemini-flash-latest",
     ) -> None:
         self.repo_path = str(repo_path)
         self.vector_store = VectorStore(persist_directory=persist_directory)

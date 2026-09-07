@@ -4,26 +4,26 @@ code\_chat\_rag package
 Submodules
 ----------
 
-code\_chat\_rag.indexer module
-------------------------------
+code\_chat\_rag.code\_indexer module
+------------------------------------
 
-.. automodule:: code_chat_rag.indexer
+.. automodule:: code_chat_rag.code_indexer
    :members:
    :show-inheritance:
    :undoc-members:
 
-code\_chat\_rag.manager module
-------------------------------
+code\_chat\_rag.code\_rag\_service module
+-----------------------------------------
 
-.. automodule:: code_chat_rag.manager
+.. automodule:: code_chat_rag.code_rag_service
    :members:
    :show-inheritance:
    :undoc-members:
 
-code\_chat\_rag.store module
-----------------------------
+code\_chat\_rag.vector\_store module
+------------------------------------
 
-.. automodule:: code_chat_rag.store
+.. automodule:: code_chat_rag.vector_store
    :members:
    :show-inheritance:
    :undoc-members:

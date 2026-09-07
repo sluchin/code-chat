@@ -119,6 +119,7 @@ def read_path_content(target_path: str) -> str:
 
     if path.is_dir():
         contents: list[str] = []
+        loaded_files: list[Path] = []
 
         # os.walk を使うことで除外ディレクトリ配下の走査を即座にスキップ可能
         for root, dirs, files in os.walk(path):
@@ -131,6 +132,8 @@ def read_path_content(target_path: str) -> str:
                     try:
                         text = file_path.read_text(encoding="utf-8", errors="ignore")
                         contents.append(f"=== File: {file_path} ===\n{text}")
+                        loaded_files.append(file_path)
+                        logger.debug("読み込み完了: %s", file_path)
                     except OSError as e:
                         logger.warning(
                             "'%s' の読み込みをスキップしました: %s",
@@ -145,7 +148,15 @@ def read_path_content(target_path: str) -> str:
             )
             return ""
 
-        return "\n\n".join(contents)
+        total_text = "\n\n".join(contents)
+        logger.info(
+            "ディレクトリ '%s' から %d 件のファイルをコンテキストとして読み込みました (合計: %d 文字).",
+            target_path,
+            len(loaded_files),
+            len(total_text),
+        )
+
+        return total_text
 
     return ""
 

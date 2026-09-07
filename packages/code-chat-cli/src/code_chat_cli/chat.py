@@ -34,6 +34,7 @@ from code_chat_cli.history import (
     save_readline_history,
     setup_readline_history,
 )
+from code_chat_cli.index import handle_ask, handle_index
 from code_chat_cli.logger import get_logger, setup_logging, suppress_info_logs
 from code_chat_cli.prompts import (
     WRITE_MODE_SYSTEM_INSTRUCTION,
@@ -75,7 +76,7 @@ def run_interactive_loop(
     while True:
         try:
             user_input = input("You > ").strip()
-        except KeyboardInterrupt, EOFError:
+        except (KeyboardInterrupt, EOFError):
             print()
             logger.info("会話を終了します.")
             sys.exit(0)
@@ -209,6 +210,20 @@ def _setup_cli_logging(cli_args: Any) -> None:
 
 def _handle_subcommands(client: Any, cli_args: Any) -> None:
     """特定サブコマンドフラグ指定時の独立処理を実行します."""
+    command = getattr(cli_args, "command", None)
+    if command == "index":
+        try:
+            handle_index(cli_args.repo_path)
+            sys.exit(0)
+        except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+            sys.exit(1)
+    elif command == "ask":
+        try:
+            handle_ask(cli_args.query)
+            sys.exit(0)
+        except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+            sys.exit(1)
+
     if getattr(cli_args, "list_models", False):
         try:
             handle_list_models(client)
@@ -281,13 +296,13 @@ def main() -> None:
         else:
             run_interactive_loop(chat, cli_args, output_file, chat_history)
 
-    except KeyboardInterrupt, EOFError:
+    except (KeyboardInterrupt, EOFError):
         logger.info("\n[Ctrl+C] 会話を終了します.")
         sys.exit(0)
     except (APIError, ServerError, ClientError) as e:
         logger.error("Gemini API エラーにより処理を中断しました: %s", e)
         sys.exit(1)
-    except FileNotFoundError, ValueError, PermissionError:
+    except (FileNotFoundError, ValueError, PermissionError):
         logger.exception("ファイル操作でエラーが発生しました")
         sys.exit(1)
     except Exception as e:  # pylint: disable=broad-exception-caught

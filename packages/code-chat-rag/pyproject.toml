@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Tetsuya Higashi", email = "996846+sluchin@users.noreply.github.com" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "chromadb>=1.5.9",
     "langchain>=1.3.15",

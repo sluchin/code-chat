@@ -38,29 +38,6 @@ def mock_gemini_client():
         }
 
 
-@pytest.fixture
-def mock_args():
-    """parse_args の全属性を網羅した SimpleNamespace モック."""
-    with patch("code_chat_cli.chat.parse_args") as mock_parse:
-        args = SimpleNamespace(
-            debug=False,
-            log_level="INFO",
-            write_mode=False,
-            model="gemini-flash-latest",
-            context=None,
-            prompt=None,
-            output_path=None,
-            target_path=None,
-            auto_save=False,
-            list_models=False,
-            generate_commit_msg=False,
-            review=False,
-            staged=False,
-        )
-        mock_parse.return_value = args
-        yield mock_parse
-
-
 def test_main_list_models_option(monkeypatch, mock_gemini_client, mock_args, capsys):
     """--list-models 指定時にモデル一覧を表示して正常終了するか検証."""
     mock_args.return_value.list_models = True
