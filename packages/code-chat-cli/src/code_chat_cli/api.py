@@ -46,6 +46,7 @@ def send_message_with_retry(
         except Exception as e:  # noqa: BLE001 # pylint: disable=broad-exception-caught
             last_exception = e
             if attempt == max_retries or not _is_retryable_error(e):
+                _log_api_error_details(e)
                 break
 
             api_retry_delay = _extract_retry_delay(e)
@@ -114,13 +115,17 @@ def send_message_stream_with_retry(
                 or attempt == max_retries
                 or not _is_retryable_error(e)
             ):
-                error_detail = (
-                    str(e) if logger.isEnabledFor(logging.DEBUG) else type(e).__name__
-                )
-                logger.error(
-                    "ストリーミングの受信途中でエラーが発生しました（一部出力済みのためリトライ中断）: %s",
-                    error_detail,
-                )
+                _log_api_error_details(e)
+                if has_yielded_content:
+                    error_detail = (
+                        str(e)
+                        if logger.isEnabledFor(logging.DEBUG)
+                        else type(e).__name__
+                    )
+                    logger.error(
+                        "ストリーミングの受信途中でエラーが発生しました（一部出力済みのためリトライ中断）: %s",
+                        error_detail,
+                    )
                 raise
 
             # API側から retryDelay の指定があれば優先, なければ指数バックオフ
@@ -187,3 +192,23 @@ def _is_retryable_error(e: Exception) -> bool:
         keyword in err_msg
         for keyword in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED")
     )
+
+
+def _log_api_error_details(e: Exception) -> None:
+    """API エラーの詳細情報と解決のヒントをログに出力します.
+
+    Args:
+        e (Exception): 発生した例外オブジェクト.
+    """
+    err_str = str(e)
+    code = getattr(e, "code", None) or getattr(e, "status_code", None) or "N/A"
+
+    logger.error("Gemini API エラーが発生しました [HTTP %s]: %s", code, err_str)
+
+    if "429" in str(code) or "RESOURCE_EXHAUSTED" in err_str.upper():
+        logger.error(
+            "【ヒント】429 エラーの原因:\n"
+            "  1. API キーが有料プロジェクト（Google Cloud 請求先アカウント）に紐付いていない (無料枠の上限に到達)\n"
+            "  2. 一度に送信したコード（コンテキスト）のサイズが大きすぎる (TPM 制限を超過)\n"
+            "  3. 短時間での連続呼び出し (RPM 制限を超過)"
+        )

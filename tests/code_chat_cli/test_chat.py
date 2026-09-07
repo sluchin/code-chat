@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from code_chat_cli.chat import (
+    _handle_subcommands,
     main,
     run_single_turn_mode,
 )
@@ -341,14 +342,15 @@ def test_main_keyboard_interrupt(monkeypatch):
     # parse_args と get_gemini_client をモック化
     with patch("code_chat_cli.chat.parse_args") as mock_parse_args:
         mock_args = MagicMock()
-        mock_args.list_models = False
+        mock_args.prompt = None
+        mock_args.target_path = None
+        mock_args.output_path = None
+        mock_args.auto_save = False
         mock_args.generate_commit_msg = False
         mock_args.debug = False
         mock_args.log_level = "INFO"
+        mock_args.list_models = False
         mock_args.context = None
-        mock_args.prompt = None
-        mock_args.auto_save = False
-        mock_args.output_path = None
         mock_parse_args.return_value = mock_args
 
         # input() が呼ばれたら KeyboardInterrupt を発生させる
@@ -573,15 +575,16 @@ def test_main_keyboard_interrupt_exit():
     ):
         # prompt / context が None なので run_interactive_loop に進む
         mock_args.return_value = MagicMock(
-            list_models=False,
-            generate_commit_msg=False,
-            debug=False,
-            log_level="INFO",
-            context=None,
             prompt=None,
-            write_mode=False,
+            target_path=None,
             output_path=None,
             auto_save=False,
+            write_mode=False,
+            debug=False,
+            log_level="INFO",
+            list_models=False,
+            generate_commit_msg=False,
+            context=None,
         )
 
         with pytest.raises(SystemExit) as exc_info:
@@ -598,15 +601,16 @@ def test_main_eof_error_exit():
         patch("code_chat_cli.chat.run_interactive_loop", side_effect=EOFError),
     ):
         mock_args.return_value = MagicMock(
-            list_models=False,
-            generate_commit_msg=False,
-            debug=False,
-            log_level="INFO",
-            context=None,
             prompt=None,
-            write_mode=False,
+            target_path=None,
             output_path=None,
             auto_save=False,
+            write_mode=False,
+            debug=False,
+            log_level="INFO",
+            list_models=False,
+            generate_commit_msg=False,
+            context=None,
         )
 
         with pytest.raises(SystemExit) as exc_info:
@@ -683,3 +687,78 @@ def test_cli_generate_commit_msg_integration(
 
     assert exc_info.value.code == 0
     mock_handle.assert_called_once()
+
+
+def test_handle_subcommands_index_success() -> None:
+    """command='index' で正常終了する場合、sys.exit(0) が呼ばれること."""
+    mock_client = MagicMock()
+    mock_args = MagicMock(command="index", repo_path="/path/to/repo")
+
+    with (
+        patch("code_chat_cli.chat.handle_index") as mock_handle_index,
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        _handle_subcommands(mock_client, mock_args)
+
+    mock_handle_index.assert_called_once_with("/path/to/repo")
+    assert exc_info.value.code == 0
+
+
+def test_handle_subcommands_index_exception() -> None:
+    """command='index' 実行時に例外が発生した場合、sys.exit(1) が呼ばれること."""
+    mock_client = MagicMock()
+    mock_args = MagicMock(command="index", repo_path="/path/to/repo")
+
+    with (
+        patch(
+            "code_chat_cli.chat.handle_index", side_effect=RuntimeError("Index failure")
+        ),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        _handle_subcommands(mock_client, mock_args)
+
+    assert exc_info.value.code == 1
+
+
+def test_handle_subcommands_ask_success() -> None:
+    """command='ask' で正常終了する場合、sys.exit(0) が呼ばれること."""
+    mock_client = MagicMock()
+    mock_args = MagicMock(command="ask", query="how to use this?")
+
+    with (
+        patch("code_chat_cli.chat.handle_ask") as mock_handle_ask,
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        _handle_subcommands(mock_client, mock_args)
+
+    mock_handle_ask.assert_called_once_with("how to use this?")
+    assert exc_info.value.code == 0
+
+
+def test_handle_subcommands_ask_exception() -> None:
+    """command='ask' 実行時に例外が発生した場合、sys.exit(1) が呼ばれること."""
+    mock_client = MagicMock()
+    mock_args = MagicMock(command="ask", query="how to use this?")
+
+    with (
+        patch("code_chat_cli.chat.handle_ask", side_effect=RuntimeError("Ask failure")),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        _handle_subcommands(mock_client, mock_args)
+
+    assert exc_info.value.code == 1
+
+
+def test_handle_subcommands_none() -> None:
+    """サブコマンドが指定されていない場合、処理をスキップすること."""
+    mock_client = MagicMock()
+    mock_args = MagicMock(
+        target_path=None,
+        list_models=False,
+        generate_commit_msg=False,
+        review=False,
+        command=None,
+    )
+
+    # sys.exit が呼ばれずに正常終了することを確認
+    _handle_subcommands(mock_client, mock_args)

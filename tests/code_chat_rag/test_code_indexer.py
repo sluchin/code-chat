@@ -97,3 +97,26 @@ def test_load_and_chunk_empty_documents(mock_loader_cls, tmp_path):
 
     assert not chunks
     mock_loader.load.assert_called_once()
+
+
+def test_get_splitter_for_path_fallback() -> None:
+    """マッピングにない拡張子（.txt や .unknown など）を指定した場合に汎用スプリッターが返されることを検証."""
+    # コンストラクタに必要な依存オブジェクトがあれば MagicMock 等で作成
+    indexer = CodeIndexer()
+
+    # pylint: disable=protected-access
+    splitter = indexer._get_splitter_for_path("example.txt")
+
+    assert splitter._chunk_size == indexer.chunk_size
+    assert splitter._chunk_overlap == indexer.chunk_overlap
+
+
+def test_get_splitter_for_path_no_extension() -> None:
+    """拡張子のないファイルパス（Dockerfile など）を指定した場合のフォールバックを検証."""
+    indexer = CodeIndexer()
+
+    # pylint: disable=protected-access
+    splitter = indexer._get_splitter_for_path("Dockerfile")
+
+    assert splitter._chunk_size == indexer.chunk_size
+    assert splitter._chunk_overlap == indexer.chunk_overlap

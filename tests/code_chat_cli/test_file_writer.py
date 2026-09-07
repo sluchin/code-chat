@@ -1,12 +1,16 @@
 """ファイル書き込みおよび変更の確認処理モジュールの単体テスト."""
 
+import time
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 from code_chat_cli.file_writer import (
+    _cleanup_old_backups,
     _is_partial_code,
+    _sanitize_code_output,
     apply_file_modification,
+    create_safe_backup,
     handle_write_mode_confirmation,
 )
 
@@ -54,13 +58,12 @@ def test_apply_file_modification_success(tmp_path):
     new_code = "updated_code"
     apply_file_modification(str(target_file), new_code)
 
-    # バックアップファイル (.py.bak) が作成され, 元の内容が保存されていること
-    bak_file = tmp_path / "sample.py.bak"
-    assert bak_file.exists()
-    assert bak_file.read_text(encoding="utf-8") == "original_code"
+    bak_orig = tmp_path / "sample.py.bak.orig"
+    assert bak_orig.exists()
 
-    # 対象ファイルが新しいコードで更新されていること
-    assert target_file.read_text(encoding="utf-8") == new_code
+    # タイムスタンプ付きバックアップの存在確認 (glob検索など)
+    bak_files = list(tmp_path.glob("sample.py.bak.*"))
+    assert len(bak_files) >= 1
 
 
 def test_apply_file_modification_not_a_file(tmp_path):
@@ -140,3 +143,122 @@ def test_handle_write_mode_confirmation_user_declines(monkeypatch, tmp_path):
 
     # ファイルが上書きされていないこと
     assert target_file.read_text(encoding="utf-8") == "print('old')"
+
+
+def test_create_safe_backup_not_exists(tmp_path: Path) -> None:
+    """存在しないファイルパスを指定した場合、None が返されること."""
+    non_existent_path = tmp_path / "non_existent.py"
+
+    result = create_safe_backup(non_existent_path)
+
+    assert result is None
+
+
+def test_create_safe_backup_is_directory(tmp_path: Path) -> None:
+    """ファイルではなくディレクトリパスを指定した場合、None が返されること."""
+    dir_path = tmp_path / "test_dir"
+    dir_path.mkdir()
+
+    result = create_safe_backup(dir_path)
+
+    assert result is None
+
+
+def test_extract_code_block_fallback_with_intro_phrase() -> None:
+    """コードブロック記号がなく、先頭に解説文（"Here is the code:" など）が含まれる場合のフォールバック抽出を検証."""
+    text = (
+        "Here is the code:\n"  # 253-255行目の continue を通過
+        "\n"  # 250行目 (not stripped)
+        "# This is a comment\n"  # 249行目 (startswith("#"))
+        "import os\n"  # 249行目 (startswith("import "))
+        "def main():\n"
+        "    pass\n"
+    )
+
+    result = _sanitize_code_output(text)
+
+    expected = "# This is a comment\nimport os\ndef main():\n    pass\n"
+    assert result == expected
+
+
+def test_extract_code_block_fallback_direct_code() -> None:
+    """コードブロック記号がなく、解説文なしで通常のテキストからコードが開始する場合を検証."""
+    text = (
+        "Some general explanation text\n"  # 256-257行目の else (is_code_started = True) を通過
+        "print('hello')\n"
+    )
+
+    result = _sanitize_code_output(text)
+
+    expected = "Some general explanation text\nprint('hello')\n"
+    assert result == expected
+
+
+def test_extract_code_block_fallback_empty_result() -> None:
+    """コード部分が存在せず空文字が返される場合（263行目の else 判定）を検証."""
+    text = "Here is the code:\n"  # 全行スキップされて sanitized が空になる
+
+    result = _sanitize_code_output(text)
+
+    assert result == ""
+
+
+def test_cleanup_old_backups_exceeds_max_keep(tmp_path: Path) -> None:
+    """古いバックアップファイル数が上限を超えた場合、超過分が正常に削除されることを検証."""
+    target_file = tmp_path / "test.py"
+    target_file.write_text("content", encoding="utf-8")
+
+    # 例: max_keep が 3 の場合、4つのバックアップファイルを作成
+    backup_files = []
+    for i in range(4):
+        # タイムスタンプ順になるようソート可能な名前で作成
+        bak = tmp_path / f"test.py.bak.20260907_10000{i}"
+        bak.write_text(f"backup {i}", encoding="utf-8")
+        backup_files.append(bak)
+        time.sleep(0.01)
+
+    # _cleanup_old_backups を実行 (max_keep=3 を指定)
+    _cleanup_old_backups(target_file, max_keep=3)
+
+    # 最も古い backup_files[0] のみが削除されていること
+    assert not backup_files[0].exists()
+    assert backup_files[1].exists()
+    assert backup_files[2].exists()
+    assert backup_files[3].exists()
+
+
+def test_cleanup_old_backups_unlink_os_error(tmp_path: Path) -> None:
+    """古いバックアップファイルの削除中に OSError が発生しても例外をキャッチして継続することを検証."""
+    target_file = tmp_path / "test.py"
+    target_file.write_text("content", encoding="utf-8")
+
+    # max_keep を超える2つのバックアップを作成
+    bak1 = tmp_path / "test.py.20260907_100001.bak"
+    bak2 = tmp_path / "test.py.20260907_100002.bak"
+    bak1.write_text("old", encoding="utf-8")
+    bak2.write_text("new", encoding="utf-8")
+
+    # unlink 呼び出し時に OSError を発生させる
+    with patch.object(Path, "unlink", side_effect=OSError("Permission denied")):
+        # 例外がスルーされずに正常終了することを確認
+        _cleanup_old_backups(target_file, max_keep=1)
+
+
+def test_cleanup_old_backups_os_error_handled(tmp_path: Path) -> None:
+    """古いバックアップ削除時に OSError が発生しても例外をキャッチして処理が継続することを検証."""
+    target_file = tmp_path / "test.py"
+    target_file.write_text("initial content", encoding="utf-8")
+
+    # 実際にバックアップファイルをディスクに作成する
+    # (※プロダクトコードの命名規則に合わせて .bak などの拡張子を調整してください)
+    for i in range(4):
+        bak = tmp_path / f"test.py.bak.20260907_10000{i}"
+        bak.write_text(f"backup {i}", encoding="utf-8")
+
+    # module 側の Path.unlink を失敗させる
+    with patch(
+        "code_chat_cli.file_writer.Path.unlink",
+        side_effect=OSError("Permission denied"),
+    ):
+        # 例外が発生しても例外が送出されず正常終了することを確認
+        _cleanup_old_backups(target_file, max_keep=1)

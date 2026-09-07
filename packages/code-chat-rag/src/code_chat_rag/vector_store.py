@@ -1,5 +1,6 @@
 """コード埋め込み用のベクトルストア管理モジュール."""
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -7,6 +8,8 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+logger = logging.getLogger(__name__)
 
 
 class VectorStore:
@@ -20,13 +23,18 @@ class VectorStore:
         self.persist_directory = str(persist_directory)
         # デフォルトは OpenAIEmbeddings (環境変数 OPENAI_API_KEY が必要).
         self.embeddings = embedding_function or GoogleGenerativeAIEmbeddings(
-            model="text-embedding-3-small"
+            model="gemini-flash-latest"
         )
         self._db: Chroma | None = None
 
     def _get_db(self) -> Chroma:
         """Chromaデータベースインスタンスを取得または初期化します."""
         path = Path(self.persist_directory)
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            logger.warning("ディレクトリ '%s' の作成に失敗しました: %s", path, e)
+
         if not path.exists():
             raise FileNotFoundError(f"ディレクトリのパスが存在しません: {path}")
 
