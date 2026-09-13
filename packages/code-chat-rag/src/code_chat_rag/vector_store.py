@@ -27,24 +27,6 @@ class VectorStore:
         )
         self._db: Chroma | None = None
 
-    def _get_db(self) -> Chroma:
-        """Chromaデータベースインスタンスを取得または初期化します."""
-        path = Path(self.persist_directory)
-        try:
-            path.mkdir(parents=True, exist_ok=True)
-        except OSError as e:
-            logger.warning("ディレクトリ '%s' の作成に失敗しました: %s", path, e)
-
-        if not path.exists():
-            raise FileNotFoundError(f"ディレクトリのパスが存在しません: {path}")
-
-        if self._db is None:
-            self._db = Chroma(
-                persist_directory=str(path),
-                embedding_function=self.embeddings,
-            )
-        return self._db
-
     def add_chunks(self, chunks: list[dict[str, Any]]) -> list[str]:
         """チャンクの辞書データをベクトルデータベースに保存します.
 
@@ -75,3 +57,21 @@ class VectorStore:
         """検索実行用のリトリーバーインターフェースを返します."""
         db = self._get_db()
         return db.as_retriever(search_type=search_type, search_kwargs={"k": k})
+
+    def _get_db(self) -> Chroma:
+        """Chromaデータベースインスタンスを取得または初期化します."""
+        path = Path(self.persist_directory)
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            logger.warning("ディレクトリ '%s' の作成に失敗しました: %s", path, e)
+
+        if not path.exists():
+            raise FileNotFoundError(f"ディレクトリのパスが存在しません: {path}")
+
+        if self._db is None:
+            self._db = Chroma(
+                persist_directory=str(path),
+                embedding_function=self.embeddings,
+            )
+        return self._db

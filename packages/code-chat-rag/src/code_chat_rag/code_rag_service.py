@@ -42,6 +42,32 @@ class CodeRagService:
         added_ids = self.vector_store.add_chunks(chunks)
         return len(added_ids)
 
+    def ask(self, question: str, k: int = 5) -> str:
+        """インデックスされたコードベースを使用してコードに関する質問に回答します.
+
+        Args:
+            question: ユーザーのクエリ文字列.
+            k: 参照する取得チャンク数.
+
+        Returns:
+            生成された回答テキスト.
+        """
+        chain = self._build_chain(k=k)
+        return chain.invoke(question)
+
+    def ask_stream(self, question: str, k: int = 5) -> Generator[str, None, None]:
+        """レスポンシブなCLIインタラクションのために回答トークンをストリーミングします.
+
+        Args:
+            question: ユーザーのクエリ文字列.
+            k: 参照する取得チャンク数.
+
+        Yields:
+            LLMによって生成されたトークンチャンク.
+        """
+        chain = self._build_chain(k=k)
+        yield from chain.stream(question)
+
     def _build_chain(self, k: int = 5):
         """LangChain Expression Language (LCEL) を使用してRAGパイプラインを構築します."""
         retriever = self.vector_store.as_retriever(k=k)
@@ -74,29 +100,3 @@ class CodeRagService:
             | StrOutputParser()
         )
         return chain
-
-    def ask(self, question: str, k: int = 5) -> str:
-        """インデックスされたコードベースを使用してコードに関する質問に回答します.
-
-        Args:
-            question: ユーザーのクエリ文字列.
-            k: 参照する取得チャンク数.
-
-        Returns:
-            生成された回答テキスト.
-        """
-        chain = self._build_chain(k=k)
-        return chain.invoke(question)
-
-    def ask_stream(self, question: str, k: int = 5) -> Generator[str, None, None]:
-        """レスポンシブなCLIインタラクションのために回答トークンをストリーミングします.
-
-        Args:
-            question: ユーザーのクエリ文字列.
-            k: 参照する取得チャンク数.
-
-        Yields:
-            LLMによって生成されたトークンチャンク.
-        """
-        chain = self._build_chain(k=k)
-        yield from chain.stream(question)
