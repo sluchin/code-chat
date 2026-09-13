@@ -1,3 +1,5 @@
+"""モデル関連のコマンドハンドラを提供するモジュール."""
+
 from typing import Any
 
 from code_chat_cli.logger import get_logger

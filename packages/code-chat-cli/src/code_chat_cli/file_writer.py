@@ -86,8 +86,8 @@ def handle_write_mode_confirmation(
 def apply_file_modification(target_path: str, new_code: str) -> None:
     """指定された単一ファイルへ修正後コードを書き込みます.
 
-    元のファイルと同じディレクトリに `.bak` 拡張子を付けたバックアップファイルを
-    生成した上で, 指定パスのファイルを新しい内容で上書きします.
+    安全なバックアップファイルを生成した上で,
+    指定パスのファイルを新しい内容で上書きします.
 
     Args:
         target_path (str): 上書き対象のファイルパス.
@@ -99,7 +99,7 @@ def apply_file_modification(target_path: str, new_code: str) -> None:
         return
 
     try:
-        # バックアップファイルの作成 (.bak)
+        # バックアップファイルの作成
         if path.exists():
             create_safe_backup(path)
 
@@ -122,7 +122,10 @@ def create_safe_backup(path: Path) -> Path | None:
 
     Returns:
         Path | None: 作成されたタイムスタンプ付きバックアップのパス.
-            ファイルが存在しない場合は None.
+            ファイルが存在しないか通常ファイルでない場合は None.
+
+    Raises:
+        OSError: タイムスタンプ付きバックアップの作成に失敗した場合.
     """
     if not path.exists() or not path.is_file():
         return None

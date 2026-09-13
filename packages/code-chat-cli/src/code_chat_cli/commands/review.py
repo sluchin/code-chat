@@ -65,7 +65,7 @@ def handle_code_review(
 
 
 def _get_git_diff(staged: bool) -> str | None:
-    """git diff から変更差分を取得します.
+    """git diff から変更差分を取得する.
 
     Args:
         staged (bool): True の場合 `--cached` (ステージング済み) 差分を取得する.

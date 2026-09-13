@@ -2,7 +2,6 @@
 
 import logging
 import subprocess
-import sys
 from typing import Any
 
 from google.genai.errors import APIError, ClientError, ServerError
@@ -10,14 +9,12 @@ from google.genai.errors import APIError, ClientError, ServerError
 from code_chat_cli.api import send_message_stream_with_retry
 from code_chat_cli.git_utils import get_git_diff
 from code_chat_cli.logger import get_logger
-from code_chat_cli.prompts import COMMIT_PROMPT_TEMPLATE_JA, COMMIT_PROMPT_TEMPLATE_EN
+from code_chat_cli.prompts import COMMIT_PROMPT_TEMPLATE_EN, COMMIT_PROMPT_TEMPLATE_JA
 
 logger = get_logger(__name__)
 
 
-def handle_commit_generation(
-    client: Any, model_name: str, lang: str = "en"
-) -> None:
+def handle_commit_generation(client: Any, model_name: str, lang: str = "en") -> None:
     """Git の diff（差分）を取得し, Gemini API を用いてコミットメッセージを自動生成します.
 
     `git diff --staged`（ステージング済み差分）および `git diff`（未ステージング差分）を
@@ -29,9 +26,14 @@ def handle_commit_generation(
         model_name (str): 使用する Gemini モデル名.
         lang (str, optional): コミットメッセージの出力言語（例: "ja", "en"）. デフォルトは "en".
 
+    Returns:
+        None: なし（生成されたコミットメッセージは標準出力にストリーミング出力されます）.
+
     Raises:
         subprocess.CalledProcessError: Git コマンドの実行に失敗した場合.
-        APIError: Gemini API 呼び出し時に通信エラーや 503 等が発生した場合.
+        APIError: Gemini API 呼び出し時に通信エラー等が発生した場合.
+        ClientError: Gemini API 呼び出し時にクライアントエラーが発生した場合.
+        ServerError: Gemini API 呼び出し時にサーバーエラーが発生した場合.
         Exception: その他の予期せぬエラーが発生した場合.
     """
     try:

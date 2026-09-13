@@ -2,9 +2,10 @@
 
 from collections.abc import Generator
 
+from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables import Runnable, RunnablePassthrough
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from code_chat_rag.code_indexer import CodeIndexer
@@ -20,7 +21,14 @@ class CodeRagService:
         persist_directory: str = "./.chroma_db",
         model_name: str = "gemini-flash-latest",
     ) -> None:
-        self.repo_path = str(repo_path)
+        """CodeRagServiceのインスタンスを初期化します.
+
+        Args:
+            repo_path: 対象のコードリポジトリへのパス.
+            persist_directory: ベクトルストアの永続化先ディレクトリ.
+            model_name: 使用するLLMのモデル名.
+        """
+        self.repo_path = str(repo_path) if repo_path is not None else ""
         self.vector_store = VectorStore(persist_directory=persist_directory)
         self.llm = ChatGoogleGenerativeAI(model=model_name, temperature=0.0)
 
@@ -68,12 +76,26 @@ class CodeRagService:
         chain = self._build_chain(k=k)
         yield from chain.stream(question)
 
-    def _build_chain(self, k: int = 5):
-        """LangChain Expression Language (LCEL) を使用してRAGパイプラインを構築します."""
+    def _build_chain(self, k: int = 5) -> Runnable:
+        """LangChain Expression Language (LCEL) を使用してRAGパイプラインを構築します.
+
+        Args:
+            k: 検索時に取得するチャンク数.
+
+        Returns:
+            質問文字列を受け取り, 回答文字列を出力する実行可能なLCELチェーン.
+        """
         retriever = self.vector_store.as_retriever(k=k)
 
-        # ドキュメント群を1つのコンテキスト文字列に整形するヘルパー.
-        def format_docs(docs):
+        def format_docs(docs: list[Document]) -> str:
+            """取得したドキュメント群をプロンプト埋め込み用の単一文字列に整形します.
+
+            Args:
+                docs: 整形対象のDocumentオブジェクトのリスト.
+
+            Returns:
+                各ドキュメントのソースパスと内容を結合したコンテキスト文字列.
+            """
             formatted = []
             for doc in docs:
                 source = doc.metadata.get("source", "Unknown")

@@ -7,6 +7,7 @@ from typing import Any
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
+from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 logger = logging.getLogger(__name__)
@@ -20,8 +21,13 @@ class VectorStore:
         persist_directory: str = "./.chroma_db",
         embedding_function: Embeddings | None = None,
     ) -> None:
+        """VectorStore インスタンスを初期化します.
+
+        Args:
+            persist_directory: データベースの永続化先ディレクトリパス.
+            embedding_function: 使用する埋め込みモデル. 未指定時は GoogleGenerativeAIEmbeddings を使用.
+        """
         self.persist_directory = str(persist_directory)
-        # デフォルトは OpenAIEmbeddings (環境変数 OPENAI_API_KEY が必要).
         self.embeddings = embedding_function or GoogleGenerativeAIEmbeddings(
             model="gemini-flash-latest"
         )
@@ -53,13 +59,30 @@ class VectorStore:
         ids = db.add_documents(documents)
         return ids
 
-    def as_retriever(self, search_type: str = "similarity", k: int = 4):
-        """検索実行用のリトリーバーインターフェースを返します."""
+    def as_retriever(
+        self, search_type: str = "similarity", k: int = 4
+    ) -> VectorStoreRetriever:
+        """検索実行用のリトリーバーインターフェースを返します.
+
+        Args:
+            search_type: 検索タイプ（例: "similarity", "mmr"）.
+            k: 検索結果として取得する上位ドキュメント数.
+
+        Returns:
+            VectorStoreRetriever: 設定されたリトリーバーインスタンス.
+        """
         db = self._get_db()
         return db.as_retriever(search_type=search_type, search_kwargs={"k": k})
 
     def _get_db(self) -> Chroma:
-        """Chromaデータベースインスタンスを取得または初期化します."""
+        """Chromaデータベースインスタンスを取得または初期化します.
+
+        Returns:
+            Chroma: 初期化されたChromaデータベースインスタンス.
+
+        Raises:
+            FileNotFoundError: ディレクトリのパスが存在しない、または作成できなかった場合.
+        """
         path = Path(self.persist_directory)
         try:
             path.mkdir(parents=True, exist_ok=True)

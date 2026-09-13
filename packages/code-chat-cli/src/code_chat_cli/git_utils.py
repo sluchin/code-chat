@@ -10,6 +10,13 @@ def get_git_diff() -> str:
     """Git の変更差分 (diff) を取得する.
 
     ステージング済み (--cached) の差分を優先し, なければ作業ディレクトリの差分を取得する.
+
+    Returns:
+        str: 取得した Git の差分文字列. 差分がない場合は空文字列.
+
+    Raises:
+        subprocess.CalledProcessError: git diff コマンドの実行に失敗した場合.
+        FileNotFoundError: git コマンドが見つからない場合.
     """
     try:
         # まずステージング済みの差分を確認

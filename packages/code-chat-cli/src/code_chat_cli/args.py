@@ -57,20 +57,22 @@ class CliArgs:
     """使用する Gemini モデル名."""
 
     debug: bool
-    """デバッグモード."""
+    """デバッグモード有効化フラグ."""
 
     log_level: str
     """ログレベル文字列."""
 
     list_models: bool
-    """モデル一覧表示."""
+    """モデル一覧表示フラグ."""
 
     generate_commit_msg: bool
-    """コミットメッセージ生成."""
+    """コミットメッセージ生成フラグ."""
 
     review: bool
+    """コードレビュー実行フラグ."""
 
     staged: bool
+    """staged 状態の差分を対象とするフラグ."""
 
     context: str
     """読み込まれた標準入力およびファイルコンテキストの結合文字列."""
