@@ -14,7 +14,14 @@ APP_NAME = Path(sys.argv[0]).stem if sys.argv and sys.argv[0] else "python"
 
 
 def syslog_context_filter(record: logging.LogRecord) -> bool:
-    """LogRecord に syslog スタイルの動的タイムスタンプおよびホスト情報を追加するフィルタ."""
+    """LogRecord に syslog スタイルの動的タイムスタンプおよびホスト情報を追加するフィルタ.
+
+    Args:
+        record (logging.LogRecord): 処理対象のログレコード.
+
+    Returns:
+        bool: 常に True（レコードを常に処理対象とする）.
+    """
     dt = datetime.fromtimestamp(record.created).astimezone()
     record.syslog_time = dt.isoformat(timespec="microseconds")
     record.hostname = HOSTNAME
@@ -32,12 +39,12 @@ def setup_logging(level_name: str = "INFO") -> None:
     """
     numeric_level = getattr(logging, level_name.upper(), logging.INFO)
 
-    LOG_FORMAT = (
+    log_format = (
         "%(syslog_time)s %(hostname)s %(app_name)s[%(pid)d]: "
         "%(filename)s:%(lineno)d: %(message)s"
     )
 
-    formatter = logging.Formatter(fmt=LOG_FORMAT)
+    formatter = logging.Formatter(fmt=log_format)
 
     # ハンドラを作成し, フィルターを追加する（Logger ではなく Handler に追加）
     handler = logging.StreamHandler(sys.stderr)
@@ -81,7 +88,7 @@ def get_logger(name: str) -> logging.Logger:
 
 
 def suppress_info_logs() -> None:
-    """コミットメッセージ生成時など, 標準出力のノイズを減らすため INFO ログを抑制する."""
+    """コミットメッセージ生成時など, 標準出力のノイズを減らすため INFO ログを抑制します."""
     logging.getLogger().setLevel(logging.WARNING)
     logging.getLogger("code_chat_cli").setLevel(logging.WARNING)
     logging.getLogger("google_genai").setLevel(logging.WARNING)

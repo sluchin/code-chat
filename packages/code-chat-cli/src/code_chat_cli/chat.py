@@ -44,7 +44,13 @@ logger = get_logger(__name__)
 
 
 def run_single_turn_mode(chat: Any, cli_args: Any, chat_history: list[str]) -> None:
-    """コンテキスト指定時やワンショットプロンプト実行時の単発処理を行います."""
+    """コンテキスト指定時やワンショットプロンプト実行時の単発処理を行います.
+
+    Args:
+        chat (Any): Gemini Chat インスタンス.
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+        chat_history (list[str]): 対話履歴を格納するリスト.
+    """
     if cli_args.context:
         _handle_context_mode(chat, cli_args, chat_history)
     elif cli_args.prompt:
@@ -123,7 +129,14 @@ def run_interactive_loop(
 
 
 def _build_context_prompt(cli_args: Any) -> str:
-    """コンテキスト指定時のプロンプト文字列を構築します."""
+    """コンテキスト指定時のプロンプト文字列を構築します.
+
+    Args:
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+
+    Returns:
+        str: 構築されたプロンプト文字列.
+    """
     prompt_text = cli_args.prompt or ""
     if cli_args.write_mode and prompt_text:
         prompt_text += "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください."
@@ -142,7 +155,16 @@ def _build_context_prompt(cli_args: Any) -> str:
 
 
 def _fetch_response_text(chat: Any, prompt: str, is_write_mode: bool) -> str:
-    """メッセージを送信し, 応答テキストを取得・出力します."""
+    """メッセージを送信し, 応答テキストを取得・出力します.
+
+    Args:
+        chat (Any): Gemini Chat インスタンス.
+        prompt (str): 送信するプロンプト文字列.
+        is_write_mode (bool): 上書きモードが有効かどうか.
+
+    Returns:
+        str: モデルから受信した応答テキスト.
+    """
     if is_write_mode:
         response = send_message_with_retry(chat, prompt)
         response_text = response.text or ""
@@ -160,7 +182,13 @@ def _fetch_response_text(chat: Any, prompt: str, is_write_mode: bool) -> str:
 
 
 def _handle_context_mode(chat: Any, cli_args: Any, chat_history: list[str]) -> None:
-    """コンテキストが存在する場合の処理."""
+    """コンテキストが存在する場合の処理を実行します.
+
+    Args:
+        chat (Any): Gemini Chat インスタンス.
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+        chat_history (list[str]): 対話履歴を格納するリスト.
+    """
     full_init_prompt = _build_context_prompt(cli_args)
     file_label = getattr(cli_args, "file", None) or "コンテキストテキスト"
 
@@ -182,7 +210,13 @@ def _handle_context_mode(chat: Any, cli_args: Any, chat_history: list[str]) -> N
 
 
 def _handle_prompt_mode(chat: Any, cli_args: Any, chat_history: list[str]) -> None:
-    """プロンプトのみの場合の処理."""
+    """プロンプトのみの場合の処理を実行します.
+
+    Args:
+        chat (Any): Gemini Chat インスタンス.
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+        chat_history (list[str]): 対話履歴を格納するリスト.
+    """
     prompt_text = cli_args.prompt
     if cli_args.write_mode:
         prompt_text += "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください."
@@ -199,7 +233,11 @@ def _handle_prompt_mode(chat: Any, cli_args: Any, chat_history: list[str]) -> No
 
 
 def _setup_cli_logging(cli_args: Any) -> None:
-    """CLI 引数に基づいてロギングを設定します."""
+    """CLI 引数に基づいてロギングを設定します.
+
+    Args:
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+    """
     if not cli_args.debug and (cli_args.list_models or cli_args.generate_commit_msg):
         suppress_info_logs()
         return
@@ -209,7 +247,12 @@ def _setup_cli_logging(cli_args: Any) -> None:
 
 
 def _handle_subcommands(client: Any, cli_args: Any) -> None:
-    """特定サブコマンドフラグ指定時の独立処理を実行します."""
+    """特定サブコマンドフラグ指定時の独立処理を実行します.
+
+    Args:
+        client (Any): Gemini Client インスタンス.
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+    """
     command = getattr(cli_args, "command", None)
     if command == "index":
         try:
@@ -252,7 +295,14 @@ def _handle_subcommands(client: Any, cli_args: Any) -> None:
 
 
 def _build_chat_config(is_write_mode: bool) -> types.GenerateContentConfig:
-    """Write Mode に応じた GenerateContentConfig を作成します."""
+    """Write Mode に応じた GenerateContentConfig を作成します.
+
+    Args:
+        is_write_mode (bool): 上書きモードが有効かどうか.
+
+    Returns:
+        types.GenerateContentConfig: 設定された生成設定オブジェクト.
+    """
     if is_write_mode:
         return types.GenerateContentConfig(
             system_instruction=WRITE_MODE_SYSTEM_INSTRUCTION,

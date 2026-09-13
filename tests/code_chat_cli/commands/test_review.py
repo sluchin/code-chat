@@ -304,3 +304,47 @@ def test_handle_code_review_with_git_diff():
 
         mock_diff.assert_called_once_with(False)
         mock_client.models.generate_content_stream.assert_called_once()
+
+
+def test_handle_code_review_exception_handling(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """generate_content_stream 実行時に例外が発生した場合の例外処理を検証."""
+    mock_client = MagicMock()
+    # API 呼出時に RuntimeError を発生させる設定
+    mock_client.models.generate_content_stream.side_effect = RuntimeError("API Error")
+
+    # git diff で何らかのコードが取得できる状況をモック
+    with patch(
+        "code_chat_cli.commands.review._get_git_diff",
+        return_value="def foo(): pass",
+    ):
+        handle_code_review(client=mock_client, model_name="gemini-2.5-flash")
+
+    # 標準エラー出力 (sys.stderr) にエラーメッセージが出力されたか確認
+    captured = capsys.readouterr()
+    assert "エラーが発生しました: API Error" in captured.err
+
+
+def test_handle_code_review_stream_exception_handling(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """ストリームの読み込み途中で例外が発生した場合の例外処理を検証."""
+
+    # ジェネレータの途中で例外を発生させるイテレータを模擬
+    def error_stream():
+        yield MagicMock(text="一部の応答")
+        raise RuntimeError("Stream Error")
+
+    mock_client = MagicMock()
+    mock_client.models.generate_content_stream.return_value = error_stream()
+
+    with patch(
+        "code_chat_cli.commands.review._get_git_diff",
+        return_value="def foo(): pass",
+    ):
+        handle_code_review(client=mock_client, model_name="gemini-2.5-flash")
+
+    captured = capsys.readouterr()
+    assert "一部の応答" in captured.out
+    assert "エラーが発生しました: Stream Error" in captured.err

@@ -78,7 +78,16 @@ def save_readline_history() -> None:
 def save_history_if_needed(
     chat_history: list[str], output_file: str | None, auto_save: bool
 ) -> None:
-    """必要に応じて対話履歴をファイルに保存します."""
+    """必要に応じて対話履歴をファイルに保存します.
+
+    対話履歴が存在し, 保存先ファイルパスが指定されているか自動保存が有効な場合に
+    対話ログをファイルへ保存します.
+
+    Args:
+        chat_history (list[str]): 保存対象の対話履歴リスト.
+        output_file (str | None): 保存先のファイルパス. 指定がない場合は None.
+        auto_save (bool): ファイルパス未指定時にタイムスタンプ付きファイル名を生成して保存するかどうか.
+    """
     if not chat_history:
         return
 

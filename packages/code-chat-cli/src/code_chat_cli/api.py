@@ -93,7 +93,7 @@ def send_message_stream_with_retry(
         Any: Gemini API からのレスポンスチャンク.
 
     Raises:
-        APIError: 最大リトライ回数を超えてエラーが発生した場合.
+        Exception: 最大リトライ回数を超えてエラーが発生した場合, または出力開始後に通信エラーが発生した場合.
     """
     delay = initial_delay
 
