@@ -5,7 +5,7 @@ import subprocess
 import sys
 from typing import Any
 
-from code_chat_cli.args import read_path_content
+from code_chat_cli.file_utils import read_path_content
 from code_chat_cli.prompts import REVIEW_PROMPT_TEMPLATE
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ def handle_code_review(
 
     logger.info("コードレビュー対象のコンテキストサイズ: %d 文字", len(target_code))
 
-    prompt = REVIEW_PROMPT_TEMPLATE.format(code=target_code)
+    prompt = REVIEW_PROMPT_TEMPLATE.replace("{code}", target_code)
 
     print("コードレビューを実行中...\n")
 

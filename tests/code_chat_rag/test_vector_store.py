@@ -18,10 +18,10 @@ def mock_embedding():
 def test_vector_store_init(mock_embedding):
     """VectorStore の初期化処理を検証する."""
     store = VectorStore(
-        persist_directory="/dummy/path",
+        output_dir="/dummy/path",
         embedding_function=mock_embedding,
     )
-    assert store.persist_directory == "/dummy/path"
+    assert store.output_dir == "/dummy/path"
     assert store.embeddings == mock_embedding
     assert store._db is None
 
@@ -29,7 +29,7 @@ def test_vector_store_init(mock_embedding):
 # pylint: disable=protected-access
 def test_get_db_file_not_found():
     """存在しないディレクトリを指定した場合に FileNotFoundError が発生するか検証する."""
-    store = VectorStore(persist_directory="/non_existent_directory_path_12345")
+    store = VectorStore(output_dir="/non_existent_directory_path_12345")
     with pytest.raises(FileNotFoundError):
         store._get_db()
 
@@ -47,7 +47,7 @@ def test_add_chunks_success(mock_chroma_cls, mock_embedding, tmp_path):
     mock_chroma_cls.return_value = mock_chroma_instance
 
     store = VectorStore(
-        persist_directory=str(persist_dir),
+        output_dir=str(persist_dir),
         embedding_function=mock_embedding,
     )
 
@@ -77,7 +77,7 @@ def test_add_chunks_success(mock_chroma_cls, mock_embedding, tmp_path):
 def test_add_chunks_empty(mock_embedding):
     """空のチャンクリストを渡した場合に空配列が返され DB が呼び出されないことを検証する."""
     store = VectorStore(
-        persist_directory="/dummy/path",
+        output_dir="/dummy/path",
         embedding_function=mock_embedding,
     )
     assert store.add_chunks([]) == []
@@ -95,7 +95,7 @@ def test_as_retriever(mock_chroma_cls, mock_embedding, tmp_path):
     mock_chroma_cls.return_value = mock_chroma_instance
 
     store = VectorStore(
-        persist_directory=str(persist_dir),
+        output_dir=str(persist_dir),
         embedding_function=mock_embedding,
     )
 

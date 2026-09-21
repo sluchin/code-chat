@@ -30,7 +30,7 @@ def syslog_context_filter(record: logging.LogRecord) -> bool:
     return True
 
 
-def setup_logging(level_name: str = "INFO") -> None:
+def setup_logging(level_name: str = "INFO", trace: bool = False) -> None:
     """指定されたログレベル名に基づいてアプリケーション全体のロガーを初期化します.
 
     Args:
@@ -65,14 +65,17 @@ def setup_logging(level_name: str = "INFO") -> None:
     app_logger = logging.getLogger("code_chat_cli")
     app_logger.setLevel(numeric_level)
 
-    # サードパーティライブラリのログ制御
-    if numeric_level == logging.DEBUG:
-        logging.getLogger("httpx").setLevel(logging.DEBUG)
-        logging.getLogger("google").setLevel(logging.DEBUG)
+    # サードパーティ製ライブラリのログ制御
+    third_party_loggers = ["httpx", "httpcore", "google", "urllib3"]
+
+    if trace:
+        # --trace が指定されている場合のみ、ライブラリの DEBUG / TRACE ログを出す
+        for logger_name in third_party_loggers:
+            logging.getLogger(logger_name).setLevel(logging.DEBUG)
     else:
-        # 通信ログ（httpx）の無駄な出力のみを抑え, アプリ本体のログレベルは全伝播させる
-        logging.getLogger("httpx").setLevel(logging.WARNING)
-        # google_genai の警告ログまで消してしまうのを防ぐため, WARNING で止めずにルートに委ねるか INFO にする
+        # 通常時 (-D / --log-level DEBUG の場合含む) はサードパーティの通信ログを抑制
+        for logger_name in third_party_loggers:
+            logging.getLogger(logger_name).setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> logging.Logger:

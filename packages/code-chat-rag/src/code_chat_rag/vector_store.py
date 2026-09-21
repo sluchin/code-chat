@@ -18,18 +18,18 @@ class VectorStore:
 
     def __init__(
         self,
-        persist_directory: str = "./.chroma_db",
+        output_dir: str = "./chroma_db",
         embedding_function: Embeddings | None = None,
     ) -> None:
         """VectorStore インスタンスを初期化します.
 
         Args:
-            persist_directory: データベースの永続化先ディレクトリパス.
+            output_dir: データベースの永続化先ディレクトリパス.
             embedding_function: 使用する埋め込みモデル. 未指定時は GoogleGenerativeAIEmbeddings を使用.
         """
-        self.persist_directory = str(persist_directory)
+        self.output_dir = str(output_dir)
         self.embeddings = embedding_function or GoogleGenerativeAIEmbeddings(
-            model="gemini-flash-latest"
+            model="gemini-embedding-001"
         )
         self._db: Chroma | None = None
 
@@ -56,7 +56,7 @@ class VectorStore:
 
         # Chroma DB にドキュメントを追加 (自動的に永続化されます)
         db = self._get_db()
-        ids = db.add_documents(documents)
+        ids = db.add_documents(documents, batch_size=32)
         return ids
 
     def as_retriever(
@@ -74,6 +74,45 @@ class VectorStore:
         db = self._get_db()
         return db.as_retriever(search_type=search_type, search_kwargs={"k": k})
 
+    def count(self) -> int:
+        """データベースに登録されているドキュメントの総件数を返します."""
+        db = self._get_db()
+        # pylint: disable=protected-access
+        return db._collection.count()
+
+    def search_debug(self, query: str, k: int = 4) -> list[tuple[Document, float]]:
+        """検索スコア（距離）付きでドキュメントを取得するデバッグ用メソッド."""
+        db = self._get_db()
+        # 類似度スコア (距離) 付きで上位k件を取得
+        results = db.similarity_search_with_score(query, k=k)
+        for doc, score in results:
+            logger.info(
+                "Score (Distance): %f | Content: %s...",
+                score,
+                doc.page_content[:50].replace("\n", " "),
+            )
+        return results
+
+    def clear(self) -> None:
+        """VectorStore（Chroma DB コレクション）内のすべてのデータを削除して初期化します."""
+        try:
+            logger.info("VectorStore のデータをクリアしています...")
+
+            if self._db is not None:
+                # LangChain の Chroma オブジェクトから全件削除
+                # コレクション内の全ドキュメント ID を取得して delete を実行
+                # pylint: disable=protected-access
+                all_data = self._db._collection
+                all_ids = all_data.get()["ids"]
+                if all_ids:
+                    self._db.delete(ids=all_ids)
+                    logger.info("%d 件のチャンクを削除しました", len(all_ids))
+
+            logger.info("VectorStore のクリアが完了しました")
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.exception("VectorStore のクリア処理中にエラーが発生しました")
+            raise
+
     def _get_db(self) -> Chroma:
         """Chromaデータベースインスタンスを取得または初期化します.
 
@@ -83,7 +122,7 @@ class VectorStore:
         Raises:
             FileNotFoundError: ディレクトリのパスが存在しない、または作成できなかった場合.
         """
-        path = Path(self.persist_directory)
+        path = Path(self.output_dir)
         try:
             path.mkdir(parents=True, exist_ok=True)
         except OSError as e:
@@ -91,6 +130,8 @@ class VectorStore:
 
         if not path.exists():
             raise FileNotFoundError(f"ディレクトリのパスが存在しません: {path}")
+
+        logger.info("Vector DB: %s", path)
 
         if self._db is None:
             self._db = Chroma(

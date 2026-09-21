@@ -6,7 +6,7 @@ from unittest import mock
 from unittest.mock import patch
 
 import pytest
-from code_chat_cli.args import parse_args, read_path_content, read_stdin_content
+from code_chat_cli.args import _read_stdin_content, parse_args, read_path_content
 
 
 @pytest.fixture(autouse=True)
@@ -124,7 +124,7 @@ def test_read_stdin_content_pipe(monkeypatch):
     monkeypatch.setattr("sys.stdin", io.StringIO("パイプからの入力内容"))
     monkeypatch.setattr("sys.stdin.isatty", lambda: False)
 
-    result = read_stdin_content()
+    result = _read_stdin_content()
 
     assert result == "パイプからの入力内容"
 
@@ -134,7 +134,7 @@ def test_read_stdin_content_tty(monkeypatch):
     monkeypatch.setattr("sys.stdin", io.StringIO("入力文字列"))
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
 
-    result = read_stdin_content()
+    result = _read_stdin_content()
 
     assert result == ""
 
@@ -145,12 +145,10 @@ def test_parse_args_default(monkeypatch):
     args = parse_args()
 
     assert args.prompt == ""
-    assert args.debug is False
+    assert args.debug_mode is False
     assert args.log_level == "INFO"
-    assert args.command is None
-    assert args.repo_path == "."
-    assert args.query is None
-    assert args.top_k == 5
+    assert args.subcommand is None
+    assert args.output_dir == "."
 
 
 def test_parse_args_prompt(monkeypatch):
@@ -159,7 +157,7 @@ def test_parse_args_prompt(monkeypatch):
     args = parse_args()
 
     assert args.prompt == "コードをレビューして"
-    assert args.command is None
+    assert args.subcommand is None
 
 
 def test_parse_args_debug_short_option(monkeypatch):
@@ -167,7 +165,7 @@ def test_parse_args_debug_short_option(monkeypatch):
     monkeypatch.setattr("sys.argv", ["chat.py", "-D"])
     args = parse_args()
 
-    assert args.debug is True
+    assert args.debug_mode is True
 
 
 def test_parse_args_debug_long_option(monkeypatch):
@@ -175,7 +173,7 @@ def test_parse_args_debug_long_option(monkeypatch):
     monkeypatch.setattr("sys.argv", ["chat.py", "--debug"])
     args = parse_args()
 
-    assert args.debug is True
+    assert args.debug_mode is True
 
 
 def test_parse_args_log_level_custom(monkeypatch):
@@ -226,8 +224,8 @@ def test_parse_args_rag_index_subcommand(monkeypatch):
     monkeypatch.setattr("sys.argv", ["cchat", "index", "-r", "/tmp/repo"])
     args = parse_args()
 
-    assert args.command == "index"
-    assert args.repo_path == "/tmp/repo"
+    assert args.subcommand == "index"
+    assert args.output_dir == "/tmp/repo"
 
 
 def test_parse_args_rag_ask_subcommand(monkeypatch):
@@ -238,7 +236,5 @@ def test_parse_args_rag_ask_subcommand(monkeypatch):
     )
     args = parse_args()
 
-    assert args.command == "ask"
-    assert args.query == "how to build?"
-    assert args.repo_path == "/tmp/repo"
-    assert args.top_k == 10
+    assert args.subcommand == "ask"
+    assert args.output_dir == "/tmp/repo"

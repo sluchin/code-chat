@@ -28,6 +28,7 @@ members = ["packages/*"]
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4.6.2",
     "pytest-cov>=7.1.0",
 ]
 
