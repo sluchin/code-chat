@@ -39,17 +39,14 @@ def mock_dependencies():
 def test_code_rag_service_init(mock_dependencies):
     """CodeRagService の初期化処理を検証する."""
     service = CodeRagService(
-        repo_path="/dummy/path",
-        persist_directory="/dummy/chroma",
-        model_name="gemini-1.5-flash",
+        output_dir="/dummy/chroma",
+        model_name="gemini-3.5-flash",
     )
 
-    assert service.repo_path == "/dummy/path"
-    mock_dependencies["vs_cls"].assert_called_once_with(
-        persist_directory="/dummy/chroma"
-    )
+    assert service.output_dir == "/dummy/path"
+    mock_dependencies["vs_cls"].assert_called_once_with(output_dir="/dummy/chroma")
     mock_dependencies["llm_cls"].assert_called_once_with(
-        model="gemini-1.5-flash",
+        model="gemini-3.5-flash",
         temperature=0.0,
     )
 
@@ -66,14 +63,14 @@ def test_index_repository_success(mock_indexer_cls, mock_dependencies):
     mock_indexer_cls.return_value = mock_indexer_instance
     mock_dependencies["vs_inst"].add_chunks.return_value = ["id1", "id2"]
 
-    service = CodeRagService(repo_path="/dummy/path")
+    service = CodeRagService(input_dirs=["/dummy/path"])
 
     # 実行
-    count = service.index_repository(repo_path="/target/repo")
+    count = service.index_repository(input_dirs=["/target/repo"])
 
     # 検証
     assert count == 2
-    mock_indexer_cls.assert_called_once_with(repo_path="/target/repo")
+    mock_indexer_cls.assert_called_once_with(output_dir="/target/repo")
     mock_indexer_instance.load_and_chunk.assert_called_once()
     mock_dependencies["vs_inst"].add_chunks.assert_called_once_with(
         [
@@ -91,7 +88,7 @@ def test_index_repository_empty(mock_indexer_cls, mock_dependencies):
     mock_indexer_cls.return_value = mock_indexer_instance
 
     service = CodeRagService()
-    count = service.index_repository(repo_path="/target/repo")
+    count = service.index_repository(input_dirs=["/target/repo"])
 
     assert count == 0
     mock_dependencies["vs_inst"].add_chunks.assert_not_called()
@@ -144,14 +141,14 @@ def test_build_chain_execution(mock_dependencies):
 
 
 @patch.object(CodeRagService, "_build_chain")
-def test_ask(mock_build_chain):
+def test_query(mock_build_chain):
     """ask メソッドがチェーンをビルドし invoke を呼び出すか検証する."""
     mock_chain = MagicMock()
     mock_chain.invoke.return_value = "This is an answer."
     mock_build_chain.return_value = mock_chain
 
     service = CodeRagService()
-    answer = service.ask("How to run this?", k=3)
+    answer = service.query("How to run this?", k=3)
 
     assert answer == "This is an answer."
     mock_build_chain.assert_called_once_with(k=3)
@@ -159,14 +156,14 @@ def test_ask(mock_build_chain):
 
 
 @patch.object(CodeRagService, "_build_chain")
-def test_ask_stream(mock_build_chain):
+def test_query_stream(mock_build_chain):
     """ask_stream メソッドがトークンを逐次生成（ジェネレータ化）するか検証する."""
     mock_chain = MagicMock()
     mock_chain.stream.return_value = iter(["Hello", " ", "World"])
     mock_build_chain.return_value = mock_chain
 
     service = CodeRagService()
-    stream_result = list(service.ask_stream("How to run this?", k=3))
+    stream_result = list(service.query_stream("How to run this?", k=3))
 
     assert stream_result == ["Hello", " ", "World"]
     mock_build_chain.assert_called_once_with(k=3)

@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from code_chat_cli.index import handle_ask, handle_index
+from code_chat_cli.index import handle_index, handle_rag
 
 
 @patch("code_chat_cli.index.CodeRagService")
@@ -33,7 +33,7 @@ def test_handle_ask(mock_rag_service_cls):
 
     # 実行
     with patch("builtins.print") as mock_print:
-        handle_ask("テストの質問")
+        handle_rag("テストの質問")
 
     # 検証
     mock_rag_service_cls.assert_called_once_with(persist_directory="./.chroma_db")

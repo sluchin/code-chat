@@ -1,36 +1,17 @@
-"""Gemini CLI Tool - Argument Parser and Context Collector.
+"""Code Chat CLI - 引数パーサーおよびコンテキストコレクター.
 
-This module parses command-line arguments and collects context from files or standard input
-for the Gemini CLI application.
+このモジュールは, Code Chat CLI アプリケーションのためにコマンドライン引数を解析し,
+ファイルまたは標準入力からコンテキストを収集します.
 """
 
 import argparse
-import os
 import sys
-from dataclasses import dataclass
-from pathlib import Path
+from dataclasses import dataclass, field
 
-from code_chat_cli.constants import EXCLUDE_DIRS, TEXT_EXTENSIONS
+from code_chat_cli.file_utils import read_path_content
 from code_chat_cli.logger import get_logger
 
 logger = get_logger(__name__)
-
-SUBCOMMANDS = {"index", "ask"}
-
-# 値をとるオプション（パラメータ付きフラグ）の集合
-OPTIONS_WITH_VALUE = {
-    "-f",
-    "--file",
-    "-o",
-    "--output",
-    "-m",
-    "--model",
-    "--log-level",
-    "-r",
-    "--repo-path",
-    "-k",
-    "--top-k",
-}
 
 
 # pylint: disable=too-many-instance-attributes
@@ -38,226 +19,278 @@ OPTIONS_WITH_VALUE = {
 class CliArgs:
     """解析済み引数とコンテキスト情報を保持するデータクラス."""
 
-    prompt: str
+    subcommand: str | None = None
+    """実行するサブコマンド ('rag' / 'cache' / 'mcp' / None)."""
+
+    subcommand_action: str | None = None
+    """サブコマンド内のアクション ('create' / 'update' / 'rm' / 'status' / 'list' / 'run' / 'test')."""
+
+    subcommand_target: str | None = None
+    """サブコマンドの対象パスや識別子 (PATH / CACHE_ID / SERVER_NAME)."""
+
+    # メイン対話・共通オプション
+    prompt: str | None = None
     """ユーザーが指定した初期プロンプト文字列."""
 
-    target_path: str | None
-    """`-f`/`--file` で指定された参照パス."""
+    files: list[str] = field(default_factory=list)
+    """`-f`/`--file` で指定された参照ファイル・ディレクトリパス."""
 
-    output_path: str | None
-    """`-o`/`--output` で指定されたログ保存先パス."""
+    rag: bool = False
+    """`--rag` による RAG コンテキスト注入の有効化フラグ."""
 
-    auto_save: bool
-    """`-s`/`--auto-save` による自動保存の有効化フラグ."""
+    mcp_local: bool = False
+    """`--mcp-local` によるローカル MCP 連携の有効化フラグ."""
 
-    write_mode: bool
+    mcp_github: bool = False
+    """`--mcp-github` による GitHub MCP 連携の有効化フラグ."""
+
+    cache: bool | str = False
+    """`-c`/`--cache` による Context Caching 利用指定 (True または Cache ID 文字列)."""
+
+    model: str = "gemini-3.5-flash"
+    """使用するモデル名."""
+
+    provider: str = "gemini"
+    """使用する LLM プロバイダ名 ('gemini' / 'claude' / 'openai' / 'local')."""
+
+    write_mode: bool = False
     """`-w`/`--write` によるソースコード直接修正モードの有効化フラグ."""
 
-    model: str
-    """使用する Gemini モデル名."""
+    auto_save: bool = False
+    """`-a`/`--auto-save` による自動保存の有効化フラグ."""
 
-    debug: bool
-    """デバッグモード有効化フラグ."""
-
-    log_level: str
-    """ログレベル文字列."""
-
-    list_models: bool
-    """モデル一覧表示フラグ."""
-
-    generate_commit_msg: bool
-    """コミットメッセージ生成フラグ."""
-
-    review: bool
-    """コードレビュー実行フラグ."""
-
-    staged: bool
-    """staged 状態の差分を対象とするフラグ."""
-
-    context: str
+    context: str | None = None
     """読み込まれた標準入力およびファイルコンテキストの結合文字列."""
 
-    command: str | None = None
-    """実行する RAG サブコマンド ('index' / 'ask' / None)."""
+    # cache サブコマンド専用オプション
+    cache_ttl: int = 3600
+    """`cache` コマンド用: キャッシュ保持時間 (秒)."""
 
-    repo_path: str = "."
-    """RAG 対象のリポジトリパス."""
+    # ログ・デバッグ用
+    debug_mode: bool = False
+    """デバッグモード有効化フラグ."""
 
-    query: str | None = None
-    """RAG `ask` サブコマンド指定時の検索クエリ."""
+    log_level: str | None = None
+    """ログレベル文字列."""
 
-    top_k: int = 5
-    """RAG `ask` サブコマンド指定時の検索取得件数."""
+    trace_mode: bool = False
+    """サードパーティ製ライブラリのトランスポートログ制御."""
 
+    dry_run: bool = False
+    """ドライラン（実行処理の事前検証・試行）フラグ."""
 
-def read_path_content(target_path: str) -> str:
-    """指定されたパス（単一ファイルまたはディレクトリ）からコンテンツを読み込む.
+    list_models: bool = False
+    """モデル一覧表示フラグ."""
 
-    ディレクトリが指定された場合は再帰的に探索し, 対象の拡張子を持つファイルの内容を
-    除外ディレクトリを回避しながら結合して返します.
+    generate_commit_msg: bool = False
+    """コミットメッセージ生成フラグ."""
 
-    Args:
-        target_path: 読み込み対象のファイルまたはディレクトリのパス.
+    review: bool = False
+    """`--review` によるコードレビュー・静的解析モードフラグ."""
 
-    Returns:
-        読み込まれたファイル内容のテキスト. 該当ファイルが存在しない場合は空文字列.
+    # rag サブコマンド固有フラグ
+    input_dirs: list[str] = field(default_factory=list)
+    """インデックス作成対象のディレクトリパス"""
 
-    Raises:
-        SystemExit: 指定されたパスが存在しない場合, またはファイルの読み込みに失敗した場合に
-            ステータスコード 1 で終了します.
-    """
-    path = Path(target_path)
-
-    if not path.exists():
-        logger.error("パス '%s' が見つかりません.", target_path)
-        sys.exit(1)
-
-    if path.is_file():
-        try:
-            return f"=== File: {path} ===\n" + path.read_text(encoding="utf-8")
-        except OSError:
-            logger.exception("ファイル '%s' の読み込みに失敗しました", path)
-            sys.exit(1)
-
-    if path.is_dir():
-        contents: list[str] = []
-        loaded_files: list[Path] = []
-
-        # os.walk を使うことで除外ディレクトリ配下の走査を即座にスキップ可能
-        for root, dirs, files in os.walk(path):
-            # EXCLUDE_DIRS に含まれるディレクトリ配下を走査対象から除外
-            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-
-            for file in files:
-                file_path = Path(root) / file
-                if file_path.suffix.lower() in TEXT_EXTENSIONS:
-                    try:
-                        text = file_path.read_text(encoding="utf-8", errors="ignore")
-                        contents.append(f"=== File: {file_path} ===\n{text}")
-                        loaded_files.append(file_path)
-                        logger.debug("読み込み完了: %s", file_path)
-                    except OSError as e:
-                        logger.warning(
-                            "'%s' の読み込みをスキップしました: %s",
-                            file_path,
-                            e,
-                        )
-
-        if not contents:
-            logger.warning(
-                "ディレクトリ '%s' 内に対象ファイルが見つかりませんでした.",
-                target_path,
-            )
-            return ""
-
-        total_text = "\n\n".join(contents)
-        logger.info(
-            "ディレクトリ '%s' から %d 件のファイルをコンテキストとして読み込みました (合計: %d 文字).",
-            target_path,
-            len(loaded_files),
-            len(total_text),
-        )
-
-        return total_text
-
-    return ""
-
-
-def read_stdin_content() -> str:
-    """標準入力（パイプやリダイレクト）からテキストを読み込む.
-
-    Returns:
-        標準入力から読み込まれたテキスト. 端末（tty）からの入力である場合は空文字列.
-    """
-    if not sys.stdin.isatty():
-        return sys.stdin.read()
-    return ""
+    output_dir: str | None = "./chroma_db"
+    """インデックス出力ディレクトリパス"""
 
 
 # pylint: disable=too-many-locals,too-many-statements
 def parse_args(args: list[str] | None = None) -> CliArgs:
-    """コマンドライン引数を解析し, コンテキストを取得して返す.
-
-    標準入力および `-f`/`--file` オプション経由で指定されたコンテキスト情報を収集し,
-    解析済みデータクラス `CliArgs` にまとめて返却します.
-
-    Args:
-        args: 解析対象のコマンドライン引数リスト. None の場合は `sys.argv[1:]` を参照します.
-
-    Returns:
-        解析済みのコマンドライン引数と収集されたコンテキストを保持する `CliArgs` オブジェクト.
-    """
+    """コマンドライン引数を解析し, コンテキストを取得して返す."""
     if args is None:
         args = sys.argv[1:]
 
-    prompt_parts: list[str] = []
-    filtered_args: list[str] = []
-    has_subcommand = False
+    global_parser = _build_global_parser()
+    main_parser = _build_main_execution_parser(global_parser)
 
-    i = 0
-    while i < len(args):
-        arg = args[i]
-
-        if arg in SUBCOMMANDS:
-            has_subcommand = True
-            filtered_args.append(arg)
-            i += 1
-        elif arg.startswith("-"):
-            filtered_args.append(arg)
-            # `--log-level debug` のように値を取るオプションの場合は直後の引数もそのまま保存する
-            if arg in OPTIONS_WITH_VALUE and i + 1 < len(args):
-                i += 1
-                filtered_args.append(args[i])
-            i += 1
-        elif not has_subcommand:
-            prompt_parts.append(arg)
-            i += 1
-        else:
-            filtered_args.append(arg)
-            i += 1
-
-    prompt = " ".join(prompt_parts)
-
-    parser = argparse.ArgumentParser(description="Gemini API を使った CLI ツール")
-
-    parser.add_argument(
-        "-f",
-        "--file",
-        type=str,
-        help="参照するファイルまたはディレクトリのパス",
-        default=None,
+    # サブコマンド定義
+    subparsers = main_parser.add_subparsers(
+        dest="subcommand", help="管理用サブコマンド"
     )
-    parser.add_argument(
-        "-o",
-        "--output",
-        type=str,
-        help="指定したファイル名で対話ログを保存",
-        default=None,
+
+    # RAG 管理サブコマンド
+    rag_parser = subparsers.add_parser(
+        "rag", parents=[global_parser], help="RAG インデックス管理"
     )
+    rag_subparsers = rag_parser.add_subparsers(
+        dest="subcommand_action", help="RAG アクション"
+    )
+
+    rag_create = rag_subparsers.add_parser(
+        "create", parents=[global_parser], help="Vector DB を作成"
+    )
+    rag_create.add_argument(
+        "--input_dirs", type=list[str], default=["."], help="入力パス (デフォルト: .)"
+    )
+    rag_create.add_argument(
+        "--output_dir",
+        type=str,
+        default="./chroma_db",
+        help="出力パス (デフォルト: ./chroma_db)",
+    )
+
+    rag_update = rag_subparsers.add_parser(
+        "update", parents=[global_parser], help="差分インデックスを更新"
+    )
+    rag_update.add_argument(
+        "--input_dirs", type=list[str], default=["."], help="入力パス (デフォルト: .)"
+    )
+    rag_update.add_argument(
+        "--output_dir",
+        type=str,
+        default="./chroma_db",
+        help="出力パス (デフォルト: ./chroma_db)",
+    )
+
+    rag_subparsers.add_parser("rm", parents=[global_parser], help="Vector DB を削除")
+    rag_subparsers.add_parser(
+        "status", parents=[global_parser], help="DB ステータスを表示"
+    )
+
+    # Cache 管理サブコマンド
+    cache_parser = subparsers.add_parser(
+        "cache", parents=[global_parser], help="Context Caching 管理"
+    )
+    cache_subparsers = cache_parser.add_subparsers(dest="subcommand_action")
+
+    cache_create = cache_subparsers.add_parser(
+        "create", parents=[global_parser], help="新規キャッシュを作成"
+    )
+    cache_create.add_argument(
+        "target", nargs="?", default=".", help="対象パス (デフォルト: .)"
+    )
+    cache_create.add_argument(
+        "--ttl", type=int, default=3600, help="保持時間(秒) (デフォルト: 3600)"
+    )
+
+    cache_update = cache_subparsers.add_parser(
+        "update", parents=[global_parser], help="キャッシュを更新・再作成"
+    )
+    cache_update.add_argument(
+        "target", nargs="?", default=".", help="対象パス (デフォルト: .)"
+    )
+
+    cache_rm = cache_subparsers.add_parser(
+        "rm", parents=[global_parser], help="指定したキャッシュを削除"
+    )
+    cache_rm.add_argument(
+        "target", nargs="?", default=None, help="Cache ID (省略時はすべて)"
+    )
+
+    cache_subparsers.add_parser(
+        "list", parents=[global_parser], help="アクティブなキャッシュ一覧を表示"
+    )
+
+    # MCP 管理サブコマンド
+    mcp_parser = subparsers.add_parser(
+        "mcp", parents=[global_parser], help="MCP サーバー管理"
+    )
+    mcp_subparsers = mcp_parser.add_subparsers(dest="subcommand_action")
+
+    mcp_run = mcp_subparsers.add_parser(
+        "run", parents=[global_parser], help="指定した MCP サーバーを個別起動"
+    )
+    mcp_run.add_argument("target", help="サーバー名")
+
+    mcp_subparsers.add_parser(
+        "status", parents=[global_parser], help="MCP サーバーの接続状態を表示"
+    )
+
+    mcp_test = mcp_subparsers.add_parser(
+        "test", parents=[global_parser], help="MCP サーバーの導通テスト"
+    )
+    mcp_test.add_argument(
+        "target", nargs="?", default=None, help="サーバー名 (省略時はすべて)"
+    )
+
+    # パース処理
+    # parse_known_args を使用して定義済みフラグ/サブコマンドと、位置引数(prompt)を分離
+    raw_args, unparsed_args = main_parser.parse_known_args(args)
+
+    # 管理用サブコマンドでない場合は unparsed_args を prompt として扱う
+    if raw_args.subcommand in ("rag", "cache", "mcp"):
+        prompt_str = ""
+    else:
+        prompt_str = " ".join(unparsed_args) if unparsed_args else ""
+
+    context_parts: list[str] = []
+
+    # 標準入力の取得
+    stdin_text = _read_stdin_content()
+    if stdin_text:
+        context_parts.append(f"--- [標準入力] ---\n{stdin_text}")
+
+    # -f, --file オプションのテキスト読み込み
+    file_targets: list[str] = getattr(raw_args, "files", None) or []
+    if isinstance(file_targets, str):
+        file_targets = [file_targets]
+
+    for target in file_targets:
+        if target:
+            path_text = read_path_content(target)
+            if path_text:
+                context_parts.append(f"--- [パス入力: {target}] ---\n{path_text}")
+
+    context_str = "\n\n".join(context_parts)
+
+    # --input オプション (重複削除)
+    raw_input_dirs = getattr(raw_args, "input_dirs", None)
+    input_dirs = (
+        list(dict.fromkeys(raw_input_dirs)) if raw_input_dirs is not None else ["."]
+    )
+
+    # ログレベルとデバッグモードの設定同期
+    debug_mode = getattr(raw_args, "debug_mode", False)
+    log_level = getattr(raw_args, "log_level", "INFO")
+    if debug_mode or log_level == "DEBUG":
+        debug_mode = True
+        log_level = "DEBUG"
+
+    trace_mode = bool(getattr(raw_args, "trace_mode", False) or "--trace" in args)
+
+    return CliArgs(
+        subcommand=getattr(raw_args, "subcommand", None),
+        subcommand_action=getattr(raw_args, "subcommand_action", None),
+        subcommand_target=getattr(raw_args, "target", None),
+        prompt=prompt_str,
+        files=file_targets,
+        rag=getattr(raw_args, "rag", False),
+        mcp_local=getattr(raw_args, "mcp_local", False),
+        mcp_github=getattr(raw_args, "mcp_github", False),
+        cache=getattr(raw_args, "cache", False),
+        model=getattr(raw_args, "model", "gemini-3.5-flash"),
+        provider=getattr(raw_args, "provider", "gemini"),
+        write_mode=getattr(raw_args, "write_mode", False),
+        auto_save=getattr(raw_args, "auto_save", False),
+        context=context_str,
+        cache_ttl=getattr(raw_args, "ttl", 3600),
+        debug_mode=debug_mode,
+        log_level=log_level,
+        trace_mode=trace_mode,
+        dry_run=getattr(raw_args, "dry_run", False),
+        list_models=getattr(raw_args, "list_models", False),
+        generate_commit_msg=getattr(raw_args, "generate_commit_msg", False),
+        review=getattr(raw_args, "review", False),
+        input_dirs=input_dirs,
+        output_dir=getattr(raw_args, "output_dir", "./chroma_db"),
+    )
+
+
+def _build_global_parser() -> argparse.ArgumentParser:
+    """すべてのサブコマンドおよびメイン対話で共有される基本オプションを定義."""
+    parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument(
-        "-s",
-        "--auto-save",
+        "--dry-run",
         action="store_true",
-        help="対話内容からタイトルを自動生成して保存",
+        help="API 呼び出しを行わず、読み込まれるファイル群や指定引数の確認のみ実行します",
     )
-    parser.add_argument(
-        "-w",
-        "--write",
-        action="store_true",
-        help="Gemini によるソースコードの直接修正・書き換えを許可するモード",
-    )
-    parser.add_argument(
-        "-m",
-        "--model",
-        type=str,
-        default="gemini-flash-latest",
-        help="使用する Gemini モデル名 (デフォルト: gemini-flash-latest)",
-    )
-    # デバッグフラグ (-D / --debug)
     parser.add_argument(
         "-D",
         "--debug",
         action="store_true",
+        dest="debug_mode",
         help="デバッグモードを有効にします（--log-level DEBUG と同等）",
     )
     parser.add_argument(
@@ -265,97 +298,122 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
         type=str.upper,
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default="INFO",
+        dest="log_level",
         help="ログレベルを指定します (デフォルト: INFO)",
     )
     parser.add_argument(
-        "-l",
+        "--trace",
+        action="store_true",
+        dest="trace_mode",
+        help="SDK や HTTP クライアント等のライブラリ内部通信ログを出力します",
+    )
+    parser.add_argument(
         "--list-models",
+        "-l",
         action="store_true",
-        help="利用可能なモデルの一覧を表示して終了します",
+        dest="list_models",
+        help="利用可能な LLM モデル一覧を表示します",
     )
     parser.add_argument(
-        "-g",
         "--generate-commit-msg",
+        "-g",
         action="store_true",
-        help="git diff (--cached) からコミットメッセージ案を生成します",
+        dest="generate_commit_msg",
+        help="コミットメッセージ出力",
     )
     parser.add_argument(
-        "-r",
         "--review",
+        "-r",
         action="store_true",
-        help="git diff または指定ファイルの内容をコードレビューします.",
+        help="指定ファイルまたは Git 差分のコードレビューを実行します",
+    )
+    return parser
+
+
+def _build_main_execution_parser(
+    global_parser: argparse.ArgumentParser,
+) -> argparse.ArgumentParser:
+    """メイン対話・ワンショット実行用オプションを定義."""
+    parser = argparse.ArgumentParser(
+        description="LLM / RAG / MCP / Context Caching を統合した CLI ツール",
+        parents=[global_parser],
+    )
+    # parser.add_argument(
+    #    "prompt",
+    #    nargs="*",
+    #    default=[],
+    #    help="実行するプロンプト。省略時は対話モード (REPL) を起動",
+    # )
+    parser.add_argument(
+        "--rag",
+        action="store_true",
+        help="RAG (ChromaDB Vector Store) 検索によるコンテキスト注入を有効化",
     )
     parser.add_argument(
-        "--staged",
+        "--mcp-local",
         action="store_true",
-        help="--review または --generate-commit-msg 実行時に staged 状態の差分を対象にします.",
+        dest="mcp_local",
+        help="ローカル MCP サーバーとの連携を有効化",
     )
-
-    # RAG サブコマンド
-    subparsers = parser.add_subparsers(dest="command", help="RAG サブコマンド")
-
-    index_parser = subparsers.add_parser(
-        "index", help="リポジトリの RAG インデックスを作成します"
+    parser.add_argument(
+        "--mcp-github",
+        action="store_true",
+        dest="mcp_github",
+        help="外部 GitHub MCP サーバーとの連携を有効化",
     )
-    index_parser.add_argument(
-        "--repo-path",
-        "-r",
-        default=".",
-        help="対象リポジトリのパス (デフォルト: カレントディレクトリ)",
+    parser.add_argument(
+        "-c",
+        "--cache",
+        nargs="?",
+        const=True,
+        default=False,
+        help="Context Caching を利用。指定なしで最新キャッシュ自動選択、Cache ID 指定で特定キャッシュ再利用",
     )
-
-    ask_parser = subparsers.add_parser(
-        "ask", help="RAG を使ってリポジトリのコードベースに質問します"
+    parser.add_argument(
+        "-f",
+        "--file",
+        type=str,
+        action="append",
+        dest="files",
+        help="コンテキストとしてロードする（または書き込み対象とする）ファイル・ディレクトリパス",
     )
-    ask_parser.add_argument("query", type=str, help="検索クエリ")
-    ask_parser.add_argument(
-        "--repo-path",
-        "-r",
-        default=".",
-        help="対象リポジトリのパス (デフォルト: カレントディレクトリ)",
+    parser.add_argument(
+        "-m",
+        "--model",
+        type=str,
+        default="gemini-3.5-flash",
+        help="使用する LLM モデル名 (デフォルト: gemini-3.5-flash)",
     )
-    ask_parser.add_argument(
-        "--top-k",
-        "-k",
-        type=int,
-        default=5,
-        help="取得するコンテキストの件数 (デフォルト: 5)",
+    parser.add_argument(
+        "-p",
+        "--provider",
+        type=str,
+        default="gemini",
+        help="使用する LLM プロバイダ (デフォルト: gemini)",
     )
-
-    raw_args = parser.parse_args(filtered_args)
-
-    # コンテキストの収集
-    context_parts: list[str] = []
-
-    # パイプからの入力を取得
-    stdin_text = read_stdin_content()
-    if stdin_text:
-        context_parts.append(f"--- [標準入力] ---\n{stdin_text}")
-
-    # -f オプションからの入力を取得
-    if raw_args.file:
-        path_text = read_path_content(raw_args.file)
-        if path_text:
-            context_parts.append(f"--- [パス入力: {raw_args.file}] ---\n{path_text}")
-
-    context_str = "\n\n".join(context_parts)
-
-    return CliArgs(
-        prompt=prompt,
-        target_path=raw_args.file,
-        output_path=raw_args.output,
-        auto_save=raw_args.auto_save,
-        write_mode=raw_args.write,
-        model=raw_args.model,
-        debug=raw_args.debug,
-        log_level=raw_args.log_level,
-        list_models=raw_args.list_models,
-        generate_commit_msg=raw_args.generate_commit_msg,
-        review=raw_args.review,
-        staged=raw_args.staged,
-        context=context_str,
-        command=raw_args.command,
-        repo_path=getattr(raw_args, "repo_path", "."),
-        query=getattr(raw_args, "query", None),
-        top_k=getattr(raw_args, "top_k", 5),
+    parser.add_argument(
+        "-w",
+        "--write",
+        action="store_true",
+        dest="write_mode",
+        help="生成・修正結果を対象ファイルに直接書き込み・適用",
     )
+    parser.add_argument(
+        "-a",
+        "--auto-save",
+        action="store_true",
+        dest="auto_save",
+        help="対話ログや出力結果を自動保存",
+    )
+    return parser
+
+
+def _read_stdin_content() -> str:
+    """標準入力 (パイプやリダイレクト) からテキストを読み込む.
+
+    Returns:
+        標準入力から読み込まれたテキスト. 端末（tty）からの入力である場合は空文字列.
+    """
+    if not sys.stdin.isatty():
+        return sys.stdin.read()
+    return ""

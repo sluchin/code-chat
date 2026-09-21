@@ -10,13 +10,13 @@ from langchain_core.documents import Document
 def test_code_indexer_init():
     """初期化パラメータが正しく保持されるか検証する."""
     indexer = CodeIndexer(
-        repo_path="/dummy/repo",
+        input_dirs=["/dummy/repo"],
         suffixes=[".py", ".ts"],
         chunk_size=500,
         chunk_overlap=50,
     )
 
-    assert indexer.repo_path == "/dummy/repo"
+    assert indexer.input_dirs == ["/dummy/repo"]
     assert indexer.suffixes == [".py", ".ts"]
     assert indexer.chunk_size == 500
     assert indexer.chunk_overlap == 50
@@ -24,7 +24,7 @@ def test_code_indexer_init():
 
 def test_load_and_chunk_file_not_found():
     """存在しないパスを指定した場合に FileNotFoundError が発生するか検証する."""
-    indexer = CodeIndexer(repo_path="/non_existent_directory_path_12345")
+    indexer = CodeIndexer(input_dirs=["/non_existent_directory_path_12345"])
     with pytest.raises(FileNotFoundError):
         indexer.load_and_chunk()
 
@@ -57,7 +57,7 @@ def test_load_and_chunk_success(mock_splitter_cls, mock_loader_cls, tmp_path):
     mock_splitter_cls.from_language.return_value = mock_splitter
 
     # テスト対象の実行
-    indexer = CodeIndexer(repo_path=str(repo_dir))
+    indexer = CodeIndexer(input_dirs=list[str(repo_dir)])
     chunks = indexer.load_and_chunk()
 
     # 検証
@@ -92,7 +92,7 @@ def test_load_and_chunk_empty_documents(mock_loader_cls, tmp_path):
     mock_loader.load.return_value = []
     mock_loader_cls.from_filesystem.return_value = mock_loader
 
-    indexer = CodeIndexer(repo_path=str(repo_dir))
+    indexer = CodeIndexer(input_dirs=list[str(repo_dir)])
     chunks = indexer.load_and_chunk()
 
     assert not chunks

@@ -19,58 +19,63 @@ MAX_BACKUP_COUNT = 5
 
 
 def handle_write_mode_confirmation(
-    target_path_str: str | None, response_text: str
+    target_paths: list[str] | None, response_text: str
 ) -> None:
     """Write Mode 時に抽出したコードでファイルを更新します.
 
     抽出したコードの妥当性を検証し, ユーザーに確認を求めた上でファイルの上書きを行います.
 
     Args:
-        target_path_str (str | None): 書き換え対象のファイルパス.
+        target_paths (list[str] | None): 書き換え対象のファイルパスリスト.
         response_text (str): Gemini から返却されたレスポンス本文全体.
     """
     logger.debug(
-        "handle_write_mode_confirmation 呼び出し - target_path: '%s'", target_path_str
+        "handle_write_mode_confirmation 呼び出し - target_paths: %s", target_paths
     )
 
-    if not target_path_str:
+    if not target_paths:
         logger.error("対象のファイルパスが指定されていません.")
         return
 
-    target_path = Path(target_path_str)
-    logger.debug(
-        "ファイル存在チェック: path='%s', is_file()=%s",
-        target_path.resolve(),
-        target_path.is_file(),
-    )
+    # 渡されたパスのうち、存在するファイルのみを有効な対象として抽出
+    valid_targets: list[Path] = []
+    for p_str in target_paths:
+        path = Path(p_str)
+        if path.is_file():
+            valid_targets.append(path)
+        else:
+            logger.warning("'%s' は存在しないか、通常のファイルではありません.", p_str)
 
-    if not target_path.is_file():
-        logger.error(
-            "'%s' は存在しないか, 通常のファイルではありません.", target_path_str
-        )
+    if not valid_targets:
+        logger.error("書き込み対象となる有効なファイルが存在しません.")
         return
 
-    code = _sanitize_code_output(response_text)
-    logger.debug("抽出結果コード長: %d 文字", len(code))
+    # レスポンスから (パス, コードブロック) のペアを抽出
+    # 例: ```python:path/to/file.py ... ``` や ```path/to/file.py ... ```
+    changes = _extract_file_changes(response_text, valid_targets)
 
-    if not code.strip():
+    if not changes:
         logger.error(
             "レスポンスから書き込み可能なコードブロックを抽出できませんでした."
         )
         return
 
-    if _is_partial_code(code):
-        logger.warning(
-            "出力コード内に省略（'...' や '変更なし' 等）"
-            "が含まれている可能性があります."
-            "そのまま上書きするとコードが破損する恐れがあります."
-        )
+    # 変更対象ファイルとコードの検証・確認表示
+    print("\n[Write Mode] 以下のファイルへの変更が提案されています:")
+    for path_str, code in changes.items():
+        line_count = len(code.splitlines())
+        has_partial = _is_partial_code(code)
+        warning_msg = " [省略の可能性あり]" if has_partial else ""
+        print(f"  - {path_str} ({line_count} 行){warning_msg}")
+
+        if has_partial:
+            logger.warning(
+                "'%s' の出力コード内に省略（'...' や '変更なし' 等）が含まれている可能性があります.",
+                path_str,
+            )
 
     confirm = (
-        input(
-            f"\n[Write Mode] 提案されたコード（{len(code.splitlines())} 行）で "
-            f"'{target_path_str}' を上書きしますか？ (y/N): "
-        )
+        input("\n提案された内容で対象ファイルを上書きしますか？ (y/N): ")
         .strip()
         .lower()
     )
@@ -78,7 +83,9 @@ def handle_write_mode_confirmation(
     logger.debug("ユーザー入力結果: '%s'", confirm)
 
     if confirm == "y":
-        apply_file_modification(target_path_str, code)
+        for path_str, code in changes.items():
+            apply_file_modification(path_str, code)
+            logger.info("ファイルを更新しました: %s", path_str)
     else:
         logger.info("上書きをキャンセルしました.")
 
@@ -281,3 +288,66 @@ def _cleanup_old_backups(path: Path, max_keep: int) -> None:
                 logger.debug("古いバックアップを削除しました: %s", old_bak)
             except OSError:
                 pass
+
+
+def apply_multi_file_changes(model_response: str, allowed_paths: list[str]) -> None:
+    """LLMのレスポンスからファイルパスとコードブロックを抽出し、対象ファイルに書き込みます
+
+    Args:
+        model_response (str): LLMからのテキスト出力
+        allowed_paths (list[str]): -f で指定された安全な書き込み対象パスリスト
+    """
+    # ```python:path/to/file.py や ### File: path/to/file.py などを検出するパターン
+    pattern = r"```(?:\w+:)?([^\n]+)\n(.*?)```"
+    matches = re.findall(pattern, model_response, re.DOTALL)
+
+    if not matches:
+        logger.warning("書き込み対象のコードブロックが抽出できませんでした")
+        return
+
+    for target_path_str, code_content in matches:
+        target_path_str = target_path_str.strip()
+
+        # 指定された -f のリストに含まれているか安全性を確認
+        if target_path_str in allowed_paths:
+            path = Path(target_path_str)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(code_content.lstrip(), encoding="utf-8")
+            logger.info("ファイルを更新しました: %s", target_path_str)
+        else:
+            logger.warning(
+                "指定外のパスへの書き込みをスキップしました: %s", target_path_str
+            )
+
+
+def _extract_file_changes(
+    response_text: str, valid_targets: list[Path]
+) -> dict[str, str]:
+    """レスポンス本文からパスとコードブロックの対応辞書を抽出します."""
+    valid_str_paths = {str(p.resolve()): str(p) for p in valid_targets}
+    changes: dict[str, str] = {}
+
+    # パス付きコードブロックのパターン検索 (例: ```python:src/a.py または ```src/a.py)
+    pattern = r"```(?:[\w+-]+:)?([^\n]+)\n(.*?)```"
+    matches = re.findall(pattern, response_text, re.DOTALL)
+
+    for path_hint, code_block in matches:
+        path_hint = path_hint.strip()
+        cleaned_code = _sanitize_code_output(code_block)
+
+        if not cleaned_code.strip():
+            continue
+
+        # ヘッダーに指定されたパスが valid_targets に含まれているか照合
+        resolved_hint = str(Path(path_hint).resolve())
+        if resolved_hint in valid_str_paths:
+            original_path = valid_str_paths[resolved_hint]
+            changes[original_path] = cleaned_code
+
+    # パスが明記されていない単一コードブロックの場合（対象が1つだけのフォールバック）
+    if not changes and len(valid_targets) == 1:
+        single_code = _sanitize_code_output(response_text)
+        if single_code.strip():
+            changes[str(valid_targets[0])] = single_code
+
+    return changes

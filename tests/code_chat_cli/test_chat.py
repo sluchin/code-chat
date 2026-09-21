@@ -16,33 +16,6 @@ from google.genai.errors import APIError
 
 
 @pytest.fixture
-def mock_gemini_client():
-    """Gemini Client および Chat セッションのモックを作成."""
-    with patch("code_chat_cli.chat.get_gemini_client") as mock_get_client:
-        mock_client = MagicMock()
-        mock_chat = MagicMock()
-
-        # ストリーミングレスポンス（イテレータ）のモック
-        mock_chunk = MagicMock()
-        mock_chunk.text = "モックされたAIからの回答です."
-        mock_chat.send_message_stream.return_value = [mock_chunk]
-
-        # 通常送信のレスポンスのモック
-        mock_response = MagicMock()
-        mock_response.text = "コンテキスト受信完了"
-        mock_chat.send_message.return_value = mock_response
-
-        mock_client.chats.create.return_value = mock_chat
-        mock_get_client.return_value = mock_client
-
-        yield {
-            "get_client": mock_get_client,
-            "client": mock_client,
-            "chat": mock_chat,
-        }
-
-
-@pytest.fixture
 def mock_args():
     """parse_args の全属性を網羅した SimpleNamespace モック."""
     with patch("code_chat_cli.chat.parse_args") as mock_parse:
@@ -311,30 +284,6 @@ def test_main_chat_loop_write_mode_append_instruction(
         "(※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください)"
         in sent_prompt
     )
-
-
-# @patch("code_chat_cli.args.read_stdin_content", return_value="")
-# @patch("code_chat_cli.commands.commit.handle_commit_generation")
-# def test_cli_generate_commit_msg_failure(mock_handle, _mock_read_stdin, monkeypatch):
-#    """CLI 実行時にコミットメッセージ生成で例外が発生し, sys.exit(1) で終了することを検証."""
-#    # handle_commit_generation で例外を送出させる
-#    mock_handle.side_effect = RuntimeError("Unexpected Error")
-#
-# コマンドライン引数をシミュレート (-g フラグなどを指定)
-# project_name, -g (または --generate-commit-msg) を渡す
-#    monkeypatch.setattr("sys.argv", ["code-chat", "-g"])
-
-# APIキーのチェック等で落ちないよう環境変数をダミー設定
-#    monkeypatch.setenv("GEMINI_API_KEY", "dummy_key")
-
-# sys.exit(1) が実行されると SystemExit 例外が発生する
-#    with pytest.raises(SystemExit) as exc_info:
-#        main()  # 引数なしで呼び出し
-
-# 終了ステータスコードが 1 であることを検証
-#    assert exc_info.value.code == 1
-# 確実に呼び出されたか検証
-#    mock_handle.assert_called_once()
 
 
 def test_main_keyboard_interrupt(monkeypatch):

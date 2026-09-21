@@ -1,7 +1,9 @@
 """コードRAG操作のための高レベルサービスインターフェース."""
 
 from collections.abc import Generator
+from pathlib import Path
 
+from code_chat_cli.logger import get_logger
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -11,46 +13,66 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from code_chat_rag.code_indexer import CodeIndexer
 from code_chat_rag.vector_store import VectorStore
 
+logger = get_logger(__name__)
+
 
 class CodeRagService:
     """インデックス作成, 検索, コードクエリへの回答を調整するサービスレイヤー."""
 
     def __init__(
         self,
-        repo_path: str | None = None,
-        persist_directory: str = "./.chroma_db",
-        model_name: str = "gemini-flash-latest",
+        input_dirs: list[str] | None = None,
+        output_dir: str = "./chroma_db",
+        model_name: str = "gemini-3.5-flash",
     ) -> None:
         """CodeRagServiceのインスタンスを初期化します.
 
         Args:
-            repo_path: 対象のコードリポジトリへのパス.
-            persist_directory: ベクトルストアの永続化先ディレクトリ.
+            index_dirs: 対象のコードリポジトリへのパス.
+            output_dir: ベクトルストアの永続化先ディレクトリ.
             model_name: 使用するLLMのモデル名.
         """
-        self.repo_path = str(repo_path) if repo_path is not None else ""
-        self.vector_store = VectorStore(persist_directory=persist_directory)
+        self.input_dirs = input_dirs
+        self.output_dir = output_dir
+        self.vector_store = VectorStore(output_dir=output_dir)
+        doc_count = self.vector_store.count()
+        logger.info("RAG Vector DB: %s", output_dir)
+        logger.info("RAG DB 登録ドキュメント数: %d 件", doc_count)
         self.llm = ChatGoogleGenerativeAI(model=model_name, temperature=0.0)
 
-    def index_repository(self, repo_path: str) -> int:
+    def index_repository(self, input_dirs: list[str], update_only: bool = False) -> int:
         """コードリポジトリを読み込み, チャンク化してVectorStoreに保存します.
 
         Args:
-            repo_path: コードリポジトリディレクトリへのパス.
+            input_dirs: コードリポジトリディレクトリへのパス.
+            update_only: True の場合は既存データを消さずに差分追加/更新し, False の場合は初期化して全件再作成します.
 
         Returns:
             インデックスされたチャンク数.
         """
-        indexer = CodeIndexer(repo_path=repo_path)
+        indexer = CodeIndexer(input_dirs=input_dirs)
         chunks = indexer.load_and_chunk()
 
         if not chunks:
             return 0
 
+        if not update_only:
+            # 新規作成 (新規インデックス化) のときは既存のベクトルストア内容をクリア
+            self.vector_store.clear()
+
         added_ids = self.vector_store.add_chunks(chunks)
         return len(added_ids)
 
-    def ask(self, question: str, k: int = 5) -> str:
+    def get_context(self, question: str, k: int = 5) -> str:
+        """質問に関連するコード情報を整形済みコンテキスト文字列として取得します."""
+        docs = self.vector_store.as_retriever(k=k).invoke(question)
+        return self._format_docs(docs)
+
+    def clear(self):
+        """Vector DB 削除"""
+        self.vector_store.clear()
+
+    def query(self, question: str, k: int = 5) -> str:
         """インデックスされたコードベースを使用してコードに関する質問に回答します.
 
         Args:
@@ -63,7 +85,7 @@ class CodeRagService:
         chain = self._build_chain(k=k)
         return chain.invoke(question)
 
-    def ask_stream(self, question: str, k: int = 5) -> Generator[str, None, None]:
+    def query_stream(self, question: str, k: int = 5) -> Generator[str, None, None]:
         """レスポンシブなCLIインタラクションのために回答トークンをストリーミングします.
 
         Args:
@@ -76,6 +98,33 @@ class CodeRagService:
         chain = self._build_chain(k=k)
         yield from chain.stream(question)
 
+    def get_status(self) -> str:
+        """インデックス（VectorStore）の現在のステータス情報を取得します.
+
+        Returns:
+            str: ステータス概要テキスト.
+        """
+        # VectorStore から件数を取得 (VectorStore 側に count() がある前提)
+        chunk_count = self.vector_store.count()
+        db_path = Path(self.output_dir).resolve()
+
+        return f"データベースパス: {db_path}\n総インデックスチャンク数: {chunk_count}"
+
+    def _format_docs(self, docs: list[Document]) -> str:
+        """取得したドキュメント群をプロンプト埋め込み用の単一文字列に整形します.
+
+        Args:
+            docs: 整形対象のDocumentオブジェクトのリスト.
+
+        Returns:
+           各ドキュメントのソースパスと内容を結合したコンテキスト文字列.
+        """
+        formatted = []
+        for doc in docs:
+            source = doc.metadata.get("source", "Unknown")
+            formatted.append(f"--- File: {source} ---\n{doc.page_content}")
+        return "\n\n".join(formatted)
+
     def _build_chain(self, k: int = 5) -> Runnable:
         """LangChain Expression Language (LCEL) を使用してRAGパイプラインを構築します.
 
@@ -86,21 +135,6 @@ class CodeRagService:
             質問文字列を受け取り, 回答文字列を出力する実行可能なLCELチェーン.
         """
         retriever = self.vector_store.as_retriever(k=k)
-
-        def format_docs(docs: list[Document]) -> str:
-            """取得したドキュメント群をプロンプト埋め込み用の単一文字列に整形します.
-
-            Args:
-                docs: 整形対象のDocumentオブジェクトのリスト.
-
-            Returns:
-                各ドキュメントのソースパスと内容を結合したコンテキスト文字列.
-            """
-            formatted = []
-            for doc in docs:
-                source = doc.metadata.get("source", "Unknown")
-                formatted.append(f"--- File: {source} ---\n{doc.page_content}")
-            return "\n\n".join(formatted)
 
         prompt = ChatPromptTemplate.from_template(
             "あなたはコードベースの解釈と解説を行うエキスパートです.\n"
@@ -114,7 +148,7 @@ class CodeRagService:
 
         chain = (
             {
-                "context": retriever | format_docs,
+                "context": retriever | self._format_docs,
                 "question": RunnablePassthrough(),
             }
             | prompt

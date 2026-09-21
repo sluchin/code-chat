@@ -2,40 +2,13 @@
 """モデル一覧の取得および表示処理を行うサブコマンドモジュール."""
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from code_chat_cli.chat import (
     main,
 )
 from code_chat_cli.commands.models import handle_list_models
-
-
-@pytest.fixture
-def mock_gemini_client():
-    """Gemini Client および Chat セッションのモックを作成."""
-    with patch("code_chat_cli.chat.get_gemini_client") as mock_get_client:
-        mock_client = MagicMock()
-        mock_chat = MagicMock()
-
-        # ストリーミングレスポンス（イテレータ）のモック
-        mock_chunk = MagicMock()
-        mock_chunk.text = "モックされたAIからの回答です."
-        mock_chat.send_message_stream.return_value = [mock_chunk]
-
-        # 通常送信のレスポンスのモック
-        mock_response = MagicMock()
-        mock_response.text = "コンテキスト受信完了"
-        mock_chat.send_message.return_value = mock_response
-
-        mock_client.chats.create.return_value = mock_chat
-        mock_get_client.return_value = mock_client
-
-        yield {
-            "get_client": mock_get_client,
-            "client": mock_client,
-            "chat": mock_chat,
-        }
 
 
 def test_main_list_models_option(monkeypatch, mock_gemini_client, mock_args, capsys):

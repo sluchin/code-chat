@@ -63,7 +63,7 @@ print(answer)
 ## アーキテクチャ概要
 
 ```text
-[ Source Code ] 
+[ Source Code ]
        │
        ▼  (CodeIndexer)
 [ Document Chunks ]
