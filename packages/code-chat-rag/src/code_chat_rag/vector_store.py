@@ -18,7 +18,7 @@ class VectorStore:
 
     def __init__(
         self,
-        output_dir: str = "./chroma_db",
+        output_dir: str = "./.chroma_db",
         embedding_function: Embeddings | None = None,
     ) -> None:
         """VectorStore インスタンスを初期化します.

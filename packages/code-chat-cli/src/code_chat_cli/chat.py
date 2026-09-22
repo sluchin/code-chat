@@ -494,7 +494,7 @@ def _handle_rag_subcommand(cli_args: Any) -> None:
     """
     logger.info("rag サブコマンドを実行します")
     input_dirs = getattr(cli_args, "input_dirs", None) or ["."]
-    output_dir = getattr(cli_args, "output_dir", None) or "./chroma_db"
+    output_dir = getattr(cli_args, "output_dir", None) or "./.chroma_db"
     action = getattr(cli_args, "subcommand_action", None)
 
     try:
@@ -616,7 +616,7 @@ def main() -> None:
 
         auto_save = getattr(cli_args, "auto_save", False)
         input_dirs = getattr(cli_args, "input_dirs", None) or ["."]
-        output_dir = getattr(cli_args, "output_dir", None) or "./chroma_db"
+        output_dir = getattr(cli_args, "output_dir", None) or "./.chroma_db"
 
         logger.debug("デバッグモードが有効化されました")
         logger.info("Gemini CLI ツールを起動します")
