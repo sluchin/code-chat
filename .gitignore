@@ -48,4 +48,4 @@ htmlcov/
 *.bak
 
 # code-chat
-chroma_db/
+.chroma_db/

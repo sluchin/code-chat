@@ -22,7 +22,7 @@ class CodeRagService:
     def __init__(
         self,
         input_dirs: list[str] | None = None,
-        output_dir: str = "./chroma_db",
+        output_dir: str = "./.chroma_db",
         model_name: str = "gemini-3.5-flash",
     ) -> None:
         """CodeRagServiceのインスタンスを初期化します.

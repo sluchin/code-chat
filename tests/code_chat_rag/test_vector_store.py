@@ -38,7 +38,7 @@ def test_get_db_file_not_found():
 def test_add_chunks_success(mock_chroma_cls, mock_embedding, tmp_path):
     """チャンクデータ（辞書のリスト）が正常に Document 化され Chroma に保存されるか検証する."""
     # ダミーの保存先ディレクトリを作成
-    persist_dir = tmp_path / "chroma_db"
+    persist_dir = tmp_path / ".chroma_db"
     persist_dir.mkdir()
 
     # Chroma インスタンスのモック設定
@@ -86,7 +86,7 @@ def test_add_chunks_empty(mock_embedding):
 @patch("code_chat_rag.vector_store.Chroma")
 def test_as_retriever(mock_chroma_cls, mock_embedding, tmp_path):
     """リトリーバーインターフェースが正しく取得できるか検証する."""
-    persist_dir = tmp_path / "chroma_db"
+    persist_dir = tmp_path / ".chroma_db"
     persist_dir.mkdir()
 
     mock_chroma_instance = MagicMock()

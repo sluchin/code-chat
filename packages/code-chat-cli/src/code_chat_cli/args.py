@@ -92,7 +92,7 @@ class CliArgs:
     input_dirs: list[str] = field(default_factory=list)
     """インデックス作成対象のディレクトリパス"""
 
-    output_dir: str | None = "./chroma_db"
+    output_dir: str | None = "./.chroma_db"
     """インデックス出力ディレクトリパス"""
 
 
@@ -127,8 +127,8 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
     rag_create.add_argument(
         "--output_dir",
         type=str,
-        default="./chroma_db",
-        help="出力パス (デフォルト: ./chroma_db)",
+        default="./.chroma_db",
+        help="出力パス (デフォルト: ./.chroma_db)",
     )
 
     rag_update = rag_subparsers.add_parser(
@@ -140,8 +140,8 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
     rag_update.add_argument(
         "--output_dir",
         type=str,
-        default="./chroma_db",
-        help="出力パス (デフォルト: ./chroma_db)",
+        default="./.chroma_db",
+        help="出力パス (デフォルト: ./.chroma_db)",
     )
 
     rag_subparsers.add_parser("rm", parents=[global_parser], help="Vector DB を削除")
@@ -274,7 +274,7 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
         generate_commit_msg=getattr(raw_args, "generate_commit_msg", False),
         review=getattr(raw_args, "review", False),
         input_dirs=input_dirs,
-        output_dir=getattr(raw_args, "output_dir", "./chroma_db"),
+        output_dir=getattr(raw_args, "output_dir", "./.chroma_db"),
     )
 
 
