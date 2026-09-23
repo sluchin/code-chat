@@ -3,13 +3,13 @@
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
-from code_chat_rag.code_indexer import CodeIndexer
+from code_chat_rag.indexer import Indexer
 from langchain_core.documents import Document
 
 
 def test_code_indexer_init():
     """初期化パラメータが正しく保持されるか検証する."""
-    indexer = CodeIndexer(
+    indexer = Indexer(
         input_dirs=["/dummy/repo"],
         suffixes=[".py", ".ts"],
         chunk_size=500,
@@ -24,7 +24,7 @@ def test_code_indexer_init():
 
 def test_load_and_chunk_file_not_found():
     """存在しないパスを指定した場合に FileNotFoundError が発生するか検証する."""
-    indexer = CodeIndexer(input_dirs=["/non_existent_directory_path_12345"])
+    indexer = Indexer(input_dirs=["/non_existent_directory_path_12345"])
     with pytest.raises(FileNotFoundError):
         indexer.load_and_chunk()
 
@@ -57,7 +57,7 @@ def test_load_and_chunk_success(mock_splitter_cls, mock_loader_cls, tmp_path):
     mock_splitter_cls.from_language.return_value = mock_splitter
 
     # テスト対象の実行
-    indexer = CodeIndexer(input_dirs=list[str(repo_dir)])
+    indexer = Indexer(input_dirs=list[str(repo_dir)])
     chunks = indexer.load_and_chunk()
 
     # 検証
@@ -92,7 +92,7 @@ def test_load_and_chunk_empty_documents(mock_loader_cls, tmp_path):
     mock_loader.load.return_value = []
     mock_loader_cls.from_filesystem.return_value = mock_loader
 
-    indexer = CodeIndexer(input_dirs=list[str(repo_dir)])
+    indexer = Indexer(input_dirs=list[str(repo_dir)])
     chunks = indexer.load_and_chunk()
 
     assert not chunks
@@ -102,7 +102,7 @@ def test_load_and_chunk_empty_documents(mock_loader_cls, tmp_path):
 def test_get_splitter_for_path_fallback() -> None:
     """マッピングにない拡張子（.txt や .unknown など）を指定した場合に汎用スプリッターが返されることを検証."""
     # コンストラクタに必要な依存オブジェクトがあれば MagicMock 等で作成
-    indexer = CodeIndexer()
+    indexer = Indexer()
 
     # pylint: disable=protected-access
     splitter = indexer._get_splitter_for_path("example.txt")
@@ -113,7 +113,7 @@ def test_get_splitter_for_path_fallback() -> None:
 
 def test_get_splitter_for_path_no_extension() -> None:
     """拡張子のないファイルパス（Dockerfile など）を指定した場合のフォールバックを検証."""
-    indexer = CodeIndexer()
+    indexer = Indexer()
 
     # pylint: disable=protected-access
     splitter = indexer._get_splitter_for_path("Dockerfile")

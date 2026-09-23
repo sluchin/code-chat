@@ -28,6 +28,7 @@ def handle_write_mode_confirmation(
     Args:
         target_paths (list[str] | None): 書き換え対象のファイルパスリスト.
         response_text (str): Gemini から返却されたレスポンス本文全体.
+
     """
     logger.debug(
         "handle_write_mode_confirmation 呼び出し - target_paths: %s", target_paths
@@ -37,14 +38,14 @@ def handle_write_mode_confirmation(
         logger.error("対象のファイルパスが指定されていません.")
         return
 
-    # 渡されたパスのうち、存在するファイルのみを有効な対象として抽出
+    # 渡されたパスのうち, 存在するファイルのみを有効な対象として抽出
     valid_targets: list[Path] = []
     for p_str in target_paths:
         path = Path(p_str)
         if path.is_file():
             valid_targets.append(path)
         else:
-            logger.warning("'%s' は存在しないか、通常のファイルではありません.", p_str)
+            logger.warning("'%s' は存在しないか, 通常のファイルではありません.", p_str)
 
     if not valid_targets:
         logger.error("書き込み対象となる有効なファイルが存在しません.")
@@ -99,6 +100,7 @@ def apply_file_modification(target_path: str, new_code: str) -> None:
     Args:
         target_path (str): 上書き対象のファイルパス.
         new_code (str): ファイルに書き込む新しいソースコード文字列.
+
     """
     path = Path(target_path)
     if not path.is_file():
@@ -133,6 +135,7 @@ def create_safe_backup(path: Path) -> Path | None:
 
     Raises:
         OSError: タイムスタンプ付きバックアップの作成に失敗した場合.
+
     """
     if not path.exists() or not path.is_file():
         return None
@@ -171,6 +174,7 @@ def _is_partial_code(code: str) -> bool:
 
     Returns:
         bool: 省略表現が含まれている場合は True, それ以外は False.
+
     """
     patterns = [
         # 行全体またはインデント後の行頭が省略コメントになっているパターン
@@ -204,6 +208,7 @@ def _sanitize_code_output(raw_output: str) -> str:
 
     Returns:
         str: ファイルに書き込むためのサニタイズ済みソースコード.
+
     """
     if not raw_output:
         return ""
@@ -268,6 +273,7 @@ def _cleanup_old_backups(path: Path, max_keep: int) -> None:
     Args:
         path (Path): バックアップ対象の元ファイルパス.
         max_keep (int): 保持するタイムスタンプ付きバックアップの最大世代数.
+
     """
     pattern = f"{path.name}.bak.*"
     # *.bak.orig 以外のタイムスタンプ付きバックアップを抽出
@@ -291,11 +297,12 @@ def _cleanup_old_backups(path: Path, max_keep: int) -> None:
 
 
 def apply_multi_file_changes(model_response: str, allowed_paths: list[str]) -> None:
-    """LLMのレスポンスからファイルパスとコードブロックを抽出し、対象ファイルに書き込みます
+    """LLMのレスポンスからファイルパスとコードブロックを抽出し, 対象ファイルに書き込みます.
 
     Args:
         model_response (str): LLMからのテキスト出力
         allowed_paths (list[str]): -f で指定された安全な書き込み対象パスリスト
+
     """
     # ```python:path/to/file.py や ### File: path/to/file.py などを検出するパターン
     pattern = r"```(?:\w+:)?([^\n]+)\n(.*?)```"

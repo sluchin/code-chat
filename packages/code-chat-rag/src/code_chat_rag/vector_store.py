@@ -26,6 +26,7 @@ class VectorStore:
         Args:
             output_dir: データベースの永続化先ディレクトリパス.
             embedding_function: 使用する埋め込みモデル. 未指定時は GoogleGenerativeAIEmbeddings を使用.
+
         """
         self.output_dir = str(output_dir)
         self.embeddings = embedding_function or GoogleGenerativeAIEmbeddings(
@@ -41,6 +42,7 @@ class VectorStore:
 
         Returns:
             生成されたドキュメントIDのリスト.
+
         """
         if not chunks:
             return []
@@ -70,6 +72,7 @@ class VectorStore:
 
         Returns:
             VectorStoreRetriever: 設定されたリトリーバーインスタンス.
+
         """
         db = self._get_db()
         return db.as_retriever(search_type=search_type, search_kwargs={"k": k})
@@ -120,7 +123,8 @@ class VectorStore:
             Chroma: 初期化されたChromaデータベースインスタンス.
 
         Raises:
-            FileNotFoundError: ディレクトリのパスが存在しない、または作成できなかった場合.
+            FileNotFoundError: ディレクトリのパスが存在しない, または作成できなかった場合.
+
         """
         path = Path(self.output_dir)
         try:

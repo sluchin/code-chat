@@ -59,7 +59,7 @@ def test_handle_commit_msg_generation_no_diff(
 def test_handle_commit_msg_generation_called_process_error(
     mock_client: MagicMock,
 ) -> None:
-    """subprocess が失敗例外を送出した場合に呼び出し元へ送出されるか、適切にキャッチされることを検証する."""
+    """subprocess が失敗例外を送出した場合に呼び出し元へ送出されるか, 適切にキャッチされることを検証する."""
     with (
         patch(
             "subprocess.run",
@@ -75,7 +75,7 @@ def test_handle_commit_msg_generation_suppresses_traceback(
     mock_client: MagicMock,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """API例外発生時に例外が呼び出し元へ伝播し、ログにエラーメッセージが出力されることを検証する."""
+    """API例外発生時に例外が呼び出し元へ伝播し, ログにエラーメッセージが出力されることを検証する."""
     with (
         patch(
             "code_chat_cli.commands.commit.get_git_diff",
@@ -98,7 +98,7 @@ def test_handle_commit_generation_api_error_non_debug(
     mock_client: MagicMock,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """非 DEBUG モード時に APIError が発生した場合、型名がログに出力され再送出されることを検証する."""
+    """非 DEBUG モード時に APIError が発生した場合, 型名がログに出力され再送出されることを検証する."""
     # 対象ロガーのログレベルを INFO に設定して logger.isEnabledFor(logging.DEBUG) を False にする
     caplog.set_level(logging.INFO, logger="code_chat_cli.commands.commit")
 
@@ -117,7 +117,7 @@ def test_handle_commit_generation_api_error_non_debug(
     ):
         handle_commit_generation(mock_client, "gemini-flash-latest")
 
-    # False ルートが通り、型名 (APIError) がログに含まれることを検証
+    # False ルートが通り, 型名 (APIError) がログに含まれることを検証
     assert "Gemini API でエラーが発生しました: APIError" in caplog.text
 
 
@@ -125,7 +125,7 @@ def test_handle_commit_generation_api_error_debug(
     mock_client: MagicMock,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """DEBUG モード時に APIError が発生した場合、エラーの詳細文字列がログに出力され再送出されることを検証する."""
+    """DEBUG モード時に APIError が発生した場合, エラーの詳細文字列がログに出力され再送出されることを検証する."""
     # 対象ロガーのログレベルを DEBUG に設定して logger.isEnabledFor(logging.DEBUG) を True にする
     caplog.set_level(logging.DEBUG, logger="code_chat_cli.commands.commit")
 
@@ -145,5 +145,5 @@ def test_handle_commit_generation_api_error_debug(
     ):
         handle_commit_generation(mock_client, "gemini-flash-latest")
 
-    # True ルートが通り、詳細文字列 (str(e)) がログに含まれることを検証
+    # True ルートが通り, 詳細文字列 (str(e)) がログに含まれることを検証
     assert error_message in caplog.text

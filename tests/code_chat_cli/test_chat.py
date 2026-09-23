@@ -573,7 +573,7 @@ def test_main_interactive_mode_exit_exceptions(
     exception_type: type[BaseException],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """input() 実行時に KeyboardInterrupt や EOFError が発生した場合、正常終了 (SystemExit: 0) することを検証する.
+    """input() 実行時に KeyboardInterrupt や EOFError が発生した場合, 正常終了 (SystemExit: 0) することを検証する.
 
     Args:
         exception_type (type[BaseException]): 発生させる例外クラス (KeyboardInterrupt または EOFError).
@@ -639,7 +639,7 @@ def test_cli_generate_commit_msg_integration(
 
 
 def test_handle_subcommands_index_success() -> None:
-    """command='index' で正常終了する場合、sys.exit(0) が呼ばれること."""
+    """command='index' で正常終了する場合, sys.exit(0) が呼ばれること."""
     mock_client = MagicMock()
     mock_args = MagicMock(command="index", repo_path="/path/to/repo")
 
@@ -654,7 +654,7 @@ def test_handle_subcommands_index_success() -> None:
 
 
 def test_handle_subcommands_index_exception() -> None:
-    """command='index' 実行時に例外が発生した場合、sys.exit(1) が呼ばれること."""
+    """command='index' 実行時に例外が発生した場合, sys.exit(1) が呼ばれること."""
     mock_client = MagicMock()
     mock_args = MagicMock(command="index", repo_path="/path/to/repo")
 
@@ -670,7 +670,7 @@ def test_handle_subcommands_index_exception() -> None:
 
 
 def test_handle_subcommands_ask_success() -> None:
-    """command='ask' で正常終了する場合、sys.exit(0) が呼ばれること."""
+    """command='ask' で正常終了する場合, sys.exit(0) が呼ばれること."""
     mock_client = MagicMock()
     mock_args = MagicMock(command="ask", query="how to use this?")
 
@@ -685,7 +685,7 @@ def test_handle_subcommands_ask_success() -> None:
 
 
 def test_handle_subcommands_ask_exception() -> None:
-    """command='ask' 実行時に例外が発生した場合、sys.exit(1) が呼ばれること."""
+    """command='ask' 実行時に例外が発生した場合, sys.exit(1) が呼ばれること."""
     mock_client = MagicMock()
     mock_args = MagicMock(command="ask", query="how to use this?")
 
@@ -699,7 +699,7 @@ def test_handle_subcommands_ask_exception() -> None:
 
 
 def test_handle_subcommands_none() -> None:
-    """サブコマンドが指定されていない場合、処理をスキップすること."""
+    """サブコマンドが指定されていない場合, 処理をスキップすること."""
     mock_client = MagicMock()
     mock_args = MagicMock(
         target_path=None,

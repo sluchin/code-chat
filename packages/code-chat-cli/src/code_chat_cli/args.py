@@ -38,11 +38,8 @@ class CliArgs:
     rag: bool = False
     """`--rag` による RAG コンテキスト注入の有効化フラグ."""
 
-    mcp_local: bool = False
-    """`--mcp-local` によるローカル MCP 連携の有効化フラグ."""
-
-    mcp_github: bool = False
-    """`--mcp-github` による GitHub MCP 連携の有効化フラグ."""
+    mcp: bool = False
+    """`--mcp` による MCP 連携の有効化フラグ."""
 
     cache: bool | str = False
     """`-c`/`--cache` による Context Caching 利用指定 (True または Cache ID 文字列)."""
@@ -206,7 +203,7 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
     )
 
     # パース処理
-    # parse_known_args を使用して定義済みフラグ/サブコマンドと、位置引数(prompt)を分離
+    # parse_known_args を使用して定義済みフラグ/サブコマンドと, 位置引数(prompt)を分離
     raw_args, unparsed_args = main_parser.parse_known_args(args)
 
     # 管理用サブコマンドでない場合は unparsed_args を prompt として扱う
@@ -257,8 +254,7 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
         prompt=prompt_str,
         files=file_targets,
         rag=getattr(raw_args, "rag", False),
-        mcp_local=getattr(raw_args, "mcp_local", False),
-        mcp_github=getattr(raw_args, "mcp_github", False),
+        mcp=getattr(raw_args, "mcp", False),
         cache=getattr(raw_args, "cache", False),
         model=getattr(raw_args, "model", "gemini-3.5-flash"),
         provider=getattr(raw_args, "provider", "gemini"),
@@ -284,7 +280,7 @@ def _build_global_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="API 呼び出しを行わず、読み込まれるファイル群や指定引数の確認のみ実行します",
+        help="API 呼び出しを行わず, 読み込まれるファイル群や指定引数の確認のみ実行します",
     )
     parser.add_argument(
         "-D",
@@ -338,28 +334,15 @@ def _build_main_execution_parser(
         description="LLM / RAG / MCP / Context Caching を統合した CLI ツール",
         parents=[global_parser],
     )
-    # parser.add_argument(
-    #    "prompt",
-    #    nargs="*",
-    #    default=[],
-    #    help="実行するプロンプト。省略時は対話モード (REPL) を起動",
-    # )
     parser.add_argument(
         "--rag",
         action="store_true",
         help="RAG (ChromaDB Vector Store) 検索によるコンテキスト注入を有効化",
     )
     parser.add_argument(
-        "--mcp-local",
+        "--mcp",
         action="store_true",
-        dest="mcp_local",
-        help="ローカル MCP サーバーとの連携を有効化",
-    )
-    parser.add_argument(
-        "--mcp-github",
-        action="store_true",
-        dest="mcp_github",
-        help="外部 GitHub MCP サーバーとの連携を有効化",
+        help="MCP サーバーとの連携を有効化",
     )
     parser.add_argument(
         "-c",
@@ -367,7 +350,7 @@ def _build_main_execution_parser(
         nargs="?",
         const=True,
         default=False,
-        help="Context Caching を利用。指定なしで最新キャッシュ自動選択、Cache ID 指定で特定キャッシュ再利用",
+        help="Context Caching を利用。指定なしで最新キャッシュ自動選択, Cache ID 指定で特定キャッシュ再利用",
     )
     parser.add_argument(
         "-f",
@@ -413,6 +396,7 @@ def _read_stdin_content() -> str:
 
     Returns:
         標準入力から読み込まれたテキスト. 端末（tty）からの入力である場合は空文字列.
+
     """
     if not sys.stdin.isatty():
         return sys.stdin.read()

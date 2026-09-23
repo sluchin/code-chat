@@ -25,6 +25,7 @@ def get_gemini_client() -> genai.Client:
 
     Raises:
         ClientConfigError: 環境変数 `GEMINI_API_KEY` が設定されていない場合.
+
     """
     api_key = os.getenv("GEMINI_API_KEY")
 

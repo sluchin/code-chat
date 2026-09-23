@@ -57,7 +57,7 @@ def test_main_list_models_exception(monkeypatch, mock_gemini_client, mock_args):
 
 
 def test_handle_list_models_exception(mock_client: MagicMock) -> None:
-    """model.list() で例外が発生した場合、例外がログ出力されて再送出されることを検証する."""
+    """model.list() で例外が発生した場合, 例外がログ出力されて再送出されることを検証する."""
     # client.models.list() が例外を発生させるようにモックを設定
     mock_client.models.list.side_effect = Exception("API Error")
 
