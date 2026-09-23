@@ -95,7 +95,15 @@ class CliArgs:
 
 # pylint: disable=too-many-locals,too-many-statements
 def parse_args(args: list[str] | None = None) -> CliArgs:
-    """コマンドライン引数を解析し, コンテキストを取得して返す."""
+    """コマンドライン引数を解析し, コンテキストを取得して返す.
+
+    Args:
+        args (list[str] | None, optional): 解析対象の引数リスト. Defaults to None.
+
+    Returns:
+        CliArgs: 解析された引数とコンテキスト情報を保持するオブジェクト.
+
+    """
     if args is None:
         args = sys.argv[1:]
 
@@ -186,10 +194,10 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
     )
     mcp_subparsers = mcp_parser.add_subparsers(dest="subcommand_action")
 
-    mcp_run = mcp_subparsers.add_parser(
-        "run", parents=[global_parser], help="指定した MCP サーバーを個別起動"
-    )
-    mcp_run.add_argument("target", help="サーバー名")
+    #    mcp_run = mcp_subparsers.add_parser(
+    #        "run", parents=[global_parser], help="指定した MCP サーバーを個別起動"
+    #    )
+    #    mcp_run.add_argument("target", help="サーバー名")
 
     mcp_subparsers.add_parser(
         "status", parents=[global_parser], help="MCP サーバーの接続状態を表示"
@@ -275,7 +283,12 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
 
 
 def _build_global_parser() -> argparse.ArgumentParser:
-    """すべてのサブコマンドおよびメイン対話で共有される基本オプションを定義."""
+    """すべてのサブコマンドおよびメイン対話で共有される基本オプションを定義.
+
+    Returns:
+        argparse.ArgumentParser: グローバルオプションが定義されたパーサー.
+
+    """
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument(
         "--dry-run",
@@ -329,7 +342,15 @@ def _build_global_parser() -> argparse.ArgumentParser:
 def _build_main_execution_parser(
     global_parser: argparse.ArgumentParser,
 ) -> argparse.ArgumentParser:
-    """メイン対話・ワンショット実行用オプションを定義."""
+    """メイン対話・ワンショット実行用オプションを定義.
+
+    Args:
+        global_parser (argparse.ArgumentParser): グローバル引数パーサー.
+
+    Returns:
+        argparse.ArgumentParser: メイン実行用オプションが追加されたパーサー.
+
+    """
     parser = argparse.ArgumentParser(
         description="LLM / RAG / MCP / Context Caching を統合した CLI ツール",
         parents=[global_parser],

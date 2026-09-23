@@ -52,7 +52,7 @@ def handle_mcp_status(config_path: Path | str | None = None) -> None:
     """`code-chat mcp status` 等の CLI コマンドから呼び出されるステータス確認ロジック.
 
     Args:
-        config_path (Path | str | None): MCP 設定ファイルのパス. 省略時はデフォルトパスを使用.
+        config_path (Path | str | None, optional): MCP 設定ファイルのパス. 省略時はデフォルトパスを使用. Defaults to None.
 
     """
 
@@ -80,11 +80,13 @@ def handle_mcp_test(config_path: Path | str | None = None) -> None:
     """mcp.json に定義された MCP サーバーへの接続およびツール一覧取得テストを行います.
 
     Args:
-        config_path (Path | str | None): MCP 設定ファイルのパス. 省略時はデフォルトパスを使用.
+        config_path (Path | str | None, optional): MCP 設定ファイルのパス. 省略時はデフォルトパスを使用. Defaults to None.
 
     """
-    config = Path(config_path) if config_path else None
 
-    # McpService の test_connection を呼び出す
-    service = McpService(config_path=config)
-    service.test_connection()
+    async def _test() -> None:
+        config = Path(config_path) if config_path else None
+        async with McpService(config_path=config) as mcp_service:
+            await mcp_service.test_connection()
+
+    asyncio.run(_test())

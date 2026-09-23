@@ -90,7 +90,16 @@ def run_interactive_loop(
     chat_history: list[str],
     rag_service: Any | None = None,
 ) -> None:
-    """対話型チャットループを実行します."""
+    """対話型チャットループを実行します.
+
+    Args:
+        chat (Any): Gemini Chat インスタンス.
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+        output_file (str | None): 会話ログの出力先ファイルパス.
+        chat_history (list[str]): 対話履歴を格納するリスト.
+        rag_service (Any | None, optional): RAGサービス. Defaults to None.
+
+    """
     setup_readline_history()
     if HAVE_READLINE:
         atexit.register(save_readline_history)
@@ -140,7 +149,17 @@ def _handle_slash_command(
     default_output_file: str | None,
     chat_history: list[str],
 ) -> bool:
-    """コマンド (/save など) を処理します. コマンドとして処理された場合は True を返します."""
+    """コマンド (/save など) を処理します.
+
+    Args:
+        user_input (str): ユーザーからの入力文字列.
+        default_output_file (str | None): デフォルトの保存先ファイルパス.
+        chat_history (list[str]): 対話履歴を格納するリスト.
+
+    Returns:
+        bool: コマンドとして処理された場合は True, それ以外は False.
+
+    """
     if not user_input.startswith("/save"):
         return False
 
@@ -159,7 +178,17 @@ def _build_send_text(
     cli_args: Any,
     rag_service: Any | None,
 ) -> str:
-    """ユーザー入力にファイルや RAG, Writeモード指示を統合した送信テキストを構築します."""
+    """ユーザー入力にファイルや RAG, Writeモード指示を統合した送信テキストを構築します.
+
+    Args:
+        user_input (str): ユーザーからの入力文字列.
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+        rag_service (Any | None): RAGサービス.
+
+    Returns:
+        str: 構築された送信テキスト.
+
+    """
     send_text = user_input
     files = getattr(cli_args, "files", None)
 
@@ -177,7 +206,15 @@ def _build_send_text(
 
 
 def _load_files_context(files: list[str]) -> list[str]:
-    """指定されたファイル群の内容を取得してコンテキスト文字列のリストを作成します."""
+    """指定されたファイル群の内容を取得してコンテキスト文字列のリストを作成します.
+
+    Args:
+        files (list[str]): 読み込み対象のファイルパスリスト.
+
+    Returns:
+        list[str]: 読み込まれたファイル内容のコンテキスト文字列リスト.
+
+    """
     files_context = []
     for file_path in files:
         try:
@@ -193,7 +230,17 @@ def _append_rag_context(
     user_input: str,
     rag_service: Any,
 ) -> str:
-    """RAG から取得した検索コンテキストをプロンプトに付加します."""
+    """RAG から取得した検索コンテキストをプロンプトに付加します.
+
+    Args:
+        send_text (str): 元の送信テキスト.
+        user_input (str): ユーザーからの入力文字列.
+        rag_service (Any): RAGサービス.
+
+    Returns:
+        str: RAGコンテキストが付加された送信テキスト.
+
+    """
     logger.info("RAG コンテキストを検索中: %s", user_input)
     rag_context = _retrieve_rag_context(rag_service, user_input)
 
@@ -206,7 +253,16 @@ def _append_rag_context(
 
 
 def _stream_chat_response(chat: Any, send_text: str) -> str:
-    """Gemini にメッセージを送信し, 標準出力にストリーミング表示しながらレスポンス文字列を取得します."""
+    """Gemini にメッセージを送信し, 標準出力にストリーミング表示しながらレスポンス文字列を取得します.
+
+    Args:
+        chat (Any): Gemini Chat インスタンス.
+        send_text (str): 送信するテキスト.
+
+    Returns:
+        str: 受信したレスポンス文字列全体.
+
+    """
     print("Gemini > ", end="", flush=True)
     chunks = []
     for chunk in send_message_stream_with_retry(chat, send_text):
@@ -221,7 +277,13 @@ def _stream_chat_response(chat: Any, send_text: str) -> str:
 
 
 def _handle_write_mode(cli_args: Any, response_text: str) -> None:
-    """書き込みモードの実行確認と適用を行います."""
+    """書き込みモードの実行確認と適用を行います.
+
+    Args:
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+        response_text (str): Gemini から返却されたレスポンス本文全体.
+
+    """
     target_files = getattr(cli_args, "files", None) or (
         [cli_args.file] if getattr(cli_args, "file", None) else []
     )
@@ -565,29 +627,34 @@ def _handle_rag_subcommand(cli_args: Any) -> None:
 
 
 def _handle_mcp_subcommand(cli_args: Any) -> None:
-    """MCPサブコマンド (run / status / test) の振る舞いを分岐・実行します."""
+    """MCPサブコマンド (run / status / test) の振る舞いを分岐・実行します.
+
+    Args:
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+
+    """
     logger.info("mcp サブコマンドを実行します")
     action = getattr(cli_args, "subcommand_action", None)
     config_path = getattr(cli_args, "config_path", None)
 
     try:
-        if action == "run":
-            # prompt 引数 (または query 引数) を取得
-            user_prompt = getattr(cli_args, "prompt", None) or getattr(
-                cli_args, "query", None
-            )
-            if not user_prompt:
-                logger.error(
-                    "実行するプロンプトを指定してください (例: code-chat mcp run 'git status を確認して')"
-                )
-                sys.exit(1)
-
-            # 非同期関数 handle_mcp_run を同期的に実行して結果を出力
-            result_text = asyncio.run(
-                handle_mcp_run(user_prompt=user_prompt, config_path=config_path)
-            )
-            print(result_text)
-            sys.exit(0)
+        #        if action == "run":
+        #            # prompt 引数 (または query 引数) を取得
+        #            user_prompt = getattr(cli_args, "prompt", None) or getattr(
+        #                cli_args, "query", None
+        #            )
+        #            if not user_prompt:
+        #                logger.error(
+        #                    "実行するプロンプトを指定してください (例: code-chat mcp run 'git status を確認して')"
+        #                )
+        #                sys.exit(1)
+        #
+        #            # 非同期関数 handle_mcp_run を同期的に実行して結果を出力
+        #            result_text = asyncio.run(
+        #                handle_mcp_run(user_prompt=user_prompt, config_path=config_path)
+        #            )
+        #            print(result_text)
+        #            sys.exit(0)
 
         if action == "status":
             handle_mcp_status(config_path=config_path)
@@ -639,7 +706,13 @@ def _handle_mcp_single_turn(
     cli_args: Any,
     chat_history: list[str],
 ) -> None:
-    """ワンショットモードで --mcp が指定された場合の MCP 処理を行います."""
+    """ワンショットモードで --mcp が指定された場合の MCP 処理を行います.
+
+    Args:
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+        chat_history (list[str]): 対話履歴を格納するリスト.
+
+    """
     prompt = cli_args.prompt or cli_args.context
     if not prompt:
         logger.error("MCP 実行用のプロンプトまたはコンテキストを指定してください")
@@ -665,7 +738,14 @@ def _handle_mcp_interactive(
     cli_args: Any,
     chat_history: list[str],
 ) -> None:
-    """対話型ループ内から MCP ツール連携クエリ (execute_mcp_query) を実行します."""
+    """対話型ループ内から MCP ツール連携クエリ (execute_mcp_query) を実行します.
+
+    Args:
+        user_input (str): ユーザーからの入力文字列.
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+        chat_history (list[str]): 対話履歴を格納するリスト.
+
+    """
     # `/mcp <prompt>` のようなスラッシュコマンド形式の場合はプレフィックスを除去
     prompt = user_input
     if user_input.startswith("/mcp"):

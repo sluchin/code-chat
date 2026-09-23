@@ -26,9 +26,6 @@ def handle_commit_generation(client: Any, model_name: str, lang: str = "en") -> 
         model_name (str): 使用する Gemini モデル名.
         lang (str, optional): コミットメッセージの出力言語（例: "ja", "en"）. デフォルトは "en".
 
-    Returns:
-        None: なし（生成されたコミットメッセージは標準出力にストリーミング出力されます）.
-
     Raises:
         subprocess.CalledProcessError: Git コマンドの実行に失敗した場合.
         APIError: Gemini API 呼び出し時に通信エラー等が発生した場合.

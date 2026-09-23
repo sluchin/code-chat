@@ -38,7 +38,6 @@ EXTENSION_TO_LANGUAGE: dict[str, Language] = {
 logger = get_logger(__name__)
 
 
-# pylint: disable=too-few-public-methods
 class Indexer:
     """リポジトリからのソースコードファイルの読み出しとチャンク分割を処理します.
 
@@ -160,7 +159,12 @@ class Indexer:
         return chunks
 
     def get_target_files(self) -> list[str]:
-        """指定されたリポジトリパスからインデックス対象となるファイルのリストを取得します."""
+        """指定されたリポジトリパスからインデックス対象となるファイルのリストを取得します.
+
+        Returns:
+            list[str]: インデックス対象となるファイルパスのリスト.
+
+        """
         target_files: list[str] = []
         seen_files: set[Path] = set()
 

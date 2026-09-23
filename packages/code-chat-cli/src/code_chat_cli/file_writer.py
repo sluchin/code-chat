@@ -300,8 +300,8 @@ def apply_multi_file_changes(model_response: str, allowed_paths: list[str]) -> N
     """LLMのレスポンスからファイルパスとコードブロックを抽出し, 対象ファイルに書き込みます.
 
     Args:
-        model_response (str): LLMからのテキスト出力
-        allowed_paths (list[str]): -f で指定された安全な書き込み対象パスリスト
+        model_response (str): LLMからのテキスト出力.
+        allowed_paths (list[str]): -f で指定された安全な書き込み対象パスリスト.
 
     """
     # ```python:path/to/file.py や ### File: path/to/file.py などを検出するパターン
@@ -330,7 +330,16 @@ def apply_multi_file_changes(model_response: str, allowed_paths: list[str]) -> N
 def _extract_file_changes(
     response_text: str, valid_targets: list[Path]
 ) -> dict[str, str]:
-    """レスポンス本文からパスとコードブロックの対応辞書を抽出します."""
+    """レスポンス本文からパスとコードブロックの対応辞書を抽出します.
+
+    Args:
+        response_text (str): Gemini から返却されたレスポンス本文全体.
+        valid_targets (list[Path]): 書き換え対象の有効なファイルパスリスト.
+
+    Returns:
+        dict[str, str]: ファイルパスをキー, 抽出されたコードブロックを値とする辞書.
+
+    """
     valid_str_paths = {str(p.resolve()): str(p) for p in valid_targets}
     changes: dict[str, str] = {}
 

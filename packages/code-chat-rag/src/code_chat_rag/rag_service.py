@@ -66,12 +66,21 @@ class RagService:
         return len(added_ids)
 
     def get_context(self, question: str, k: int = 5) -> str:
-        """質問に関連するコード情報を整形済みコンテキスト文字列として取得します."""
+        """質問に関連するコード情報を整形済みコンテキスト文字列として取得します.
+
+        Args:
+            question (str): ユーザーの質問文字列.
+            k (int, optional): 参照する取得チャンク数. Defaults to 5.
+
+        Returns:
+            str: 整形されたコンテキスト文字列.
+
+        """
         docs = self.vector_store.as_retriever(k=k).invoke(question)
         return self._format_docs(docs)
 
     def clear(self) -> None:
-        """Vector DB を削除（初期化）します."""
+        """Vector DB を削除 (初期化) します."""
         self.vector_store.clear()
 
     def query(self, question: str, k: int = 5) -> str:
@@ -135,10 +144,10 @@ class RagService:
         """LangChain Expression Language (LCEL) を使用してRAGパイプラインを構築します.
 
         Args:
-            k: 検索時に取得するチャンク数.
+            k (int, optional): 検索時に取得するチャンク数. Defaults to 5.
 
         Returns:
-            質問文字列を受け取り, 回答文字列を出力する実行可能なLCELチェーン.
+            Runnable: 質問文字列を受け取り, 回答文字列を出力する実行可能なLCELチェーン.
 
         """
         retriever = self.vector_store.as_retriever(k=k)
