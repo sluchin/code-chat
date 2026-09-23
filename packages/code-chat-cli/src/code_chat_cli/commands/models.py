@@ -16,6 +16,7 @@ def handle_list_models(client: Any) -> None:
 
     Raises:
         Exception: モデル一覧の取得時にエラーが発生した場合.
+
     """
     try:
         print("利用可能なモデル一覧:")

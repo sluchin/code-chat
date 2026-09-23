@@ -17,6 +17,7 @@ def get_git_diff() -> str:
     Raises:
         subprocess.CalledProcessError: git diff コマンドの実行に失敗した場合.
         FileNotFoundError: git コマンドが見つからない場合.
+
     """
     try:
         # まずステージング済みの差分を確認

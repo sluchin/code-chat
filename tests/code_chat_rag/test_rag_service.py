@@ -4,7 +4,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from code_chat_rag.code_rag_service import CodeRagService
+from code_chat_rag.rag_service import RagService
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
@@ -37,8 +37,8 @@ def mock_dependencies():
 
 
 def test_code_rag_service_init(mock_dependencies):
-    """CodeRagService の初期化処理を検証する."""
-    service = CodeRagService(
+    """RagService の初期化処理を検証する."""
+    service = RagService(
         output_dir="/dummy/chroma",
         model_name="gemini-3.5-flash",
     )
@@ -63,7 +63,7 @@ def test_index_repository_success(mock_indexer_cls, mock_dependencies):
     mock_indexer_cls.return_value = mock_indexer_instance
     mock_dependencies["vs_inst"].add_chunks.return_value = ["id1", "id2"]
 
-    service = CodeRagService(input_dirs=["/dummy/path"])
+    service = RagService(input_dirs=["/dummy/path"])
 
     # 実行
     count = service.index_repository(input_dirs=["/target/repo"])
@@ -87,7 +87,7 @@ def test_index_repository_empty(mock_indexer_cls, mock_dependencies):
     mock_indexer_instance.load_and_chunk.return_value = []
     mock_indexer_cls.return_value = mock_indexer_instance
 
-    service = CodeRagService()
+    service = RagService()
     count = service.index_repository(input_dirs=["/target/repo"])
 
     assert count == 0
@@ -122,7 +122,7 @@ def test_build_chain_execution(mock_dependencies):
     mock_vs.as_retriever.return_value = fake_retriever
 
     # テスト対象の実行
-    service = CodeRagService()
+    service = RagService()
     chain = service._build_chain(k=3)
 
     query = "どのような関数が定義されていますか？"
@@ -140,14 +140,14 @@ def test_build_chain_execution(mock_dependencies):
     assert retriever_calls[0] == query
 
 
-@patch.object(CodeRagService, "_build_chain")
+@patch.object(RagService, "_build_chain")
 def test_query(mock_build_chain):
     """ask メソッドがチェーンをビルドし invoke を呼び出すか検証する."""
     mock_chain = MagicMock()
     mock_chain.invoke.return_value = "This is an answer."
     mock_build_chain.return_value = mock_chain
 
-    service = CodeRagService()
+    service = RagService()
     answer = service.query("How to run this?", k=3)
 
     assert answer == "This is an answer."
@@ -155,14 +155,14 @@ def test_query(mock_build_chain):
     mock_chain.invoke.assert_called_once_with("How to run this?")
 
 
-@patch.object(CodeRagService, "_build_chain")
+@patch.object(RagService, "_build_chain")
 def test_query_stream(mock_build_chain):
     """ask_stream メソッドがトークンを逐次生成（ジェネレータ化）するか検証する."""
     mock_chain = MagicMock()
     mock_chain.stream.return_value = iter(["Hello", " ", "World"])
     mock_build_chain.return_value = mock_chain
 
-    service = CodeRagService()
+    service = RagService()
     stream_result = list(service.query_stream("How to run this?", k=3))
 
     assert stream_result == ["Hello", " ", "World"]

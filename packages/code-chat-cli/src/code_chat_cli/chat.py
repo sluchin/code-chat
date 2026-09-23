@@ -5,6 +5,7 @@ Gemini API と対話を行うためのコマンドラインインターフェー
 ファイルの上書き保存機能や会話ログの自動保存機能を含みます.
 """
 
+import asyncio
 import atexit
 import logging
 import sys
@@ -12,8 +13,7 @@ import time  # pylint: disable=unused-import # noqa: F401
 from pathlib import Path  # pylint: disable=unused-import
 from typing import Any
 
-from code_chat_rag.code_indexer import CodeIndexer
-from code_chat_rag.code_rag_service import CodeRagService
+from code_chat_rag.rag_service import RagService
 from google.genai import types
 from google.genai.errors import APIError, ClientError, ServerError
 
@@ -36,10 +36,21 @@ from code_chat_cli.history import (
     save_readline_history,
     setup_readline_history,
 )
-from code_chat_cli.index import clear_index, handle_index, handle_rag
 from code_chat_cli.logger import get_logger, setup_logging, suppress_info_logs
+from code_chat_cli.mcp import (
+    handle_mcp_run,
+    handle_mcp_status,
+    handle_mcp_test,
+)
 from code_chat_cli.prompts import (
     WRITE_MODE_SYSTEM_INSTRUCTION,
+)
+from code_chat_cli.rag import (
+    handle_rag,
+    handle_rag_create,
+    handle_rag_rm,
+    handle_rag_status,
+    handle_rag_update,
 )
 
 logger = get_logger(__name__)
@@ -58,7 +69,14 @@ def run_single_turn_mode(
         cli_args (Any): コマンドライン引数の名前空間オブジェクト.
         chat_history (list[str]): 対話履歴を格納するリスト.
         rag_service (Any): RAGサービス.
+
     """
+    # mcp オプションが指定されている場合
+    is_mcp_mode = getattr(cli_args, "mcp", False)
+    if is_mcp_mode:
+        _handle_mcp_single_turn(cli_args, chat_history)
+        return
+
     if cli_args.context:
         _handle_context_mode(chat, cli_args, chat_history, rag_service)
     elif cli_args.prompt:
@@ -98,6 +116,12 @@ def run_interactive_loop(
         if _handle_slash_command(user_input, output_file, chat_history):
             continue
 
+        # mcp オプション指定時または /mcp コマンド入力時の分岐
+        is_mcp_mode = getattr(cli_args, "mcp", False) or user_input.startswith("/mcp")
+        if is_mcp_mode:
+            _handle_mcp_interactive(user_input, cli_args, chat_history)
+            continue
+
         # 送信テキスト (プロンプト) の構築
         send_text = _build_send_text(user_input, cli_args, rag_service)
 
@@ -135,7 +159,7 @@ def _build_send_text(
     cli_args: Any,
     rag_service: Any | None,
 ) -> str:
-    """ユーザー入力にファイルや RAG、Writeモード指示を統合した送信テキストを構築します."""
+    """ユーザー入力にファイルや RAG, Writeモード指示を統合した送信テキストを構築します."""
     send_text = user_input
     files = getattr(cli_args, "files", None)
 
@@ -182,7 +206,7 @@ def _append_rag_context(
 
 
 def _stream_chat_response(chat: Any, send_text: str) -> str:
-    """Gemini にメッセージを送信し、標準出力にストリーミング表示しながらレスポンス文字列を取得します."""
+    """Gemini にメッセージを送信し, 標準出力にストリーミング表示しながらレスポンス文字列を取得します."""
     print("Gemini > ", end="", flush=True)
     chunks = []
     for chunk in send_message_stream_with_retry(chat, send_text):
@@ -213,6 +237,7 @@ def _retrieve_rag_context(rag_service: Any, query: str) -> str:
 
     Returns:
         str: 取得された参照コンテキスト文字列.
+
     """
     try:
         return rag_service.get_context(query)
@@ -230,6 +255,7 @@ def _build_context_prompt(cli_args: Any, rag_service: Any | None = None) -> str:
 
     Returns:
         str: 構築されたプロンプト文字列.
+
     """
     prompt_text = cli_args.prompt or ""
     if cli_args.write_mode and prompt_text:
@@ -264,6 +290,7 @@ def _fetch_response_text(chat: Any, prompt: str, is_write_mode: bool) -> str:
 
     Returns:
         str: モデルから受信した応答テキスト.
+
     """
     if is_write_mode:
         response = send_message_with_retry(chat, prompt)
@@ -294,6 +321,7 @@ def _handle_context_mode(
         cli_args (Any): コマンドライン引数の名前空間オブジェクト.
         chat_history (list[str]): 対話履歴を格納するリスト.
         rag_service (Any): RAGサービス.
+
     """
     full_init_prompt = _build_context_prompt(cli_args, rag_service=rag_service)
     file_label = getattr(cli_args, "file", None) or "コンテキストテキスト"
@@ -331,6 +359,7 @@ def _handle_prompt_mode(
         cli_args (Any): コマンドライン引数の名前空間オブジェクト.
         chat_history (list[str]): 対話履歴を格納するリスト.
         rag_service (Any): RAGサービス.
+
     """
     prompt_text = cli_args.prompt
     send_text = prompt_text
@@ -367,6 +396,7 @@ def _setup_cli_logging(cli_args: Any) -> None:
 
     Args:
         cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+
     """
     if not cli_args.debug_mode and (
         cli_args.list_models or cli_args.generate_commit_msg
@@ -385,6 +415,8 @@ def _handle_dry_run(cli_args: Any, config: types.GenerateContentConfig) -> None:
 
     Args:
         cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+        config (types.GenerateContentConfig): 生成設定オブジェクト.
+
     """
     print("[DRY-RUN] Gemini API へのリクエスト送信をスキップします")
     print(f"  サブコマンド: {cli_args.subcommand or 'None'}")
@@ -436,6 +468,7 @@ def _handle_subcommands(client: Any, cli_args: Any) -> None:
     Args:
         client (Any): Gemini Client インスタンス.
         cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+
     """
     subcommand = getattr(cli_args, "subcommand", None)
     if subcommand is None:
@@ -468,6 +501,8 @@ def _handle_subcommands(client: Any, cli_args: Any) -> None:
 
     elif subcommand == "mcp":
         logger.info("mcp サブコマンドを実行します")
+        _handle_mcp_subcommand(cli_args)
+
     elif subcommand == "cache":
         logger.info("cache サブコマンドを実行します")
 
@@ -491,6 +526,7 @@ def _handle_rag_subcommand(cli_args: Any) -> None:
 
     Args:
         cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+
     """
     logger.info("rag サブコマンドを実行します")
     input_dirs = getattr(cli_args, "input_dirs", None) or ["."]
@@ -498,22 +534,20 @@ def _handle_rag_subcommand(cli_args: Any) -> None:
     action = getattr(cli_args, "subcommand_action", None)
 
     try:
-        # アクションごとのルーティング
         if action == "create":
-            _execute_rag_create(cli_args, input_dirs, output_dir)
+            handle_rag_create(input_dirs, output_dir)
             sys.exit(0)
 
         if action == "update":
-            _execute_rag_update(cli_args, input_dirs, output_dir)
+            handle_rag_update(input_dirs, output_dir)
             sys.exit(0)
 
         if action == "rm":
-            logger.info("RAG インデックスの削除を実行します: %s", output_dir)
-            clear_index(output_dir)
+            handle_rag_rm(output_dir)
             sys.exit(0)
 
         if action == "status":
-            _execute_rag_status(input_dirs, output_dir)
+            handle_rag_status(input_dirs, output_dir)
             sys.exit(0)
 
         # アクション未指定かつプロンプトが渡された場合（ワンショット検索）
@@ -530,44 +564,45 @@ def _handle_rag_subcommand(cli_args: Any) -> None:
         sys.exit(1)
 
 
-def _execute_rag_create(cli_args: Any, input_dirs: list[str], output_dir: str) -> None:
-    """create アクションの実行ロジック."""
-    logger.info("RAG インデックスの新規作成を実行します: %s", input_dirs)
-    if getattr(cli_args, "dry_run", False):
-        print("[DRY-RUN] インデックスの作成対象ファイルを計算します...")
-        _handle_dryrun(input_dirs=input_dirs)
-        return
+def _handle_mcp_subcommand(cli_args: Any) -> None:
+    """MCPサブコマンド (run / status / test) の振る舞いを分岐・実行します."""
+    logger.info("mcp サブコマンドを実行します")
+    action = getattr(cli_args, "subcommand_action", None)
+    config_path = getattr(cli_args, "config_path", None)
 
-    handle_index(input_dirs=input_dirs, output_dir=output_dir)
+    try:
+        if action == "run":
+            # prompt 引数 (または query 引数) を取得
+            user_prompt = getattr(cli_args, "prompt", None) or getattr(
+                cli_args, "query", None
+            )
+            if not user_prompt:
+                logger.error(
+                    "実行するプロンプトを指定してください (例: code-chat mcp run 'git status を確認して')"
+                )
+                sys.exit(1)
 
+            # 非同期関数 handle_mcp_run を同期的に実行して結果を出力
+            result_text = asyncio.run(
+                handle_mcp_run(user_prompt=user_prompt, config_path=config_path)
+            )
+            print(result_text)
+            sys.exit(0)
 
-def _execute_rag_update(cli_args: Any, input_dirs: list[str], output_dir: str) -> None:
-    """update アクションの実行ロジック."""
-    logger.info("RAG インデックスの差分更新を実行します: %s", output_dir)
-    if getattr(cli_args, "dry_run", False):
-        print("[DRY-RUN] インデックスの更新対象ファイルを計算します...")
-        _handle_dryrun(input_dirs=input_dirs)
-        return
+        if action == "status":
+            handle_mcp_status(config_path=config_path)
+            sys.exit(0)
 
-    handle_index(input_dirs=input_dirs, output_dir=output_dir, update_only=True)
+        if action == "test":
+            handle_mcp_test(config_path=config_path)
+            sys.exit(0)
 
+        logger.error("不明なサブコマンドアクションです: %s", action)
+        sys.exit(1)
 
-def _execute_rag_status(input_dirs: list[str], output_dir: str) -> None:
-    """status アクションの実行ロジック."""
-    logger.info("RAG インデックスの状態を確認します")
-    rag_service = CodeRagService(input_dirs=input_dirs, output_dir=output_dir)
-    status_info = rag_service.get_status()
-    print(f"--- [RAG Index Status] ---\n{status_info}")
-
-
-def _handle_dryrun(input_dirs: list[str]) -> None:
-    all_target_files: list[str] = []
-    indexer = CodeIndexer(input_dirs=input_dirs)
-    target_files = indexer.get_target_files()
-    all_target_files.extend(target_files)
-    for file_path in target_files:
-        print(file_path)
-    print(f"対象ファイル数: {len(all_target_files)}")
+    except Exception:  # pylint: disable=broad-exception-caught
+        logger.exception("MCP (%s) コマンドの実行中にエラーが発生しました", action)
+        sys.exit(1)
 
 
 def _build_chat_config(is_write_mode: bool) -> types.GenerateContentConfig:
@@ -578,6 +613,7 @@ def _build_chat_config(is_write_mode: bool) -> types.GenerateContentConfig:
 
     Returns:
         types.GenerateContentConfig: 設定された生成設定オブジェクト.
+
     """
     if is_write_mode:
         return types.GenerateContentConfig(
@@ -597,6 +633,63 @@ def _build_chat_config(is_write_mode: bool) -> types.GenerateContentConfig:
         system_instruction=system_instruction,
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
+
+
+def _handle_mcp_single_turn(
+    cli_args: Any,
+    chat_history: list[str],
+) -> None:
+    """ワンショットモードで --mcp が指定された場合の MCP 処理を行います."""
+    prompt = cli_args.prompt or cli_args.context
+    if not prompt:
+        logger.error("MCP 実行用のプロンプトまたはコンテキストを指定してください")
+        return
+
+    config_path = getattr(cli_args, "config_path", None)
+    chat_history.append(f"### User (MCP)\n\n{prompt}")
+
+    print("Gemini (MCP) > ", end="", flush=True)
+    try:
+        # handle_mcp_run を呼ぶだけでライフサイクル管理からツール実行まで完了する
+        result_text = asyncio.run(
+            handle_mcp_run(user_prompt=prompt, config_path=config_path)
+        )
+        print(result_text)
+        chat_history.append(f"### Gemini (MCP)\n\n{result_text}")
+    except Exception as e:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+        logger.error("MCP クエリの実行中にエラーが発生しました: %s", e)
+
+
+def _handle_mcp_interactive(
+    user_input: str,
+    cli_args: Any,
+    chat_history: list[str],
+) -> None:
+    """対話型ループ内から MCP ツール連携クエリ (execute_mcp_query) を実行します."""
+    # `/mcp <prompt>` のようなスラッシュコマンド形式の場合はプレフィックスを除去
+    prompt = user_input
+    if user_input.startswith("/mcp"):
+        prompt = user_input[4:].strip()
+
+    if not prompt:
+        logger.error(
+            "実行する MCP プロンプトを指定してください (例: /mcp git status を確認して)"
+        )
+        return
+
+    config_path = getattr(cli_args, "config_path", None)
+    chat_history.append(f"### User (MCP)\n\n{prompt}")
+
+    print("Gemini (MCP) > ", end="", flush=True)
+    try:
+        result_text = asyncio.run(
+            handle_mcp_run(user_prompt=prompt, config_path=config_path)
+        )
+        print(result_text)
+        print()
+        chat_history.append(f"### Gemini (MCP)\n\n{result_text}")
+    except Exception as e:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+        logger.error("MCP クエリの実行中にエラーが発生しました: %s", e)
 
 
 def main() -> None:
@@ -631,10 +724,10 @@ def main() -> None:
         client = get_gemini_client()
         _handle_subcommands(client, cli_args)
 
-        # RAG モードの場合は CodeRagService を初期化
+        # RAG モードの場合は RagService を初期化
         rag_service = None
         if cli_args.rag:
-            rag_service = CodeRagService(input_dirs=input_dirs, output_dir=output_dir)
+            rag_service = RagService(input_dirs=input_dirs, output_dir=output_dir)
 
         chat = client.chats.create(model=cli_args.model, config=config)
 

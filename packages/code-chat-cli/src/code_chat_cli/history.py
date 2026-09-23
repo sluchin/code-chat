@@ -38,6 +38,7 @@ def save_chat_history(file_path: str, history: list[str]) -> None:
     Args:
         file_path (str): 保存先のファイルパス.
         history (list[str]): 保存対象の対話履歴リスト.
+
     """
     try:
         path = Path(file_path)
@@ -87,6 +88,7 @@ def save_history_if_needed(
         chat_history (list[str]): 保存対象の対話履歴リスト.
         output_file (str | None): 保存先のファイルパス. 指定がない場合は None.
         auto_save (bool): ファイルパス未指定時にタイムスタンプ付きファイル名を生成して保存するかどうか.
+
     """
     if not chat_history:
         return

@@ -68,7 +68,7 @@ def test_handle_code_review_directory_success(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """ディレクトリ指定時に除外対象（.git等）がスキップされ、対象ファイルのみプロンプトに含まれることを検証する.
+    """ディレクトリ指定時に除外対象（.git等）がスキップされ, 対象ファイルのみプロンプトに含まれることを検証する.
 
     Args:
         mock_client (MagicMock): Gemini API クライアントのモック.
@@ -128,7 +128,7 @@ def test_handle_code_review_empty_diff(
     mock_client: MagicMock,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """git diff の出力が空の場合にメッセージが表示され、API呼び出しがスキップされることを検証する.
+    """git diff の出力が空の場合にメッセージが表示され, API呼び出しがスキップされることを検証する.
 
     Args:
         mock_subprocess (MagicMock): subprocess.run のモック.
@@ -168,7 +168,7 @@ def test_handle_code_review_directory_read_exception(
     # capsys: pytest.CaptureFixture[str],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """ディレクトリ走査中に特定ファイルの読み込み例外が発生した際、スキップログが出力され処理が継続することを検証する."""
+    """ディレクトリ走査中に特定ファイルの読み込み例外が発生した際, スキップログが出力され処理が継続することを検証する."""
     # テキストファイルを配置
     valid_file = tmp_path / "valid.py"
     valid_file.write_text("print('ok')", encoding="utf-8")
@@ -201,7 +201,7 @@ def test_handle_code_review_single_file_read_exception(
     # capsys: pytest.CaptureFixture[str],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """単一ファイルの読み込み時に例外が発生した場合、エラーメッセージを出力して処理を中断することを検証する."""
+    """単一ファイルの読み込み時に例外が発生した場合, エラーメッセージを出力して処理を中断することを検証する."""
     test_file = tmp_path / "read_error.py"
     test_file.write_text("content", encoding="utf-8")
 
@@ -221,7 +221,7 @@ def test_handle_code_review_git_diff_error(
     mock_client: MagicMock,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """git diff の実行が非ゼロの終了ステータスで失敗した場合、エラーメッセージが出力されることを検証する."""
+    """git diff の実行が非ゼロの終了ステータスで失敗した場合, エラーメッセージが出力されることを検証する."""
     mock_subprocess.return_value = MagicMock(
         returncode=128, stderr="fatal: not a git repository"
     )
@@ -261,7 +261,7 @@ def test_handle_subcommands_review_exception() -> None:
 
 
 def test_handle_code_review_with_file_path(tmp_path):
-    """file_path (-f) が指定された場合、read_path_content 経由でコンテンツを取得してレビューを実行すること."""
+    """file_path (-f) が指定された場合, read_path_content 経由でコンテンツを取得してレビューを実行すること."""
     # テスト用ファイルの作成
     test_file = tmp_path / "sample.py"
     test_file.write_text("print('hello')", encoding="utf-8")
@@ -287,7 +287,7 @@ def test_handle_code_review_with_file_path(tmp_path):
 
 
 def test_handle_code_review_with_git_diff():
-    """file_path が指定されない場合、_get_git_diff を使用してレビューを実行すること."""
+    """file_path が指定されない場合, _get_git_diff を使用してレビューを実行すること."""
     mock_client = MagicMock()
     mock_response = [MagicMock(text="Diff reviewed")]
     mock_client.models.generate_content_stream.return_value = mock_response

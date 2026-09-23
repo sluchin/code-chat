@@ -35,6 +35,7 @@ def handle_commit_generation(client: Any, model_name: str, lang: str = "en") -> 
         ClientError: Gemini API 呼び出し時にクライアントエラーが発生した場合.
         ServerError: Gemini API 呼び出し時にサーバーエラーが発生した場合.
         Exception: その他の予期せぬエラーが発生した場合.
+
     """
     try:
         diff_text = get_git_diff()

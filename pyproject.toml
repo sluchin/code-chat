@@ -36,12 +36,14 @@ dev = [
 addopts = [
     "--cov=packages/code-chat-cli/src/code_chat_cli",
     "--cov=packages/code-chat-rag/src/code_chat_rag",
+    "--cov=packages/code-chat-rag/src/code_chat_mcp",
     "--cov-report=term-missing",
 ]
 testpaths = ["tests"]
 pythonpath = [
     "packages/code-chat-cli/src",
     "packages/code-chat-rag/src",
+    "packages/code-chat-mcp/src",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",

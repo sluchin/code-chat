@@ -35,6 +35,7 @@ def send_message_with_retry(
     Raises:
         Exception: 最大リトライ回数を超えてエラーが発生した場合.
         AssertionError: 内部状態の不整合により例外オブジェクトが保持されなかった場合.
+
     """
     delay = initial_delay
     last_exception: Exception | None = None
@@ -94,6 +95,7 @@ def send_message_stream_with_retry(
 
     Raises:
         Exception: 最大リトライ回数を超えてエラーが発生した場合, または出力開始後に通信エラーが発生した場合.
+
     """
     delay = initial_delay
 
@@ -154,6 +156,7 @@ def _extract_retry_delay(e: Exception) -> float | None:
 
     Returns:
         float | None: 抽出された推奨待機秒数. 抽出できない場合は None.
+
     """
     err_str = str(e)
     match = re.search(r"retryDelay[\"']?\s*:\s*[\"']?(\d+(?:\.\d+)?)s", err_str)
@@ -173,6 +176,7 @@ def _is_retryable_error(e: Exception) -> bool:
 
     Returns:
         bool: リトライ対象のエラーである場合は True, 400 Bad Request 等のリトライ不可エラーの場合は False.
+
     """
     err_str = str(e)
 
@@ -199,6 +203,7 @@ def _log_api_error_details(e: Exception) -> None:
 
     Args:
         e (Exception): 発生した例外オブジェクト.
+
     """
     err_str = str(e)
     code = getattr(e, "code", None) or getattr(e, "status_code", None) or "N/A"

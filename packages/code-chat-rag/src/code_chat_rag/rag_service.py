@@ -10,13 +10,13 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnablePassthrough
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from code_chat_rag.code_indexer import CodeIndexer
+from code_chat_rag.indexer import Indexer
 from code_chat_rag.vector_store import VectorStore
 
 logger = get_logger(__name__)
 
 
-class CodeRagService:
+class RagService:
     """インデックス作成, 検索, コードクエリへの回答を調整するサービスレイヤー."""
 
     def __init__(
@@ -25,12 +25,13 @@ class CodeRagService:
         output_dir: str = "./.chroma_db",
         model_name: str = "gemini-3.5-flash",
     ) -> None:
-        """CodeRagServiceのインスタンスを初期化します.
+        """RagServiceのインスタンスを初期化します.
 
         Args:
-            index_dirs: 対象のコードリポジトリへのパス.
-            output_dir: ベクトルストアの永続化先ディレクトリ.
-            model_name: 使用するLLMのモデル名.
+            input_dirs (list[str] | None): 対象のコードリポジトリへのパス.
+            output_dir (str): ベクトルストアの永続化先ディレクトリ.
+            model_name (str): 使用するLLMのモデル名.
+
         """
         self.input_dirs = input_dirs
         self.output_dir = output_dir
@@ -49,8 +50,9 @@ class CodeRagService:
 
         Returns:
             インデックスされたチャンク数.
+
         """
-        indexer = CodeIndexer(input_dirs=input_dirs)
+        indexer = Indexer(input_dirs=input_dirs)
         chunks = indexer.load_and_chunk()
 
         if not chunks:
@@ -68,8 +70,8 @@ class CodeRagService:
         docs = self.vector_store.as_retriever(k=k).invoke(question)
         return self._format_docs(docs)
 
-    def clear(self):
-        """Vector DB 削除"""
+    def clear(self) -> None:
+        """Vector DB を削除（初期化）します."""
         self.vector_store.clear()
 
     def query(self, question: str, k: int = 5) -> str:
@@ -81,6 +83,7 @@ class CodeRagService:
 
         Returns:
             生成された回答テキスト.
+
         """
         chain = self._build_chain(k=k)
         return chain.invoke(question)
@@ -94,6 +97,7 @@ class CodeRagService:
 
         Yields:
             LLMによって生成されたトークンチャンク.
+
         """
         chain = self._build_chain(k=k)
         yield from chain.stream(question)
@@ -103,6 +107,7 @@ class CodeRagService:
 
         Returns:
             str: ステータス概要テキスト.
+
         """
         # VectorStore から件数を取得 (VectorStore 側に count() がある前提)
         chunk_count = self.vector_store.count()
@@ -118,6 +123,7 @@ class CodeRagService:
 
         Returns:
            各ドキュメントのソースパスと内容を結合したコンテキスト文字列.
+
         """
         formatted = []
         for doc in docs:
@@ -133,6 +139,7 @@ class CodeRagService:
 
         Returns:
             質問文字列を受け取り, 回答文字列を出力する実行可能なLCELチェーン.
+
         """
         retriever = self.vector_store.as_retriever(k=k)
 

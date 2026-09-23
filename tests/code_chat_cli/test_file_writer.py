@@ -146,7 +146,7 @@ def test_handle_write_mode_confirmation_user_declines(monkeypatch, tmp_path):
 
 
 def test_create_safe_backup_not_exists(tmp_path: Path) -> None:
-    """存在しないファイルパスを指定した場合、None が返されること."""
+    """存在しないファイルパスを指定した場合, None が返されること."""
     non_existent_path = tmp_path / "non_existent.py"
 
     result = create_safe_backup(non_existent_path)
@@ -155,7 +155,7 @@ def test_create_safe_backup_not_exists(tmp_path: Path) -> None:
 
 
 def test_create_safe_backup_is_directory(tmp_path: Path) -> None:
-    """ファイルではなくディレクトリパスを指定した場合、None が返されること."""
+    """ファイルではなくディレクトリパスを指定した場合, None が返されること."""
     dir_path = tmp_path / "test_dir"
     dir_path.mkdir()
 
@@ -165,7 +165,7 @@ def test_create_safe_backup_is_directory(tmp_path: Path) -> None:
 
 
 def test_extract_code_block_fallback_with_intro_phrase() -> None:
-    """コードブロック記号がなく、先頭に解説文（"Here is the code:" など）が含まれる場合のフォールバック抽出を検証."""
+    """コードブロック記号がなく, 先頭に解説文（"Here is the code:" など）が含まれる場合のフォールバック抽出を検証."""
     text = (
         "Here is the code:\n"  # 253-255行目の continue を通過
         "\n"  # 250行目 (not stripped)
@@ -182,7 +182,7 @@ def test_extract_code_block_fallback_with_intro_phrase() -> None:
 
 
 def test_extract_code_block_fallback_direct_code() -> None:
-    """コードブロック記号がなく、解説文なしで通常のテキストからコードが開始する場合を検証."""
+    """コードブロック記号がなく, 解説文なしで通常のテキストからコードが開始する場合を検証."""
     text = (
         "Some general explanation text\n"  # 256-257行目の else (is_code_started = True) を通過
         "print('hello')\n"
@@ -204,11 +204,11 @@ def test_extract_code_block_fallback_empty_result() -> None:
 
 
 def test_cleanup_old_backups_exceeds_max_keep(tmp_path: Path) -> None:
-    """古いバックアップファイル数が上限を超えた場合、超過分が正常に削除されることを検証."""
+    """古いバックアップファイル数が上限を超えた場合, 超過分が正常に削除されることを検証."""
     target_file = tmp_path / "test.py"
     target_file.write_text("content", encoding="utf-8")
 
-    # 例: max_keep が 3 の場合、4つのバックアップファイルを作成
+    # 例: max_keep が 3 の場合, 4つのバックアップファイルを作成
     backup_files = []
     for i in range(4):
         # タイムスタンプ順になるようソート可能な名前で作成

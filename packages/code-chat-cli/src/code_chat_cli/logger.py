@@ -21,6 +21,7 @@ def syslog_context_filter(record: logging.LogRecord) -> bool:
 
     Returns:
         bool: 常に True（レコードを常に処理対象とする）.
+
     """
     dt = datetime.fromtimestamp(record.created).astimezone()
     record.syslog_time = dt.isoformat(timespec="microseconds")
@@ -36,6 +37,8 @@ def setup_logging(level_name: str = "INFO", trace: bool = False) -> None:
     Args:
         level_name (str, optional): ログレベル文字列 ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL").
             Defaults to "INFO".
+        trace (bool, optional): ライブラリ内部通信ログを出力するかどうか. Defaults to False.
+
     """
     numeric_level = getattr(logging, level_name.upper(), logging.INFO)
 
@@ -69,7 +72,7 @@ def setup_logging(level_name: str = "INFO", trace: bool = False) -> None:
     third_party_loggers = ["httpx", "httpcore", "google", "urllib3"]
 
     if trace:
-        # --trace が指定されている場合のみ、ライブラリの DEBUG / TRACE ログを出す
+        # --trace が指定されている場合のみ, ライブラリの DEBUG / TRACE ログを出す
         for logger_name in third_party_loggers:
             logging.getLogger(logger_name).setLevel(logging.DEBUG)
     else:
@@ -86,6 +89,7 @@ def get_logger(name: str) -> logging.Logger:
 
     Returns:
         logging.Logger: ロガーオブジェクト.
+
     """
     return logging.getLogger(name)
 

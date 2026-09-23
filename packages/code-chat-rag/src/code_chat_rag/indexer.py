@@ -39,7 +39,7 @@ logger = get_logger(__name__)
 
 
 # pylint: disable=too-few-public-methods
-class CodeIndexer:
+class Indexer:
     """リポジトリからのソースコードファイルの読み出しとチャンク分割を処理します.
 
     Attributes:
@@ -47,6 +47,7 @@ class CodeIndexer:
         suffixes (list[str]): 読み込み対象とするファイルの拡張子リスト.
         chunk_size (int): チャンクの最大文字数.
         chunk_overlap (int): チャンク間のオーバーラップ文字数.
+
     """
 
     def __init__(
@@ -65,6 +66,7 @@ class CodeIndexer:
                 Defaults to None.
             chunk_size (int, optional): チャンクの最大サイズ. Defaults to 1000.
             chunk_overlap (int, optional): チャンク間のオーバーラップサイズ. Defaults to 100.
+
         """
         self.input_dirs = input_dirs
         # 対象とする拡張子のデフォルト設定
@@ -84,6 +86,7 @@ class CodeIndexer:
 
         Raises:
             FileNotFoundError: 指定された `input_dirs` が存在しない場合に発生します.
+
         """
         # 有効な Path オブジェクトのリストを取得
         valid_dirs = self._get_valid_input_dirs()
@@ -201,6 +204,7 @@ class CodeIndexer:
 
         Returns:
             RecursiveCharacterTextSplitter: 対象言語用に設定されたテキストスプリッター.
+
         """
         ext = Path(file_path).suffix.lower()
         language = EXTENSION_TO_LANGUAGE.get(ext)
@@ -223,6 +227,7 @@ class CodeIndexer:
 
         Returns:
             list[str]: 存在するディレクトリの Path オブジェクトリスト.
+
         """
         valid_dirs: list[str] = []
 
@@ -236,7 +241,7 @@ class CodeIndexer:
                 valid_dirs.append(dir_path)
             else:
                 logger.warning(
-                    "インデックス対象のディレクトリが存在しないか、ディレクトリではありません: '%s'",
+                    "インデックス対象のディレクトリが存在しないか, ディレクトリではありません: '%s'",
                     dir_path,
                 )
 

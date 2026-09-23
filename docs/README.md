@@ -3,7 +3,7 @@
 ```markdown
 # ドキュメント構築・運用ガイド
 
-本プロジェクトでは、Python コード内の Docstring（Google Style）から [Sphinx](https://www.sphinx-doc.org/) を使用して自動的に API リファレンスおよび HTML ドキュメントを生成します。
+本プロジェクトでは, Python コード内の Docstring（Google Style）から [Sphinx](https://www.sphinx-doc.org/) を使用して自動的に API リファレンスおよび HTML ドキュメントを生成します。
 
 パッケージマネージャーおよび実行環境には `uv` を使用します。
 
@@ -32,7 +32,7 @@ uv add --dev sphinx sphinx-autobuild furo
 
 ### 方法 A: API ドキュメント再生成 + HTML ビルド（推奨）
 
-コード内の Docstring を変更した場合や新しいモジュールを追加した場合は、`.rst` ファイルを更新してビルドします。
+コード内の Docstring を変更した場合や新しいモジュールを追加した場合は, `.rst` ファイルを更新してビルドします。
 
 ```bash
 cd docs
@@ -46,7 +46,7 @@ make apidoc
 
 ### 方法 B: 通常の HTML ビルド
 
-`.rst` ファイルの変更のみ（文言の修正など）の場合は、標準の `make` コマンドでビルドできます。
+`.rst` ファイルの変更のみ（文言の修正など）の場合は, 標準の `make` コマンドでビルドできます。
 
 ```bash
 cd docs
@@ -60,7 +60,7 @@ uv run make html
 
 ## 3. リアルタイムプレビュー（開発時）
 
-ドキュメントの執筆中やスタイルの確認時には、ファイルを保存するたびに自動で再ビルドしてブラウザをリロードする `sphinx-autobuild` を使用すると便利です。
+ドキュメントの執筆中やスタイルの確認時には, ファイルを保存するたびに自動で再ビルドしてブラウザをリロードする `sphinx-autobuild` を使用すると便利です。
 
 ```bash
 # プロジェクトルートから実行
@@ -68,7 +68,7 @@ uv run sphinx-autobuild docs docs/_build/html
 
 ```
 
-起動後、ターミナルに表示される URL（例: `http://127.0.0.1:8000`）にブラウザでアクセスしてください。
+起動後, ターミナルに表示される URL（例: `http://127.0.0.1:8000`）にブラウザでアクセスしてください。
 
 ---
 
@@ -80,7 +80,7 @@ uv run sphinx-autobuild docs docs/_build/html
 ├── pyproject.toml          # uv の依存関係管理
 ├── src/                    # Python ソースコード
 └── docs/                   # Sphinx ドキュメント用ディレクトリ
-    ├── conf.py             # Sphinx 設定ファイル (パス指定、拡張子、テーマ設定)
+    ├── conf.py             # Sphinx 設定ファイル (パス指定, 拡張子, テーマ設定)
     ├── index.rst           # ドキュメントのトップページ（目次）
     ├── api/                # sphinx-apidoc によって自動生成される .rst 群
     ├── Makefile            # ビルド用コマンド設定
@@ -92,7 +92,7 @@ uv run sphinx-autobuild docs docs/_build/html
 
 ## 5. Makefile の設定 (`docs/Makefile`)
 
-`make apidoc` を有効にするため、`docs/Makefile` の末尾に以下のターゲットが記述されていることを確認してください。
+`make apidoc` を有効にするため, `docs/Makefile` の末尾に以下のターゲットが記述されていることを確認してください。
 
 ```make
 # apidoc と html ビルドを一括実行するターゲット

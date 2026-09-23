@@ -27,12 +27,13 @@ def handle_code_review(
         file_path (str | None, optional): レビュー対象のファイルまたは
             ディレクトリのパス. 指定された場合は git diff ではなく
             ファイル内容全体をレビューする. Defaults to None.
+
     """
     target_code: str | None = ""
 
     if file_path:
         logger.info(
-            "-f オプションが指定されたため、ファイル/ディレクトリをコンテキストとして読み込みます: %s",
+            "-f オプションが指定されたため, ファイル/ディレクトリをコンテキストとして読み込みます: %s",
             file_path,
         )
         target_code = read_path_content(file_path)
@@ -65,7 +66,7 @@ def handle_code_review(
 
 
 def _get_git_diff(staged: bool) -> str | None:
-    """git diff から変更差分を取得する.
+    """Git diff から変更差分を取得する.
 
     Args:
         staged (bool): True の場合 `--cached` (ステージング済み) 差分を取得する.
@@ -73,6 +74,7 @@ def _get_git_diff(staged: bool) -> str | None:
     Returns:
         str | None: 取得した差分文字列. 実行失敗時または git コマンドが
             存在しない場合は None を返す.
+
     """
     cmd = ["git", "diff", "--cached"] if staged else ["git", "diff"]
     try:
