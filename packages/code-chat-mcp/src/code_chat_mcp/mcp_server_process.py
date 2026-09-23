@@ -3,6 +3,7 @@
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from mcp import ClientSession, StdioServerParameters, Tool
@@ -29,8 +30,13 @@ class McpServerProcess:
 
         """
         self.command = command
-        self.args = args or []
+        self.args = self._resolve_args(args or [])
         self.env = env
+        logger.debug(
+            "MCPサーバプロセス: %s %s",
+            self.command,
+            " ".join(self.args),
+        )
 
         self._server_params = StdioServerParameters(
             command=self.command,
@@ -43,7 +49,7 @@ class McpServerProcess:
         """サブプロセスとして MCP サーバーを起動し, Stdio パイプによるセッションを確立します.
 
         Yields:
-            ClientSession: 初期化済みの MCP クライアントセッション
+            ClientSession: 初期化済みの MCP クライアントセッション.
 
         """
         logger.info(
@@ -97,14 +103,35 @@ class McpServerProcess:
         """指定した MCP ツールをサーバー側で実行し, 結果を返却します.
 
         Args:
-            tool_name: 実行するツール名 (例: "git_status")
-            arguments: ツールに引き渡す引数辞書
+            tool_name (str): 実行するツール名 (例: "git_status").
+            arguments (dict[str, Any] | None, optional): ツールに引き渡す引数辞書. Defaults to None.
 
         Returns:
-            CallToolResult: サーバーからの実行結果レスポンス
+            Any: サーバーからの実行結果レスポンス.
 
         """
         async with self.connect() as session:
             logger.info("MCP ツール '%s' を実行します...", tool_name)
             result = await session.call_tool(tool_name, arguments=arguments or {})
             return result
+
+    def _resolve_args(self, args: list[str]) -> list[str]:
+        """設定ファイル内のコマンド引数に含まれる変数を解決します.
+
+        引数リスト内に含まれる環境変数テンプレート (例: `${CWD}`) を
+        現在の実行環境における実際の値 (カレントディレクトリの絶対パス等) に置換します.
+
+        Args:
+            args (list[str]): 置換対象の引数文字列リスト.
+
+        Returns:
+            list[str]: 変数が置換された引数文字列リスト.
+
+        """
+        if not args:
+            return []
+        # 実行時のカレントディレクトリの絶対パス（/home/higashi/src/code-chat 等）を取得
+        current_dir = str(Path.cwd().resolve())
+
+        # "${CWD}" をカレントディレクトリの絶対パスに置換
+        return [arg.replace("${CWD}", current_dir) for arg in args]

@@ -36,7 +36,7 @@ class McpService:
         """
         self.config_path = config_path
         config = McpConfig(config_path)
-        self.servers: dict[str, McpServerConfig] = config.load_mcp_config()
+        self.servers: dict[str, McpServerConfig] = config.servers
         # _processes 属性を初期化
         self._processes: dict[str, McpServerProcess] = {}
 
@@ -151,7 +151,7 @@ class McpService:
                 cmd_str = cmd_str[:27] + "..."
             print(f"{name:<20} {status_str:<10} {cmd_str:<30}")
 
-    def test_connection(self) -> None:
+    async def test_connection(self) -> None:
         """設定ファイル (mcp.json) に登録された全 MCP サーバーに接続し, ツール一覧取得テストを行います."""
         if not self.servers:
             print("テスト対象の MCP サーバーが登録されていません")
@@ -160,7 +160,8 @@ class McpService:
         print("=== Testing MCP Server Connections via Stdio ===")
 
         # 非同期テスト処理を同期で実行
-        asyncio.run(self._test_servers_async())
+        # asyncio.run(self._test_servers_async())
+        await self._test_servers_async()
 
     async def start_all_servers(self) -> None:
         """有効になっている全 MCP サーバープロセスを起動します."""

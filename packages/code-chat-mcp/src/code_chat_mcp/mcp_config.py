@@ -22,8 +22,8 @@ class McpServerConfig:
 class McpConfig:
     """MCP サーバーの接続設定および環境設定を管理するクラス.
 
-    設定ファイル（JSON等）のロード・検証を行い,
-    各 MCP サーバーの起動パラメータ（コマンド, 引数, 環境変数など）を保持します。
+    設定ファイル (JSON等) のロード・検証を行い,
+    各 MCP サーバーの起動パラメータ (コマンド, 引数, 環境変数など) を保持します.
     """
 
     def __init__(self, config_path: Path | None = None) -> None:
@@ -52,13 +52,19 @@ class McpConfig:
             data = json.loads(self.config_path.read_text(encoding="utf-8"))
             servers = {}
             for name, cfg in data.get("mcpServers", {}).items():
-                raw_args = cfg.get("args", [])
-                resolved_args = self.resolve_args(raw_args)  # パスを展開
+                # "enabled" または "enable" フィールドのチェック (デフォルトは True)
+                is_enabled = cfg.get("enabled", cfg.get("enable", True))
+                if not is_enabled:
+                    logger.info(
+                        "MCP サーバー '%s' は無効化 (enabled: false) されているためスキップします",
+                        name,
+                    )
+                    continue
 
                 servers[name] = McpServerConfig(
                     name=name,
                     command=cfg.get("command", ""),
-                    args=resolved_args,
+                    args=cfg.get("args", []),
                     env=cfg.get("env", {}),
                     enabled=cfg.get("enabled", True),
                 )
@@ -66,22 +72,3 @@ class McpConfig:
         except Exception:  # pylint: disable=broad-exception-caught
             logger.exception("MCP 設定ファイルの読み込みに失敗しました")
             return {}
-
-    def resolve_args(self, args: list[str]) -> list[str]:
-        """設定ファイル内のコマンド引数に含まれる変数を解決します.
-
-        引数リスト内に含まれる環境変数テンプレート（例: `${CWD}`）を
-        現在の実行環境における実際の値（カレントディレクトリの絶対パス等）に置換します.
-
-        Args:
-            args (list[str]): 置換対象の引数文字列リスト.
-
-        Returns:
-            list[str]: 変数が置換された引数文字列リスト.
-
-        """
-        # 実行時のカレントディレクトリの絶対パス（/home/higashi/src/code-chat 等）を取得
-        current_dir = str(Path.cwd().resolve())
-
-        # "${CWD}" をカレントディレクトリの絶対パスに置換
-        return [arg.replace("${CWD}", current_dir) for arg in args]

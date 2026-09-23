@@ -149,16 +149,12 @@ Model Context Protocol (MCP) サーバーの起動、ステータス確認、動
 
 | コマンド | 引数 | 説明 |
 | --- | --- | --- |
-| `code-chat mcp run` | `<SERVER_NAME>` | 指定した MCP サーバーを個別起動 |
 | `code-chat mcp status` | なし | 登録されている MCP サーバーの接続状態・一覧を表示 |
 | `code-chat mcp test` | `[SERVER_NAME]` | 指定（または全）MCP サーバーの導通テストを実行 |
 
 #### 実行例
 
 ```bash
-# 特定の MCP サーバーを起動
-code-chat mcp run github
-
 # MCP サーバーの接続状態確認
 code-chat mcp status
 

@@ -7,11 +7,31 @@ from typing import Any
 from code_chat_mcp.mcp_service import McpService, McpToolInfo
 from google import genai
 from google.genai import types
+from google.genai.errors import APIError
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
 
 
-class QueryHandler:  # pylint: disable=too-few-public-methods
+def _is_rate_limit_error(exception: BaseException) -> bool:
+    """429 RESOURCE_EXHAUSTED エラーかどうかを判定します.
+
+    Args:
+        exception (BaseException): 判定対象の例外オブジェクト.
+
+    Returns:
+        bool: 429 エラーである場合は True, それ以外は False.
+
+    """
+    if isinstance(exception, APIError):
+        if getattr(exception, "code", None) == 429:
+            return True
+        if "429" in str(exception):
+            return True
+    return False
+
+
+class QueryHandler:
     """Gemini API と MCP サーバー間の Tool Calling 対話ループを管理するクラス."""
 
     def __init__(
@@ -31,6 +51,31 @@ class QueryHandler:  # pylint: disable=too-few-public-methods
         self.client = gemini_client
         self.mcp_service = mcp_service
         self.model_name = model_name
+
+    @retry(
+        retry=retry_if_exception(_is_rate_limit_error),
+        wait=wait_exponential(multiplier=2, min=5, max=60),
+        stop=stop_after_attempt(5),
+        reraise=True,
+    )
+    def _generate_content_with_retry(
+        self, contents: list[Any], config: types.GenerateContentConfig
+    ) -> types.GenerateContentResponse:
+        """429 レート制限エラー発生時に自動リトライを行う GenerateContent 呼び出しラッパー.
+
+        Args:
+            contents (list[Any]): 送信するコンテンツのリスト.
+            config (types.GenerateContentConfig): 生成設定オブジェクト.
+
+        Returns:
+            types.GenerateContentResponse: Gemini からのレスポンスオブジェクト.
+
+        """
+        return self.client.models.generate_content(
+            model=self.model_name,
+            contents=contents,
+            config=config,
+        )
 
     async def run(self, user_prompt: str) -> str:
         """ユーザープロンプトを受け取り, MCP ツールの実行を経由して最終回答を取得します.
@@ -60,8 +105,7 @@ class QueryHandler:  # pylint: disable=too-few-public-methods
         # Tool Calling ループ (ツールの呼び出し要求がなくなるまで反復)
         while True:
             logger.info("Gemini API にリクエストを送信中...")
-            response = self.client.models.generate_content(
-                model=self.model_name,
+            response = self._generate_content_with_retry(
                 contents=contents,
                 config=config,
             )

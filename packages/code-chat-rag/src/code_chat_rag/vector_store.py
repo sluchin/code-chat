@@ -67,8 +67,8 @@ class VectorStore:
         """検索実行用のリトリーバーインターフェースを返します.
 
         Args:
-            search_type: 検索タイプ（例: "similarity", "mmr"）.
-            k: 検索結果として取得する上位ドキュメント数.
+            search_type (str, optional): 検索タイプ (例: "similarity", "mmr"). Defaults to "similarity".
+            k (int, optional): 検索結果として取得する上位ドキュメント数. Defaults to 4.
 
         Returns:
             VectorStoreRetriever: 設定されたリトリーバーインスタンス.
@@ -78,13 +78,27 @@ class VectorStore:
         return db.as_retriever(search_type=search_type, search_kwargs={"k": k})
 
     def count(self) -> int:
-        """データベースに登録されているドキュメントの総件数を返します."""
+        """データベースに登録されているドキュメントの総件数を返します.
+
+        Returns:
+            int: 登録されているドキュメントの総件数.
+
+        """
         db = self._get_db()
         # pylint: disable=protected-access
         return db._collection.count()
 
     def search_debug(self, query: str, k: int = 4) -> list[tuple[Document, float]]:
-        """検索スコア（距離）付きでドキュメントを取得するデバッグ用メソッド."""
+        """検索スコア (距離) 付きでドキュメントを取得するデバッグ用メソッド.
+
+        Args:
+            query (str): 検索クエリ文字列.
+            k (int, optional): 取得する上位ドキュメント数. Defaults to 4.
+
+        Returns:
+            list[tuple[Document, float]]: ドキュメントとスコアのタプルのリスト.
+
+        """
         db = self._get_db()
         # 類似度スコア (距離) 付きで上位k件を取得
         results = db.similarity_search_with_score(query, k=k)
@@ -97,7 +111,7 @@ class VectorStore:
         return results
 
     def clear(self) -> None:
-        """VectorStore（Chroma DB コレクション）内のすべてのデータを削除して初期化します."""
+        """VectorStore (Chroma DB コレクション) 内のすべてのデータを削除して初期化します."""
         try:
             logger.info("VectorStore のデータをクリアしています...")
 
