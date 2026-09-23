@@ -42,7 +42,7 @@ class QueryHandler:  # pylint: disable=too-few-public-methods
             str: Gemini からの最終回答テキスト.
 
         """
-        # 各 MCP サーバーからツール一覧を取得し, 
+        # 各 MCP サーバーからツール一覧を取得し,
         # "server_name__tool_name" 形式で Gemini 用へ変換
         declarations = self._format_tools_for_gemini(
             await self.mcp_service.get_all_tools()
