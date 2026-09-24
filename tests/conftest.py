@@ -42,7 +42,7 @@ def mock_args():
 
 
 @pytest.fixture
-def mock_gemini_client():
+def mock_gemini_client(mock_client):
     """Gemini Client および Chat セッションのモックを作成."""
     with patch("code_chat_cli.chat.get_gemini_client") as mock_get_client:
         mock_chat = MagicMock()
