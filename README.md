@@ -16,8 +16,8 @@ Gemini API やローカル LLM を使用してローカルソースコードの�
 - 📝 **Git コミットメッセージの自動生成 (`-g`, `--generate-commit-msg`)**
   - `git diff` の変更内容を分析し、Conventional Commits 形式に沿った適切なコミットメッセージを提案・生成します。
 
-- 🔌 **マルチ LLM / プロバイダー対応予定 (Multi-LLM Support)**
-  - Gemini API をはじめ、Ollama（ローカル LLM）など複数バックエンドへの柔軟な切り替えを見据えた設計。
+- 🔌 **MCP (Model Context Protocol) 統合**
+  - 外部の MCP サーバーと連携し、安全なファイル構造の参照や環境隔離されたコマンド実行（`uv run` 経由）を自動化。
 
 - 🛡️ **堅牢なコード品質保証**
   - POSIX 標準（ファイル末尾の改行コード保証）に準拠したフォーマット出力。
@@ -27,6 +27,7 @@ Gemini API やローカル LLM を使用してローカルソースコードの�
 
 - **Python**: 3.12 以上
 - **uv**: パッケージ管理ツール ([インストール方法](https://docs.astral.sh/uv/))
+- **Node.js**: `npx` (MCP サーバー実行時に使用)
 
 ## セットアップ・インストール手順
 
@@ -63,10 +64,10 @@ cchat
 > **Note:** 開発中の変更を即座に反映させたい場合は、編集可能モード（Editable install）でインストールします。
 > ```bash
 > uv tool install --editable .
->
+> 
 > ```
->
->
+> 
+> 
 
 ## 環境変数の設定
 
@@ -91,42 +92,61 @@ cchat
 
 ```
 
+## MCP (Model Context Protocol) の設定と利用
+
+`code-chat` は MCP (Model Context Protocol) に対応しており、LLM がローカル環境のファイル参照やコマンド実行を動的かつ安全に行えます。
+
+### 1. サポートしている MCP サーバー
+
+* 📂 **`@modelcontextprotocol/server-filesystem`**:
+* プロジェクト内のファイル参照・検索・読み込みを安全に行います。
+
+
+* ⚡ **`mcp-server-commands`**:
+* `uv` 経由でのテスト実行や Git 操作などの CLI コマンドを実行します。
+* 許可リスト（Allowlist）によるコマンド制限を行い、安全性を確保します。
+
+
+
+### 2. 設定ファイル (`mcp.json`)
+
+プロジェクトルートに `mcp.json` を配置してサーバーを定義します。
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/home/higashi/src/code-chat"
+      ],
+      "enabled": true
+    },
+    "commands": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-server-commands",
+        "--allowed-commands",
+        "uv,git"
+      ],
+      "env": {
+        "PATH": "/home/higashi/.local/bin:/usr/local/bin:/usr/bin:/bin"
+      },
+      "enabled": true
+    }
+  }
+}
+
+```
+
+> **重要:** Python の依存関係やテストを正しく認識させるため、`mcp-server-commands` の許可コマンドは `uv` と `git` に絞り込み、ツール内での実行時も必ず `uv run` を前置（例: `uv run pytest`）する運用を推奨します。
+
 ## テストの実行
 
 `pytest` を使用してテストおよびカバレッジ測定を実行します。
-
-```bash
-# 単体テストの実行
-uv run pytest
-
-```
-
-## コード品質チェック・開発用コマンド
-
-コミット前や開発中に手動でコードチェックや `pre-commit` を実行できます。
-
-```bash
-# フォーマットとリンターチェック (Ruff)
-uv run ruff check --fix .
-uv run ruff format .
-
-# 詳細リンターチェック (Pylint)
-uv run pylint src/
-
-# 静的型チェック (Mypy)
-uv run mypy src/
-
-# pre-commit フックの手動実行 (全ファイル対象)
-uv run pre-commit run --all-files
-
-# pre-commit フックの更新
-uv run pre-commit autoupdate
-
-```
-
-## テストの実行
-
-プロジェクトのユニットテストを実行するには、以下のコマンドを使用します。
 
 ### 全テストの実行とカバー率の確認
 
@@ -151,6 +171,29 @@ uv run pytest -k "retry" -vv --tb=short
 
 # 標準出力（print文やログ）をキャプチャせずリアルタイム表示して実行
 uv run pytest tests/test_chat.py -s -vv --tb=short
+
+```
+
+## コード品質チェック・開発用コマンド
+
+コミット前や開発中に手動でコードチェックや `pre-commit` を実行できます。
+
+```bash
+# フォーマットとリンターチェック (Ruff)
+uv run ruff check --fix .
+uv run ruff format .
+
+# 詳細リンターチェック (Pylint)
+uv run pylint src/
+
+# 静的型チェック (Mypy)
+uv run mypy src/
+
+# pre-commit フックの手動実行 (全ファイル対象)
+uv run pre-commit run --all-files
+
+# pre-commit フックの更新
+uv run pre-commit autoupdate
 
 ```
 
