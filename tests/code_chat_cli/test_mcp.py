@@ -1,6 +1,7 @@
 """`code_chat_cli.mcp` モジュールのテスト."""
 
 import asyncio
+import logging
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -101,39 +102,28 @@ class TestHandleMcpRun:
 
         get_client.assert_called_once_with(use_oauth=True)
 
-    def test_handle_mcp_run_reraises_errors_failure(self, caplog):
-        """処理中の例外がログ出力の上で再送出されるか検証."""
+    @pytest.mark.parametrize(
+        "error",
+        [
+            RuntimeError("boom"),
+            APIError(429, {"error": {"message": "quota exceeded"}}),
+        ],
+    )
+    def test_handle_mcp_run_errors_failure(self, caplog, error):
+        """処理中の例外は, ここでは記録せずに, そのまま再送出されるか検証 (呼び出し元が 1 回だけ記録する)."""
         service_cls = _service_cm(MagicMock())
         handler = MagicMock()
-        handler.run = AsyncMock(side_effect=RuntimeError("boom"))
+        handler.run = AsyncMock(side_effect=error)
 
         with (
             patch("code_chat_cli.mcp.McpService", service_cls),
             patch("code_chat_cli.mcp.get_gemini_client"),
             patch("code_chat_cli.mcp.QueryHandler", return_value=handler),
-            pytest.raises(RuntimeError, match="boom"),
+            pytest.raises(type(error)),
         ):
             asyncio.run(handle_mcp_run("hello"))
 
-        assert "handle_mcp_run 実行中にエラーが発生しました" in caplog.text
-
-    def test_handle_mcp_run_api_error_failure(self, caplog):
-        """Gemini API のエラーは, 再送出されるが, ここでは記録されないか検証 (呼び出し元が 1 回だけ出力する)."""
-        service_cls = _service_cm(MagicMock())
-        handler = MagicMock()
-        handler.run = AsyncMock(
-            side_effect=APIError(429, {"error": {"message": "quota exceeded"}})
-        )
-
-        with (
-            patch("code_chat_cli.mcp.McpService", service_cls),
-            patch("code_chat_cli.mcp.get_gemini_client"),
-            patch("code_chat_cli.mcp.QueryHandler", return_value=handler),
-            pytest.raises(APIError),
-        ):
-            asyncio.run(handle_mcp_run("hello"))
-
-        assert "handle_mcp_run 実行中にエラーが発生しました" not in caplog.text
+        assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
 
     def test_handle_mcp_run_default_config_path(self):
         """設定パス未指定の場合は None が渡されるか検証."""

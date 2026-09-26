@@ -7,8 +7,7 @@ from pathlib import Path
 from code_chat_cli.client import get_gemini_client
 from code_chat_cli.query_handler import QueryHandler
 from code_chat_lib.constants import Constants
-from code_chat_lib.gemini_error import find_api_error
-from code_chat_lib.logger import get_logger, log_exception
+from code_chat_lib.logger import get_logger
 from code_chat_mcp.mcp_service import McpService
 from code_chat_mcp.mcp_tool_info import McpToolInfo
 
@@ -38,33 +37,27 @@ async def handle_mcp_run(
     Returns:
         str: Gemini からの最終回答テキスト.
 
+    Raises:
+        Exception: MCP サーバーや Gemini API などのエラー (ここでは記録せず, 呼び出し元が 1 回だけ記録する).
+
     """
-    try:
-        config = Path(config_path) if config_path else None
-        logger.debug("McpService の初期化とプロセスの起動を開始します")
+    config = Path(config_path) if config_path else None
+    logger.debug("McpService の初期化とプロセスの起動を開始します")
 
-        # async with で MCP サーバープロセスの自動起動・自動クリーンアップを行う
-        async with McpService(config_path=config) as mcp_service:
-            # クライアントの初期化（API キーまたは OAuth 認証）
-            client = get_gemini_client(use_oauth=use_oauth)
-            handler = QueryHandler(
-                gemini_client=client,
-                mcp_service=mcp_service,
-                model_name=model_name,
-                cached_content=cached_content,
-                max_tool_rounds=max_tool_rounds,
-            )
+    # async with で MCP サーバープロセスの自動起動・自動クリーンアップを行う
+    async with McpService(config_path=config) as mcp_service:
+        # クライアントの初期化（API キーまたは OAuth 認証）
+        client = get_gemini_client(use_oauth=use_oauth)
+        handler = QueryHandler(
+            gemini_client=client,
+            mcp_service=mcp_service,
+            model_name=model_name,
+            cached_content=cached_content,
+            max_tool_rounds=max_tool_rounds,
+        )
 
-            logger.info("ユーザープロンプトの処理を開始します: %s", user_prompt)
-            result_text = await handler.run(user_prompt)
-            return result_text
-
-    # 例外の種類を問わず, ログに記録してから再送出する (握りつぶさない).
-    except Exception as e:
-        # Gemini API のエラーは, 呼び出し元が概要とヒントを 1 回だけ出力するため, ここでは記録しない
-        if find_api_error(e) is None:
-            log_exception(logger, "handle_mcp_run 実行中にエラーが発生しました")
-        raise
+        logger.info("ユーザープロンプトの処理を開始します: %s", user_prompt)
+        return await handler.run(user_prompt)
 
 
 def handle_mcp_status(config_path: Path | str | None = None) -> None:
