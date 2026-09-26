@@ -49,39 +49,27 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
         dest="subcommand_action", help="RAG アクション"
     )
 
-    rag_create = rag_subparsers.add_parser(
-        "create", parents=[global_parser], help="Vector DB を作成"
-    )
-    rag_create.add_argument(
-        "--input_dirs",
-        nargs="+",
-        type=str,
-        default=["."],
-        help="入力パス (デフォルト: .)",
-    )
-    rag_create.add_argument(
-        "--output_dir",
-        type=str,
-        default="./.chroma_db",
-        help="出力パス (デフォルト: ./.chroma_db)",
-    )
-
-    rag_update = rag_subparsers.add_parser(
-        "update", parents=[global_parser], help="差分インデックスを更新"
-    )
-    rag_update.add_argument(
-        "--input_dirs",
-        nargs="+",
-        type=str,
-        default=["."],
-        help="入力パス (デフォルト: .)",
-    )
-    rag_update.add_argument(
-        "--output_dir",
-        type=str,
-        default="./.chroma_db",
-        help="出力パス (デフォルト: ./.chroma_db)",
-    )
+    # create / update は, 同じ入力・出力のオプションを持つ
+    for action, help_text in (
+        ("create", "Vector DB を作成"),
+        ("update", "差分インデックスを更新"),
+    ):
+        rag_index = rag_subparsers.add_parser(
+            action, parents=[global_parser], help=help_text
+        )
+        rag_index.add_argument(
+            "--input_dirs",
+            nargs="+",
+            type=str,
+            default=["."],
+            help="入力パス (デフォルト: .)",
+        )
+        rag_index.add_argument(
+            "--output_dir",
+            type=str,
+            default="./.chroma_db",
+            help="出力パス (デフォルト: ./.chroma_db)",
+        )
 
     rag_subparsers.add_parser("rm", parents=[global_parser], help="Vector DB を削除")
     rag_subparsers.add_parser(
@@ -144,7 +132,7 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
     raw_args, unparsed_args = main_parser.parse_known_args(args)
 
     # 管理用サブコマンドでない場合は unparsed_args を prompt として扱う
-    if raw_args.subcommand in ("rag", "cache", "mcp"):
+    if raw_args.subcommand in _SUBCOMMANDS:
         prompt_str = ""
     else:
         prompt_str = " ".join([*prompt_tokens, *unparsed_args])
