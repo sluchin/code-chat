@@ -130,14 +130,15 @@ class TestGetTools:
 
         assert [t.name for t in tools] == ["tool_a"]
 
-    def test_get_tools_returns_empty_on_error_exception(self):
-        """get_tools は接続エラー時に空リストを返すか検証."""
-        with patch(
-            "code_chat_mcp.mcp_server_connection.stdio_client", failing_stdio_client
+    def test_get_tools_connection_error_failure(self):
+        """get_tools は接続エラーを握りつぶさず, 呼び出し元へ送出するか検証."""
+        with (
+            patch(
+                "code_chat_mcp.mcp_server_connection.stdio_client", failing_stdio_client
+            ),
+            pytest.raises(RuntimeError, match="spawn failed"),
         ):
-            tools = asyncio.run(McpServerConnection("cmd").get_tools())
-
-        assert tools == []
+            asyncio.run(McpServerConnection("cmd").get_tools())
 
 
 class TestCallTool:

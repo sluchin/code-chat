@@ -29,6 +29,9 @@ def handle_code_review(
             ディレクトリのパス (複数指定可). 指定された場合は git diff ではなく
             ファイル内容全体をレビューする. Defaults to None.
 
+    Raises:
+        SystemExit: git diff の実行に失敗した場合, 終了コード 1 で終了します.
+
     """
     target_code: str | None = ""
 
@@ -42,6 +45,10 @@ def handle_code_review(
     else:
         logger.info("git diff から変更差分を取得してレビューを実施します.")
         target_code = _get_git_diff(staged)
+
+    # git diff の実行に失敗した場合 (エラーは出力済み) は, 差分なしと区別して, 異常終了する
+    if target_code is None:
+        sys.exit(1)
 
     if not target_code:
         print("レビュー対象のコードまたは変更点が見つかりませんでした.")
@@ -57,7 +64,9 @@ def handle_code_review(
     # 呼び出し元 (chat) が概要とヒントを 1 回だけ出力し, 終了コード 1 で終了する.
     chat = client.chats.create(model=model_name)
     for chunk in send_message_stream_with_retry(chat, prompt):
-        print(chunk.text, end="", flush=True)
+        # 使用状況だけを含む最後のチャンクなど, テキストが空のものは出力しない
+        if chunk.text:
+            print(chunk.text, end="", flush=True)
 
     print()
 

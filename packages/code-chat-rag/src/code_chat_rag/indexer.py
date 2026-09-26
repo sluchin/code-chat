@@ -184,11 +184,11 @@ class Indexer:
                 if file_path.suffix.lower() not in TARGET_EXTENSIONS:
                     continue
 
-                # 親ディレクトリ配下に除外対象または隠しフォルダが含まれている場合はスキップ
+                # 走査対象のディレクトリ配下に除外対象または隠しフォルダが含まれている場合はスキップ
+                # (走査対象のパス自体に含まれるものは, 指定された場所なので, 判定しない)
                 if any(
-                    part in EXCLUDE_DIRS
-                    or (part.startswith(".") and part not in (".", ".."))
-                    for part in file_path.parts[:-1]
+                    part in EXCLUDE_DIRS or part.startswith(".")
+                    for part in file_path.relative_to(path).parts[:-1]
                 ):
                     continue
 

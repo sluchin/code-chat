@@ -42,6 +42,25 @@ class TestHandleCommitGeneration:
             assert "feat: add commit generation feature" in captured.out
             mock_send.assert_called_once()
 
+    def test_handle_commit_generation_skips_empty_text_chunk(
+        self,
+        mock_client: MagicMock,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """テキストが空 (None) のチャンクは, "None" と出力されずに読み飛ばされることを検証する."""
+        chunks = [MagicMock(text="feat: x"), MagicMock(text=None)]
+
+        with (
+            patch("code_chat_cli.commands.commit.get_git_diff", return_value="diff"),
+            patch(
+                "code_chat_cli.commands.commit.send_message_stream_with_retry",
+                return_value=chunks,
+            ),
+        ):
+            handle_commit_generation(mock_client, "gemini-flash-latest")
+
+        assert capsys.readouterr().out == "feat: x\n"
+
     def test_handle_commit_generation_called_process_error_failure(
         self,
         mock_client: MagicMock,

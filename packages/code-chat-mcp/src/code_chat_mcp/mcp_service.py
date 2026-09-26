@@ -115,10 +115,10 @@ class McpService:
                     )
             # 1 台のサーバーの失敗で, 他のサーバーの処理を止めない.
             # MCP サーバー (外部プロセス) 由来の例外は, MCP SDK・anyio (ExceptionGroup)・OSError など多岐にわたるため, 広く捕捉する.
-            except Exception:  # pylint: disable=broad-exception-caught
-                logger.exception(
-                    "MCP サーバー '%s' からのツール取得に失敗しました",
-                    server_name,
+            # 通信の詳細は, McpServerConnection.connect が記録済みのため, ここでは, どのサーバーかだけを記録する.
+            except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+                logger.error(
+                    "MCP サーバー '%s' からのツール取得に失敗しました", server_name
                 )
 
         return all_tools
@@ -224,8 +224,9 @@ class McpService:
                 success_count += 1
             # 接続の失敗も結果として集計するため, 1 台の失敗で処理を止めない.
             # MCP サーバー (外部プロセス) 由来の例外は, MCP SDK・anyio (ExceptionGroup)・OSError など多岐にわたるため, 広く捕捉する.
-            except Exception:  # pylint: disable=broad-exception-caught
-                logger.exception("サーバー '%s' への接続テスト失敗", config.name)
+            except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+                print("[NG] Failed to connect.")
+                logger.error("サーバー '%s' への接続テスト失敗", config.name)
 
         print(
             f"\nテスト完了: {success_count}/{len(server_list)} サーバーが正常に応答しました"
