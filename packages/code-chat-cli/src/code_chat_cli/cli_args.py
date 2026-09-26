@@ -16,7 +16,7 @@ class CliArgs:
     """実行するサブコマンド ('rag' / 'cache' / 'mcp' / None)."""
 
     subcommand_action: str | None = None
-    """サブコマンド内のアクション ('create' / 'update' / 'rm' / 'status' / 'list' / 'run' / 'test')."""
+    """サブコマンド内のアクション ('create' / 'update' / 'rm' / 'status' / 'list' / 'test')."""
 
     subcommand_target: str | None = None
     """サブコマンドの対象パスや識別子 (PATH / CACHE_ID / SERVER_NAME)."""
@@ -41,7 +41,7 @@ class CliArgs:
     """使用するモデル名."""
 
     provider: str = "gemini"
-    """使用する LLM プロバイダ名 ('gemini' / 'claude' / 'openai' / 'local')."""
+    """使用する LLM プロバイダ名 (現在は 'gemini' のみ対応. `--dry-run` の表示以外には使われない)."""
 
     write_mode: bool = False
     """`-w`/`--write` によるソースコード直接修正モードの有効化フラグ."""

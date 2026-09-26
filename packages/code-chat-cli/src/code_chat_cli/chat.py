@@ -807,7 +807,7 @@ def _handle_rag_subcommand(cli_args: Any) -> None:
 
 
 def _handle_mcp_subcommand(cli_args: Any) -> None:
-    """MCPサブコマンド (run / status / test) の振る舞いを分岐・実行します.
+    """MCPサブコマンド (status / test) の振る舞いを分岐・実行します.
 
     Args:
         cli_args (Any): コマンドライン引数の名前空間オブジェクト.
@@ -817,24 +817,6 @@ def _handle_mcp_subcommand(cli_args: Any) -> None:
     config_path = getattr(cli_args, "config_path", None)
 
     try:
-        #        if action == "run":
-        #            # prompt 引数 (または query 引数) を取得
-        #            user_prompt = getattr(cli_args, "prompt", None) or getattr(
-        #                cli_args, "query", None
-        #            )
-        #            if not user_prompt:
-        #                logger.error(
-        #                    "実行するプロンプトを指定してください (例: code-chat mcp run 'git status を確認して')"
-        #                )
-        #                sys.exit(1)
-        #
-        #            # 非同期関数 handle_mcp_run を同期的に実行して結果を出力
-        #            result_text = asyncio.run(
-        #                handle_mcp_run(user_prompt=user_prompt, config_path=config_path)
-        #            )
-        #            print(result_text)
-        #            sys.exit(0)
-
         if action == "status":
             handle_mcp_status(config_path=config_path)
             sys.exit(0)
