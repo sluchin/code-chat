@@ -12,10 +12,10 @@ from langchain_community.document_loaders.generic import GenericLoader
 from langchain_community.document_loaders.parsers import LanguageParser
 from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
 
+from code_chat_cli.constants import Constants
 from code_chat_cli.logger import get_logger
 
-# プロジェクト共通の定数や拡張子定義
-EXCLUDE_DIRS = {".git", ".venv", ".env", "__pycache__", "node_modules", "build", "dist"}
+# インデックス対象の拡張子 (除外ディレクトリは, ファイル読み込みと共通の Constants.EXCLUDE_DIRS)
 TARGET_EXTENSIONS = {".py", ".cpp", ".hpp", ".c", ".h", ".ts", ".js"}
 
 # 拡張子と LangChain Language 列挙型のマッピング
@@ -187,7 +187,7 @@ class Indexer:
                 # 走査対象のディレクトリ配下に除外対象または隠しフォルダが含まれている場合はスキップ
                 # (走査対象のパス自体に含まれるものは, 指定された場所なので, 判定しない)
                 if any(
-                    part in EXCLUDE_DIRS or part.startswith(".")
+                    part in Constants.EXCLUDE_DIRS or part.startswith(".")
                     for part in file_path.relative_to(path).parts[:-1]
                 ):
                     continue
