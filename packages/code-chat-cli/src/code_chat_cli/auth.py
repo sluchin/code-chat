@@ -136,7 +136,7 @@ def login(token_path: Path | None = None) -> Credentials:
     credentials = flow.run_local_server(port=0, prompt="consent")
 
     path = _save_credentials(credentials, token_path)
-    logger.info("OAuth トークンを保存しました: %s", path)
+    print(f"OAuth トークンを保存しました: {path}")
     return credentials  # type: ignore[no-any-return]
 
 
@@ -158,7 +158,7 @@ def get_credentials(interactive: bool) -> Credentials:
         return credentials
 
     if interactive:
-        logger.info("OAuth ログインが必要です. ブラウザで認証してください")
+        print("OAuth ログインが必要です. ブラウザで認証してください")
         return login()
 
     if not os.getenv(CLIENT_ID_ENV) or not os.getenv(CLIENT_SECRET_ENV):

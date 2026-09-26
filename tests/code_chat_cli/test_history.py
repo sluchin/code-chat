@@ -63,7 +63,7 @@ class TestReadlineImport:
 class TestSaveChatHistory:
     """`save_chat_history` のテスト."""
 
-    def test_save_chat_history_success(self, tmp_path):
+    def test_save_chat_history_success(self, tmp_path, capsys):
         """正常系: 履歴が Markdown 形式でファイルへ保存されるか検証."""
         save_file = tmp_path / "chat_history.md"
         history = ["## User\nHello", "## Model\nHi there!"]
@@ -75,6 +75,7 @@ class TestSaveChatHistory:
             save_file.read_text(encoding="utf-8")
             == "## User\nHello\n\n## Model\nHi there!"
         )
+        assert f"対話ログを '{save_file}' に保存しました." in capsys.readouterr().out
 
     def test_save_chat_history_creates_parent_directory_success(self, tmp_path):
         """親ディレクトリが存在しない場合, 自動的に生成されて保存されるか検証."""

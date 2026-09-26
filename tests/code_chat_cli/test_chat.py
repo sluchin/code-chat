@@ -111,7 +111,7 @@ class TestRunInteractiveLoop:
     """`_run_interactive_loop` のテスト."""
 
     def test_run_interactive_loop_exit_command_success(
-        self, monkeypatch, mock_gemini_client
+        self, monkeypatch, mock_gemini_client, capsys
     ):
         """対話モードで 'exit' を入力した際にメッセージ送信と正常終了が行われるか検証."""
         # 標準入力に「こんにちは」→ exit を流し込み, 対話モードで起動する
@@ -127,6 +127,7 @@ class TestRunInteractiveLoop:
         mock_gemini_client["chat"].send_message_stream.assert_called_once_with(
             "こんにちは"
         )
+        assert "会話を終了します." in capsys.readouterr().out
 
     def test_run_interactive_loop_write_mode_success(
         self, monkeypatch, mock_gemini_client, mock_args
@@ -184,6 +185,7 @@ class TestRunInteractiveLoop:
         self,
         exception_type: type[BaseException],
         monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """input() 実行時に KeyboardInterrupt や EOFError が発生した場合, 正常終了 (SystemExit: 0) することを検証する."""
         # 最小限の引数セットを擬似設定
@@ -210,6 +212,7 @@ class TestRunInteractiveLoop:
 
         # sys.exit(0) で正常終了したことを検証
         assert exc_info.value.code == 0
+        assert "会話を終了します." in capsys.readouterr().out
 
     def test_run_interactive_loop_empty_input(
         self, monkeypatch, mock_gemini_client, mock_args
@@ -740,7 +743,7 @@ class TestRequireRagApiKey:
 class TestHandleLogin:
     """`_handle_login` のテスト."""
 
-    def test_handle_login_success(self, caplog):
+    def test_handle_login_success(self, capsys):
         """ログインに成功した場合, --oauth の指定を案内して終了コード 0 で終了するか検証."""
         with (
             patch("code_chat_cli.chat.login") as login,
@@ -750,7 +753,7 @@ class TestHandleLogin:
 
         login.assert_called_once_with()
         assert exc_info.value.code == 0
-        assert "--oauth" in caplog.text
+        assert "--oauth" in capsys.readouterr().out
 
     def test_handle_login_failure(self, capsys, caplog):
         """クライアント情報が未設定などでログインできない場合, メッセージを表示して終了コード 1 で終了するか検証."""
@@ -1735,6 +1738,7 @@ class TestMain:
         self,
         exception_type: type[BaseException],
         monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """_run_interactive_loop 実行時に KeyboardInterrupt や EOFError が発生した際,
            except ブロックを通って sys.exit(0) で正常終了することを検証する.
@@ -1769,3 +1773,4 @@ class TestMain:
 
         # sys.exit(0) で正常終了したことを検証
         assert exc_info.value.code == 0
+        assert "[Ctrl+C] 会話を終了します" in capsys.readouterr().out

@@ -20,7 +20,7 @@ class TestHandleWriteModeConfirmation:
     """`handle_write_mode_confirmation` のテスト."""
 
     def test_handle_write_mode_confirmation_user_accepts_success(
-        self, monkeypatch, tmp_path
+        self, monkeypatch, tmp_path, capsys
     ):
         """ユーザーが 'y' と入力した場合, _apply_file_modification が呼び出されて上書きされるか検証."""
         target_file = tmp_path / "target.py"
@@ -33,8 +33,10 @@ class TestHandleWriteModeConfirmation:
 
         handle_write_mode_confirmation([str(target_file)], response_text)
 
-        # ファイルが上書き更新されていること
+        # ファイルが上書き更新されていること (更新した旨は, 1 回だけ出力される)
         assert target_file.read_text(encoding="utf-8") == "print('new')\n"
+        out = capsys.readouterr().out
+        assert out.count(f"'{target_file}' を更新しました.") == 1
 
     def test_handle_write_mode_confirmation_none_target_path_failure(self):
         """target_path_str が None の場合, 早期リターンすること（エラーログのみ）."""
@@ -59,7 +61,9 @@ class TestHandleWriteModeConfirmation:
         # ファイルが変更されていないこと
         assert target_file.read_text(encoding="utf-8") == "print('old')"
 
-    def test_handle_write_mode_confirmation_user_declines(self, monkeypatch, tmp_path):
+    def test_handle_write_mode_confirmation_user_declines(
+        self, monkeypatch, tmp_path, capsys
+    ):
         """ユーザーが 'n' など 'y' 以外を入力した場合, 上書きがキャンセルされるか検証."""
         target_file = tmp_path / "target.py"
         target_file.write_text("print('old')", encoding="utf-8")
@@ -73,12 +77,13 @@ class TestHandleWriteModeConfirmation:
 
         # ファイルが上書きされていないこと
         assert target_file.read_text(encoding="utf-8") == "print('old')"
+        assert "上書きをキャンセルしました." in capsys.readouterr().out
 
 
 class TestApplyFileModification:
     """`_apply_file_modification` のテスト."""
 
-    def test_apply_file_modification_success(self, tmp_path):
+    def test_apply_file_modification_success(self, tmp_path, capsys):
         """正常系: .bak バックアップが作成され, 元ファイルが新しい内容で上書きされるか検証."""
         target_file = tmp_path / "sample.py"
         target_file.write_text("original_code", encoding="utf-8")
@@ -92,6 +97,11 @@ class TestApplyFileModification:
         # タイムスタンプ付きバックアップの存在確認 (glob検索など)
         bak_files = list(tmp_path.glob("sample.py.bak.*"))
         assert len(bak_files) >= 1
+
+        # 更新の結果と, 初回オリジナルバックアップの作成が出力されること
+        out = capsys.readouterr().out
+        assert f"'{target_file}' を更新しました." in out
+        assert f"初回オリジナルバックアップを作成しました: {bak_orig}" in out
 
     def test_apply_file_modification_not_a_file_failure(self, tmp_path):
         """異常系: パスが存在しない, またはディレクトリの場合, 早期リターンして何も処理しないか検証."""

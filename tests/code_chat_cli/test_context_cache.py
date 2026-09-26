@@ -2,7 +2,6 @@
 """`code_chat_cli.context_cache` モジュールのテスト."""
 
 import datetime
-import logging
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -191,7 +190,9 @@ class TestCreate:
         ContextCache(client).create("gemini-flash-latest", str(target_dir), ttl=120)
 
         assert client.caches.create.call_args.kwargs["config"].ttl == "120s"
-        assert "cachedContents/created" in capsys.readouterr().out
+        out = capsys.readouterr().out
+        assert "キャッシュを作成しました" in out
+        assert "cachedContents/created" in out
 
     def test_create_failure(self, tmp_path):
         """キャッシュ対象が無い場合は, CacheError がそのまま送出されるか検証."""
@@ -215,7 +216,10 @@ class TestUpdate:
         ContextCache(client).update("m", str(target_dir))
 
         client.caches.delete.assert_called_once_with(name="cachedContents/old")
-        assert "cachedContents/new" in capsys.readouterr().out
+        out = capsys.readouterr().out
+        assert "古いキャッシュを削除しました: cachedContents/old" in out
+        assert "キャッシュを更新しました" in out
+        assert "cachedContents/new" in out
 
     def test_update_create_failure(self, target_dir):
         """再作成に失敗した場合は, 既存のキャッシュを削除せずに CacheError が送出されるか検証."""
@@ -245,15 +249,16 @@ class TestUpdate:
 class TestRemove:
     """`ContextCache.remove` のテスト."""
 
-    def test_remove_target_success(self):
+    def test_remove_target_success(self, capsys):
         """指定した ID のキャッシュが (ID のみの指定でも) 削除されるか検証."""
         client = _client()
 
         ContextCache(client).remove("abc")
 
         client.caches.delete.assert_called_once_with(name="cachedContents/abc")
+        assert "キャッシュを削除しました: cachedContents/abc" in capsys.readouterr().out
 
-    def test_remove_all_success(self):
+    def test_remove_all_success(self, capsys):
         """ID の省略時は, このツールで作成した全てのキャッシュだけが削除されるか検証."""
         client = _client(
             [_cache("a"), _cache("b"), _cache("x", display_name="other-app")]
@@ -263,16 +268,18 @@ class TestRemove:
 
         deleted = [c.kwargs["name"] for c in client.caches.delete.call_args_list]
         assert deleted == ["cachedContents/a", "cachedContents/b"]
+        out = capsys.readouterr().out
+        assert "キャッシュを削除しました: cachedContents/a" in out
+        assert "キャッシュを削除しました: cachedContents/b" in out
 
-    def test_remove_no_caches(self, caplog):
+    def test_remove_no_caches(self, capsys):
         """削除対象が無い場合は, 何も削除せずに通知するか検証."""
         client = _client()
 
-        with caplog.at_level(logging.INFO):
-            ContextCache(client).remove()
+        ContextCache(client).remove()
 
         client.caches.delete.assert_not_called()
-        assert "削除対象のキャッシュはありません" in caplog.text
+        assert "削除対象のキャッシュはありません" in capsys.readouterr().out
 
 
 class TestListCaches:

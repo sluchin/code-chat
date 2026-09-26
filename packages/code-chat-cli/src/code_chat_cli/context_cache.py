@@ -57,7 +57,7 @@ class ContextCache:
 
         """
         cache = self._create_cache(model, target, ttl)
-        logger.info("キャッシュを作成しました")
+        print("キャッシュを作成しました")
         self._print_cache(cache)
 
     def update(self, model: str, target: str = ".") -> None:
@@ -87,9 +87,9 @@ class ContextCache:
         cache = self._create_cache(model, target, 3600)
         for old in existing:
             self.client.caches.delete(name=old.name)
-            logger.info("古いキャッシュを削除しました: %s", old.name)
+            print(f"古いキャッシュを削除しました: {old.name}")
 
-        logger.info("キャッシュを更新しました")
+        print("キャッシュを更新しました")
         self._print_cache(cache)
 
     def remove(self, target: str | None = None) -> None:
@@ -102,16 +102,16 @@ class ContextCache:
         if target:
             name = self._normalize_cache_name(target)
             self.client.caches.delete(name=name)
-            logger.info("キャッシュを削除しました: %s", name)
+            print(f"キャッシュを削除しました: {name}")
             return
 
         caches = self._list_code_chat_caches()
         if not caches:
-            logger.info("削除対象のキャッシュはありません")
+            print("削除対象のキャッシュはありません")
             return
         for cache in caches:
             self.client.caches.delete(name=cache.name)
-            logger.info("キャッシュを削除しました: %s", cache.name)
+            print(f"キャッシュを削除しました: {cache.name}")
 
     def list_caches(self) -> None:
         """このツールで作成したキャッシュの一覧を表示します."""
