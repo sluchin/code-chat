@@ -892,27 +892,26 @@ def _build_chat_config(
     )
 
 
-def _handle_mcp_single_turn(
+def _query_mcp(
+    prompt: str,
     cli_args: Any,
     chat_history: list[str],
     rag_service: Any | None = None,
-) -> None:
-    """ワンショットモードで --mcp が指定された場合の MCP 処理を行います.
+) -> bool:
+    """プロンプトを MCP ツール連携で実行し, 結果を標準出力と対話履歴に記録します.
 
     --rag との併用時は, RAG で検索したコンテキストをプロンプトに付加して MCP に渡します.
 
     Args:
+        prompt (str): 実行するプロンプト.
         cli_args (Any): コマンドライン引数の名前空間オブジェクト.
         chat_history (list[str]): 対話履歴を格納するリスト.
         rag_service (Any | None, optional): RAGサービス. Defaults to None.
 
-    """
-    # プロンプトの指定がなければ, 標準入力・ファイルのコンテキストをプロンプトとして使う
-    prompt = cli_args.prompt or cli_args.context
-    if not prompt:
-        logger.error("MCP 実行用のプロンプトまたはコンテキストを指定してください")
-        return
+    Returns:
+        bool: 実行に成功した場合は True. 失敗した場合 (エラーはログに出力済み) は False.
 
+    """
     config_path = getattr(cli_args, "config_path", None)
     chat_history.append(f"### User (MCP)\n\n{prompt}")
     # --rag との併用時は, 検索したコンテキストをプロンプトに付加する
@@ -932,12 +931,37 @@ def _handle_mcp_single_turn(
                 cached_content=_cached_content_name(cli_args),
             )
         )
-        print(result_text)
-        chat_history.append(f"### Gemini (MCP)\n\n{result_text}")
-    # Gemini API・MCP サーバー・認証設定など原因が多岐にわたり特定できない. 1 回のクエリの失敗で処理を止めないよう,
-    # 広く捕捉してログに記録する.
+    # Gemini API・MCP サーバー・認証設定など原因が多岐にわたり特定できない. 1 回のクエリの失敗で対話を終了させないよう,
+    # 広く捕捉してログに記録し, 呼び出し元に結果を返す.
     except Exception as e:  # noqa: BLE001 # pylint: disable=broad-exception-caught
         logger.error("MCP クエリの実行中にエラーが発生しました: %s", format_error(e))
+        return False
+
+    print(result_text)
+    chat_history.append(f"### Gemini (MCP)\n\n{result_text}")
+    return True
+
+
+def _handle_mcp_single_turn(
+    cli_args: Any,
+    chat_history: list[str],
+    rag_service: Any | None = None,
+) -> None:
+    """ワンショットモードで --mcp が指定された場合の MCP 処理を行います.
+
+    Args:
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+        chat_history (list[str]): 対話履歴を格納するリスト.
+        rag_service (Any | None, optional): RAGサービス. Defaults to None.
+
+    """
+    # プロンプトの指定がなければ, 標準入力・ファイルのコンテキストをプロンプトとして使う
+    prompt = cli_args.prompt or cli_args.context
+    if not prompt:
+        logger.error("MCP 実行用のプロンプトまたはコンテキストを指定してください")
+        return
+
+    _query_mcp(prompt, cli_args, chat_history, rag_service)
 
 
 def _handle_mcp_interactive(
@@ -946,9 +970,7 @@ def _handle_mcp_interactive(
     chat_history: list[str],
     rag_service: Any | None = None,
 ) -> None:
-    """対話型ループ内から MCP ツール連携クエリ (execute_mcp_query) を実行します.
-
-    --rag との併用時は, RAG で検索したコンテキストをプロンプトに付加して MCP に渡します.
+    """対話型ループ内から MCP ツール連携クエリを実行します.
 
     Args:
         user_input (str): ユーザーからの入力文字列.
@@ -968,31 +990,8 @@ def _handle_mcp_interactive(
         )
         return
 
-    config_path = getattr(cli_args, "config_path", None)
-    chat_history.append(f"### User (MCP)\n\n{prompt}")
-    # --rag との併用時は, 検索したコンテキストをプロンプトに付加する
-    send_prompt = (
-        _append_rag_context(prompt, prompt, rag_service) if rag_service else prompt
-    )
-
-    print("Gemini (MCP) > ", end="", flush=True)
-    try:
-        result_text = asyncio.run(
-            handle_mcp_run(
-                user_prompt=send_prompt,
-                config_path=config_path,
-                use_oauth=cli_args.oauth,
-                model_name=cli_args.model,
-                cached_content=_cached_content_name(cli_args),
-            )
-        )
-        print(result_text)
+    if _query_mcp(prompt, cli_args, chat_history, rag_service):
         print()
-        chat_history.append(f"### Gemini (MCP)\n\n{result_text}")
-    # Gemini API・MCP サーバー・認証設定など原因が多岐にわたり特定できない. 1 回のクエリの失敗で対話を終了させないよう,
-    # 広く捕捉してログに記録し, 次の入力へ進む.
-    except Exception as e:  # noqa: BLE001 # pylint: disable=broad-exception-caught
-        logger.error("MCP クエリの実行中にエラーが発生しました: %s", format_error(e))
 
 
 def main() -> None:
