@@ -242,7 +242,7 @@ Vector DB は既定で `./.chroma_db` に作成されます。インデックス
 # インデックスの作成 (既存の内容は初期化されます)
 code-chat rag create --input_dirs ./packages --output_dir ./.chroma_db
 
-# 差分更新
+# 差分更新 (読み込んだファイルの既存のチャンクを置き換えます)
 code-chat rag update --input_dirs ./packages
 
 # ステータス確認 / 削除
@@ -296,6 +296,8 @@ code-chat "認証機能の実装箇所を説明して" --rag
 - `args` 内の `${CWD}` は、実行時のカレントディレクトリの絶対パスに置換されます。
 - `env`（環境変数の辞書）は任意です。`"enabled": false` でサーバーを無効化できます。
 - ツール名は `<サーバー名>__<ツール名>` の形式で Gemini に渡されます。
+- Gemini がツールを呼び続けて終わらなくなることを防ぐため、ツール呼び出しの繰り返しは、既定で 20 回までです (`--max-tool-rounds N` で変更できます。超えるとエラー終了します)。
+- ワンショット実行 (`code-chat "..." --mcp`) が失敗した場合は、終了コード 1 で終了します。
 
 > **重要:** `mcp-server-commands` の許可コマンドは必要最小限（例: `uv`, `git`）に絞り、実行時も `uv run pytest` のように `uv run` を前置する運用を推奨します。
 
@@ -305,7 +307,7 @@ code-chat "認証機能の実装箇所を説明して" --rag
 # MCP サーバーの一覧とツールを表示
 code-chat mcp status
 
-# 全 MCP サーバーの導通テスト
+# 全 MCP サーバーの導通テスト (サーバーごとに [OK] / [NG] を表示)
 code-chat mcp test
 
 # MCP を使ってワンショット実行
@@ -328,7 +330,7 @@ uv build
 
 ## テストの実行
 
-`pytest` を使用してテストおよびカバレッジ測定を実行します（設定は `pyproject.toml` の `[tool.pytest.ini_options]`）。テストは `tests/code_chat_cli/`、`tests/code_chat_rag/` にあります。
+`pytest` を使用してテストおよびカバレッジ測定を実行します（設定は `pyproject.toml` の `[tool.pytest.ini_options]`）。テストは `tests/code_chat_cli/`、`tests/code_chat_lib/`、`tests/code_chat_rag/`、`tests/code_chat_mcp/` にあります。
 
 ```bash
 # 全テストの実行とカバレッジの確認

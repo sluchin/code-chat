@@ -97,22 +97,6 @@ def handle_rag_status(input_dirs: list[str], output_dir: str) -> None:
     print(f"--- [RAG Index Status] ---\n{status_info}")
 
 
-def handle_rag(question: str, output_dir: str = "./.chroma_db") -> None:
-    """質問に対して RagService を呼び出し, 回答をリアルタイムでストリーミング出力する.
-
-    Args:
-        question (str): ユーザーから入力された質問文.
-        output_dir (str): ベクトルストアの永続化先ディレクトリ.
-
-    """
-    service = RagService(output_dir=output_dir)
-
-    # CLI向けにストリーミング出力
-    for token in service.query_stream(question):
-        print(token, end="", flush=True)
-    print()
-
-
 def _handle_dryrun(input_dirs: list[str]) -> None:
     """インデックス作成対象のファイルを計算し, 一覧を表示します.
 
