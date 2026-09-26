@@ -3,11 +3,12 @@
 from collections.abc import Generator
 from pathlib import Path
 
+from code_chat_cli.api import stream_with_retry
 from code_chat_cli.logger import get_logger
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import Runnable, RunnablePassthrough
+from langchain_core.runnables import Runnable
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from code_chat_rag.indexer import Indexer
@@ -39,7 +40,12 @@ class RagService:
         doc_count = self.vector_store.count()
         logger.info("RAG Vector DB: %s", output_dir)
         logger.info("RAG DB 登録ドキュメント数: %d 件", doc_count)
-        self.llm = ChatGoogleGenerativeAI(model=model_name, temperature=0.0)
+        self.llm = ChatGoogleGenerativeAI(
+            model=model_name,
+            temperature=0.0,
+            # リトライは stream_with_retry に集約するため, ライブラリ内のリトライ (既定 6 回) は 1 回 (= リトライなし) にする
+            max_retries=1,
+        )
 
     def index_repository(self, input_dirs: list[str], update_only: bool = False) -> int:
         """コードリポジトリを読み込み, チャンク化してVectorStoreに保存します.
@@ -94,8 +100,12 @@ class RagService:
             LLMによって生成されたトークンチャンク.
 
         """
-        chain = self._build_chain(k=k)
-        yield from chain.stream(question)
+        # 検索 (埋め込み) は RetryEmbeddings がリトライするため, 二重にリトライしないよう, 検索と生成を分ける
+        context = self.get_context(question, k=k)
+        chain = self._build_chain()
+        yield from stream_with_retry(
+            chain.stream, {"context": context, "question": question}
+        )
 
     def get_status(self) -> str:
         """インデックス（VectorStore）の現在のステータス情報を取得します.
@@ -126,18 +136,13 @@ class RagService:
             formatted.append(f"--- File: {source} ---\n{doc.page_content}")
         return "\n\n".join(formatted)
 
-    def _build_chain(self, k: int = 5) -> Runnable:
-        """LangChain Expression Language (LCEL) を使用してRAGパイプラインを構築します.
-
-        Args:
-            k (int, optional): 検索時に取得するチャンク数. Defaults to 5.
+    def _build_chain(self) -> Runnable:
+        """LangChain Expression Language (LCEL) を使用して回答生成のパイプラインを構築します.
 
         Returns:
-            Runnable: 質問文字列を受け取り, 回答文字列を出力する実行可能なLCELチェーン.
+            Runnable: コンテキストと質問の辞書を受け取り, 回答文字列を出力する実行可能なLCELチェーン.
 
         """
-        retriever = self.vector_store.as_retriever(k=k)
-
         prompt = ChatPromptTemplate.from_template(
             "あなたはコードベースの解釈と解説を行うエキスパートです.\n"
             "以下のコンテキスト（コード情報）のみを参照して, ユーザーの質問に正確に答えてください.\n"
@@ -148,13 +153,4 @@ class RagService:
             "{question}"
         )
 
-        chain = (
-            {
-                "context": retriever | self._format_docs,
-                "question": RunnablePassthrough(),
-            }
-            | prompt
-            | self.llm
-            | StrOutputParser()
-        )
-        return chain
+        return prompt | self.llm | StrOutputParser()

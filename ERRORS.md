@@ -159,7 +159,12 @@ Gemini API の呼び出しは、すべて `call_with_retry` (`tenacity` を使�
 
 リトライの設定値 (試行回数、待ち時間など) は、`RetryPolicy` クラスの定数として、一元管理しています。
 
-RAG (`langchain` 経由の呼び出し) は、この共通のリトライの対象外です。`langchain` 側のリトライの設定に従います。
+RAG (`langchain` 経由の呼び出し) も、同じリトライの対象です。
+
+- 埋め込み (検索時のクエリ、インデックス作成時の 32 件ごとのバッチ): `RetryEmbeddings` が `call_with_retry` を通す。失敗したバッチだけをやり直す。
+- 回答の生成: `stream_with_retry` で、最初のチャンクを受信するまでをリトライする。検索 (埋め込み) と生成を分けて呼び出し、二重にリトライしない。
+- `langchain` が `APIError` やネットワークのエラー (`httpx.TransportError`) を別の例外で包む場合も、原因を辿って判定する (`retryDelay` も原因から取り出す)。
+- `ChatGoogleGenerativeAI` 内のリトライ (既定 6 回) は、二重にリトライしないよう、`max_retries=1` (リトライなし) にしている。
 
 ### 3.2 MCP 連携 (`--mcp`)
 

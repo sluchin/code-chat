@@ -10,6 +10,8 @@ from langchain_core.embeddings import Embeddings
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
+from code_chat_rag.retry_embeddings import RetryEmbeddings
+
 logger = logging.getLogger(__name__)
 
 
@@ -29,8 +31,9 @@ class VectorStore:
 
         """
         self.output_dir = str(output_dir)
-        self.embeddings = embedding_function or GoogleGenerativeAIEmbeddings(
-            model="gemini-embedding-001"
+        self.embeddings = RetryEmbeddings(
+            embedding_function
+            or GoogleGenerativeAIEmbeddings(model="gemini-embedding-001")
         )
         self._db: Chroma | None = None
 

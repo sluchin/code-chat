@@ -14,6 +14,7 @@ from code_chat_cli.api import (
     call_with_retry,
     send_message_stream_with_retry,
     send_message_with_retry,
+    stream_with_retry,
 )
 from code_chat_cli.retry_policy import RetryPolicy
 from google.genai.errors import APIError
@@ -236,25 +237,78 @@ class TestSendMessageStreamWithRetry:
         assert not list(send_message_stream_with_retry(chat, "hello"))
 
 
+class TestStreamWithRetry:
+    """`stream_with_retry` のテスト."""
+
+    def test_stream_with_retry_success(self):
+        """任意の呼び出しが返すチャンクが, 引数とともに呼ばれて, 順に返されるか検証."""
+        func = MagicMock(return_value=iter(["a", "b"]))
+
+        assert list(stream_with_retry(func, {"q": 1}, key="v")) == ["a", "b"]
+        func.assert_called_once_with({"q": 1}, key="v")
+
+    def test_stream_with_retry_wrapped_error_after_yielding_chunks_failure(
+        self, caplog
+    ):
+        """APIError を別の例外で包んだエラーも, 出力後は, リトライせずに送出されるか検証."""
+
+        def partial_stream():
+            yield "first_chunk"
+            raise RuntimeError("wrapped") from _api_error(503)
+
+        func = MagicMock(return_value=partial_stream())
+
+        gen = stream_with_retry(func)
+        assert next(gen) == "first_chunk"
+        with pytest.raises(RuntimeError):
+            next(gen)
+
+        assert func.call_count == 1
+        assert "一部出力済みのため" in caplog.text
+
+    def test_stream_with_retry_non_api_error_after_yielding_chunks_failure(
+        self, caplog
+    ):
+        """Gemini API と無関係のエラーは, 出力後に, ログを出さずに送出されるか検証."""
+
+        def partial_stream():
+            yield "first_chunk"
+            raise ValueError("bad")
+
+        gen = stream_with_retry(MagicMock(return_value=partial_stream()))
+        assert next(gen) == "first_chunk"
+        with pytest.raises(ValueError):
+            next(gen)
+
+        assert "一部出力済みのため" not in caplog.text
+
+    def test_stream_with_retry_wrapped_error_retry_exception(self):
+        """APIError を別の例外で包んだ一時的なエラーも, 最初のチャンクの前ならリトライされるか検証."""
+        wrapped = RuntimeError("wrapped")
+        wrapped.__cause__ = _api_error(503)
+        func = MagicMock(side_effect=[wrapped, iter(["ok"])])
+
+        assert list(stream_with_retry(func)) == ["ok"]
+
+        assert func.call_count == 2
+
+
 class TestOpenStream:
     """`_open_stream` のテスト."""
 
     def test_open_stream_success(self):
         """最初のチャンクと, 残りのストリームが返るか検証."""
-        chat = MagicMock()
-        chat.send_message_stream.return_value = ["a", "b"]
+        func = MagicMock(return_value=["a", "b"])
 
-        first, stream = _open_stream(chat, "hi")
+        first, stream = _open_stream(func, "hi", key="v")
 
         assert first == "a"
         assert list(stream) == ["b"]
+        func.assert_called_once_with("hi", key="v")
 
     def test_open_stream_empty(self):
         """チャンクが無い場合は, 最初のチャンクが終了の目印になるか検証."""
-        chat = MagicMock()
-        chat.send_message_stream.return_value = []
-
-        first, _ = _open_stream(chat, "hi")
+        first, _ = _open_stream(MagicMock(return_value=[]))
 
         assert first is _STREAM_END
 
@@ -270,6 +324,20 @@ class TestIsRetryableError:
     def test_is_retryable_error_transport_error_success(self):
         """ネットワークの一時的なエラーは, リトライ対象になるか検証."""
         assert _is_retryable_error(httpx.ReadTimeout("timeout")) is True
+
+    def test_is_retryable_error_wrapped_transport_error_success(self):
+        """ネットワークの一時的なエラーを別の例外で包んだエラーも, リトライ対象になるか検証."""
+        wrapped = RuntimeError("wrapped")
+        wrapped.__cause__ = httpx.ConnectError("refused")
+
+        assert _is_retryable_error(wrapped) is True
+
+    def test_is_retryable_error_wrapped_error_success(self):
+        """APIError を別の例外で包んだエラーも, 原因が 503 ならリトライ対象になるか検証."""
+        wrapped = RuntimeError("wrapped")
+        wrapped.__cause__ = _api_error(503)
+
+        assert _is_retryable_error(wrapped) is True
 
     @pytest.mark.parametrize("bad_code", ["not_a_number", object()])
     def test_is_retryable_error_code_fallback_exception(self, bad_code):
@@ -320,6 +388,17 @@ class TestWaitSeconds:
 
         assert (
             _wait_seconds(_retry_state(error)) == 12.0 + RetryPolicy.RETRY_DELAY_MARGIN
+        )
+
+    def test_wait_seconds_wrapped_retry_delay_success(self):
+        """APIError を別の例外で包んだエラーでも, 原因の推奨待機時間に従うか検証."""
+        wrapped = RuntimeError("wrapped")
+        wrapped.__cause__ = _api_error(
+            429, "RESOURCE_EXHAUSTED", "q", [{"retryDelay": "7s"}]
+        )
+
+        assert (
+            _wait_seconds(_retry_state(wrapped)) == 7.0 + RetryPolicy.RETRY_DELAY_MARGIN
         )
 
     def test_wait_seconds_without_outcome(self):

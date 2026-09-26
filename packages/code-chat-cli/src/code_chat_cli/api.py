@@ -4,11 +4,10 @@ Gemini API の呼び出しは, すべて `call_with_retry` を通して, リト�
 SDK (`google-genai`) 自身のリトライは, 二重にリトライしないよう, 無効のままにします.
 """
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
 import httpx
-from google.genai.errors import APIError
 from tenacity import (
     RetryCallState,
     Retrying,
@@ -19,6 +18,7 @@ from tenacity import (
 
 from code_chat_cli.gemini_error import (
     find_api_error,
+    find_cause,
     is_daily_quota_error,
     retry_delay_seconds,
     summarize_error,
@@ -88,47 +88,72 @@ def send_message_with_retry(chat: Any, prompt: str) -> Any:
 def send_message_stream_with_retry(chat: Any, prompt: str) -> Iterator[Any]:
     """Gemini API へのストリーミングリクエストを送信し, 一時的なエラー発生時にリトライを行います.
 
-    リトライの対象は, 最初のチャンクを受信するまでです. 出力が始まったあとにエラーが発生した
-    場合は, 出力の重複を防ぐため, リトライせずにエラーを送出します.
-
-    Args:
-        chat (Any): Gemini Chat インスタンス.
-        prompt (str): 送信するプロンプト文字列.
-
-    Yields:
-        Any: Gemini API からのレスポンスチャンク.
-
-    Raises:
-        APIError: 出力が始まったあとに, Gemini API のエラーが発生した場合.
-
-    """
-    first, stream = call_with_retry(_open_stream, chat, prompt)
-    if first is _STREAM_END:
-        return
-
-    try:
-        yield first
-        yield from stream
-    except APIError:
-        logger.error(
-            "ストリーミングの受信途中でエラーが発生しました (一部出力済みのため, リトライせずに中断します)"
-        )
-        raise
-
-
-def _open_stream(chat: Any, prompt: str) -> tuple[Any, Iterator[Any]]:
-    """ストリームを開き, 最初のチャンクまで受信します (リクエストは, 最初の受信で実行される).
+    リトライの対象は, 最初のチャンクを受信するまでです (`stream_with_retry` を参照).
 
     Args:
         chat (Any): Gemini Chat インスタンス.
         prompt (str): 送信するプロンプト文字列.
 
     Returns:
+        Iterator[Any]: Gemini API からのレスポンスチャンク.
+
+    """
+    return stream_with_retry(chat.send_message_stream, prompt)
+
+
+def stream_with_retry(
+    func: Callable[..., Iterable[Any]], *args: Any, **kwargs: Any
+) -> Iterator[Any]:
+    """ストリーミングの呼び出しを実行し, 一時的なエラー発生時にリトライを行います.
+
+    リトライの対象は, 最初のチャンクを受信するまでです. 出力が始まったあとにエラーが発生した
+    場合は, 出力の重複を防ぐため, リトライせずにエラーを送出します.
+
+    Args:
+        func (Callable[..., Iterable[Any]]): チャンクを返す, Gemini API の呼び出し.
+        *args (Any): `func` に渡す位置引数.
+        **kwargs (Any): `func` に渡すキーワード引数.
+
+    Yields:
+        Any: `func` が返すチャンク.
+
+    Raises:
+        Exception: 出力が始まったあとに, Gemini API のエラーが発生した場合.
+
+    """
+    first, stream = call_with_retry(_open_stream, func, *args, **kwargs)
+    if first is _STREAM_END:
+        return
+
+    try:
+        yield first
+        yield from stream
+    # LangChain など, ライブラリが Gemini API のエラーを別の例外で包む場合があるため,
+    # 例外の種類を問わず捕捉して, Gemini API のエラーの場合のみログに記録し, 再送出する.
+    except Exception as e:
+        if find_api_error(e) is not None:
+            logger.error(
+                "ストリーミングの受信途中でエラーが発生しました (一部出力済みのため, リトライせずに中断します)"
+            )
+        raise
+
+
+def _open_stream(
+    func: Callable[..., Iterable[Any]], *args: Any, **kwargs: Any
+) -> tuple[Any, Iterator[Any]]:
+    """ストリームを開き, 最初のチャンクまで受信します (リクエストは, 最初の受信で実行される).
+
+    Args:
+        func (Callable[..., Iterable[Any]]): チャンクを返す, Gemini API の呼び出し.
+        *args (Any): `func` に渡す位置引数.
+        **kwargs (Any): `func` に渡すキーワード引数.
+
+    Returns:
         tuple[Any, Iterator[Any]]: (最初のチャンク, 残りのストリーム).
             最初のチャンクを受信する前にストリームが終了した場合は, 最初のチャンクが `_STREAM_END`.
 
     """
-    stream = iter(chat.send_message_stream(prompt))
+    stream = iter(func(*args, **kwargs))
     return next(stream, _STREAM_END), stream
 
 
@@ -143,19 +168,21 @@ def _is_retryable_error(e: BaseException) -> bool:
             待っても回復しない 1 日あたりの上限 (RPD) は False.
 
     """
-    if isinstance(e, httpx.TransportError):
+    # LangChain など, ライブラリが例外を別の例外で包んでいる場合も対象にする
+    if find_cause(e, httpx.TransportError) is not None:
         return True
-    if not isinstance(e, APIError):
+    api_error = find_api_error(e)
+    if api_error is None:
         return False
 
     # 1日あたりのクォータ超過 (RPD) は待機しても回復しないためリトライしない
-    if is_daily_quota_error(e):
+    if is_daily_quota_error(api_error):
         return False
 
-    if e.code in GeminiErrorKind.RETRYABLE_HTTP_CODES:
+    if api_error.code in GeminiErrorKind.RETRYABLE_HTTP_CODES:
         return True
 
-    err_msg = str(e).upper()
+    err_msg = str(api_error).upper()
     return any(keyword in err_msg for keyword in GeminiErrorKind.RETRYABLE_KEYWORDS)
 
 
@@ -171,7 +198,9 @@ def _wait_seconds(retry_state: RetryCallState) -> float:
 
     """
     error = retry_state.outcome.exception() if retry_state.outcome else None
-    delay = retry_delay_seconds(error) if error else None
+    # 包まれた例外の文字列には, retryDelay が含まれない場合があるため, APIError を取り出す
+    api_error = find_api_error(error)
+    delay = retry_delay_seconds(api_error) if api_error else None
     if delay is not None:
         return delay + RetryPolicy.RETRY_DELAY_MARGIN
     return float(_BACKOFF(retry_state))
