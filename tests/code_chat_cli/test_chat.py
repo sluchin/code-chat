@@ -163,10 +163,10 @@ class TestRunInteractiveLoop:
         assert mock_gemini_client["chat"].send_message_stream.call_count == 1
         sent_prompt = mock_gemini_client["chat"].send_message_stream.call_args[0][0]
 
-        # 送信テキスト末尾に (※指示に従って修正した... が付加されていること
+        # 送信テキスト末尾に ※指示に従って修正した... が付加されていること
         assert sent_prompt.startswith("関数を追加してください")
         assert (
-            "(※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください)"
+            "※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください."
             in sent_prompt
         )
 
