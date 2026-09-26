@@ -201,6 +201,27 @@ class TestParseArgs:
         assert args.cache is True
         assert args.mcp is True
 
+    def test_parse_args_provider_success(self, monkeypatch):
+        """--provider は, 既定が gemini で, gemini を明示しても受け付けるか検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py", "質問です"])
+        default = parse_args()
+        monkeypatch.setattr("sys.argv", ["chat.py", "-p", "gemini", "質問です"])
+        specified = parse_args()
+
+        assert default.provider == "gemini"
+        assert specified.provider == "gemini"
+        assert specified.prompt == "質問です"
+
+    def test_parse_args_provider_unsupported_failure(self, monkeypatch, capsys):
+        """未実装のプロバイダを指定すると, 黙って無視されずに, 引数のエラーになるか検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py", "-p", "openai", "質問です"])
+
+        with pytest.raises(SystemExit) as exc_info:
+            parse_args()
+
+        assert exc_info.value.code == 2
+        assert "invalid choice" in capsys.readouterr().err
+
     def test_parse_args_max_tool_rounds_success(self, monkeypatch):
         """--max-tool-rounds は, 既定が 20 で, 指定した値が反映され, 値がプロンプトにならないか検証."""
         monkeypatch.setattr("sys.argv", ["chat.py", "質問です"])

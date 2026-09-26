@@ -46,7 +46,7 @@ class CliArgs:
     """使用するモデル名."""
 
     provider: str = "gemini"
-    """使用する LLM プロバイダ名 (現在は 'gemini' のみ対応. `--dry-run` の表示以外には使われない)."""
+    """使用する LLM プロバイダ名 ('gemini' のみ. それ以外は引数のエラー. `--dry-run` の表示以外には使われない)."""
 
     write_mode: bool = False
     """`-w`/`--write` によるソースコード直接修正モードの有効化フラグ."""
