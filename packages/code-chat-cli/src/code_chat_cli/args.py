@@ -158,9 +158,8 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
     if raw_args.files and (raw_args.rag or raw_args.mcp):
         main_parser.error("-f/--file は --rag / --mcp と併用できません")
 
-    # Context Caching は, MCP・Write モード (システム指示が異なる) と併用できない
-    if raw_args.cache and raw_args.mcp:
-        main_parser.error("-c/--cache は --mcp と併用できません")
+    # Context Caching は, Write モード (システム指示が異なる) と併用できない.
+    # --mcp との併用 (ツール定義がキャッシュに含まれない) は, ここでは止めず, Gemini API のエラーに任せる
     if raw_args.cache and raw_args.write_mode:
         main_parser.error("-c/--cache は -w/--write と併用できません")
 

@@ -35,7 +35,7 @@ code-chat [PROMPT] [OPTIONS]
 | `PROMPT` | 位置引数 (文字列) | なし | 実行するプロンプト。省略時は対話モード (REPL) を起動 (複数語はスペースで結合) |
 | `--rag` | フラグ | `False` | RAG (ChromaDB Vector Store) 検索によるコンテキスト注入を有効化。`--mcp` と併用すると、検索したコンテキストを MCP に渡すプロンプトに付加する。RAG の検索には API キー (`GEMINI_API_KEY`) が必要 (`--oauth` 指定時も) |
 | `--mcp` | フラグ | `False` | MCP サーバーとの連携 (Function Calling によるツール実行) を有効化。`--rag` と併用可 |
-| `-c, --cache` | フラグ / 文字列 | `False` | Context Caching を利用。`-c` で最新のキャッシュを自動選択、`--cache=<CACHE_ID>` で特定のキャッシュを指定 (`-c <ID>` のようにスペース区切りにすると、直後の語はプロンプトとして扱われる)。キャッシュのモデルで実行され、システム指示はキャッシュに含まれたものが使われる。`--mcp` / `-w` / `--oauth` とは併用できない (エラー終了) |
+| `-c, --cache` | フラグ / 文字列 | `False` | Context Caching を利用。`-c` で最新のキャッシュを自動選択、`--cache=<CACHE_ID>` で特定のキャッシュを指定 (`-c <ID>` のようにスペース区切りにすると、直後の語はプロンプトとして扱われる)。キャッシュのモデルで実行され、システム指示はキャッシュに含まれたものが使われる。`-w` / `--oauth` とは併用できない (エラー終了)。`--mcp` とは引数のエラーにしない。キャッシュを使うリクエストでは、ツール定義を別に指定できないため、Gemini API が 400 (`CachedContent can not be used with GenerateContent request setting system_instruction, tools or tool_config`) を返す想定 (実機では未確認) |
 | `-f, --file <PATH>` | 文字列 (複数指定可) | なし | 追加コンテキストとしてロードする (または `-w` の書き込み対象とする) ファイル・ディレクトリパス。`-f a.py -f b.py` のように繰り返して指定。ファイル内容をそのまま送信する用途のため、`--rag` / `--mcp` とは併用できない (指定するとエラー終了) |
 | `-m, --model` | 文字列 | `gemini-3.5-flash` | 使用する LLM モデル名 |
 | `-p, --provider` | 文字列 | `gemini` | LLM プロバイダ。現在は `gemini` のみ動作 (他の値は未実装) |

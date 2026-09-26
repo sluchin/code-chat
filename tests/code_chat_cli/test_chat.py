@@ -1,4 +1,4 @@
-# pylint: disable=redefined-outer-name,protected-access
+# pylint: disable=redefined-outer-name,protected-access,too-many-public-methods
 """`code_chat_cli.chat` モジュールのテスト."""
 
 import io
@@ -18,6 +18,7 @@ from code_chat_cli.chat import (
     _build_chat_config,
     _build_context_prompt,
     _build_send_text,
+    _cached_content_name,
     _handle_cache_subcommand,
     _handle_dry_run,
     _handle_login,
@@ -68,7 +69,11 @@ class TestRunSingleTurnMode:
 
         # プロンプトが MCP に渡され, 履歴に User → Gemini の順で記録されること
         run.assert_awaited_once_with(
-            user_prompt="git status", config_path=None, use_oauth=False
+            user_prompt="git status",
+            config_path=None,
+            use_oauth=False,
+            model_name="gemini-flash-latest",
+            cached_content=None,
         )
         assert history == ["### User (MCP)\n\ngit status", "### Gemini (MCP)\n\nclean"]
 
@@ -611,6 +616,21 @@ class TestResolveCacheSettings:
 
         assert exc_info.value.code == 1
         assert "使用できるキャッシュがありません" in caplog.text
+
+
+class TestCachedContentName:
+    """`_cached_content_name` のテスト."""
+
+    def test_cached_content_name_success(self):
+        """解決済みのキャッシュ名 (文字列) が, そのまま返るか検証."""
+        args = _cli_args(cache="cachedContents/abc")
+
+        assert _cached_content_name(args) == "cachedContents/abc"
+
+    @pytest.mark.parametrize("cache", [True, False])
+    def test_cached_content_name_not_resolved(self, cache):
+        """キャッシュ名が未解決 (フラグのみ) の場合は, None が返るか検証."""
+        assert _cached_content_name(_cli_args(cache=cache)) is None
 
 
 class TestHandleCacheSubcommand:
@@ -1191,6 +1211,23 @@ class TestHandleMcpSingleTurn:
 
         assert run.await_args.kwargs["use_oauth"] is True
 
+    def test_handle_mcp_single_turn_cache_success(self):
+        """解決済みのモデルとキャッシュ名が, MCP に引き継がれるか検証."""
+        args = _cli_args(
+            mcp=True,
+            prompt="q",
+            model="models/gemini-cache",
+            cache="cachedContents/abc",
+        )
+
+        with patch(
+            "code_chat_cli.chat.handle_mcp_run", new=AsyncMock(return_value="answer")
+        ) as run:
+            _handle_mcp_single_turn(args, [])
+
+        assert run.await_args.kwargs["model_name"] == "models/gemini-cache"
+        assert run.await_args.kwargs["cached_content"] == "cachedContents/abc"
+
     def test_handle_mcp_single_turn_no_input_failure(self, caplog):
         """プロンプトも context も無い場合はエラーを記録して何もしないか検証."""
         history: list[str] = []
@@ -1410,6 +1447,28 @@ class TestMain:
         kwargs = mock_gemini_client["client"].chats.create.call_args.kwargs
         assert kwargs["model"] == "models/gemini-cache"
         assert kwargs["config"].cached_content == "cachedContents/abc"
+
+    @pytest.mark.usefixtures("mock_gemini_client")
+    def test_main_cache_mcp_success(self, mock_args):
+        """-c と --mcp の併用時は, 引数のエラーにせず, キャッシュのモデルとキャッシュ名が MCP に渡されるか検証."""
+        mock_args.return_value.cache = True
+        mock_args.return_value.mcp = True
+        mock_args.return_value.prompt = "q"
+        cache = SimpleNamespace(name="cachedContents/abc", model="models/gemini-cache")
+
+        with (
+            patch(
+                "code_chat_cli.context_cache.ContextCache.resolve", return_value=cache
+            ),
+            patch(
+                "code_chat_cli.chat.handle_mcp_run",
+                new=AsyncMock(return_value="mcp-answer"),
+            ) as run,
+        ):
+            main()
+
+        assert run.await_args.kwargs["model_name"] == "models/gemini-cache"
+        assert run.await_args.kwargs["cached_content"] == "cachedContents/abc"
 
     def test_main_rag_success(self, monkeypatch, mock_args, mock_gemini_client):
         """--rag 指定時に RagService が初期化され, 応答に反映されるか検証."""

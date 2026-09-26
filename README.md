@@ -225,7 +225,7 @@ code-chat "テスト" -f ./src/main.py --dry-run
 | `-l, --list-models` | モデル一覧を表示 |
 | `--login` | ブラウザで OAuth ログインし、トークンを保存して終了 |
 | `--oauth` | `GEMINI_API_KEY` ではなく OAuth (`--login` で保存したトークン) で認証 |
-| `-c, --cache` | キャッシュを使用 (`-c` で最新、`--cache=<ID>` で指定)。`--mcp` / `-w` / `--oauth` とは併用不可 |
+| `-c, --cache` | キャッシュを使用 (`-c` で最新、`--cache=<ID>` で指定)。`-w` / `--oauth` とは併用不可 (エラー終了)。`--mcp` とは引数のエラーにはしませんが、ツール定義をキャッシュに含められないため、Gemini API が 400 を返す想定です |
 | `--rag` | RAG 検索によるコンテキスト注入 (`--mcp` と併用可) |
 | `--mcp` | MCP ツール連携 (`--rag` と併用可) |
 | `-a, --auto-save` | 対話ログを `<日時>_chat.md` に自動保存 |
