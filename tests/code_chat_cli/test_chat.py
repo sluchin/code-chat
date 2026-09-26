@@ -1107,7 +1107,8 @@ class TestQueryMcp:
             result = _query_mcp("q", _cli_args(mcp=True), [])
 
         assert result is False
-        assert "MCP クエリの実行中にエラーが発生しました: boom" in caplog.text
+        assert caplog.text.count("MCP クエリの実行中にエラーが発生しました") == 1
+        assert "RuntimeError: boom" in caplog.text
 
 
 class TestHandleMcpSingleTurn:
@@ -1236,7 +1237,8 @@ class TestHandleMcpSingleTurn:
 
         # エラーがログに残り, 履歴には User 側だけが記録され, 終了コード 1 で終了すること
         assert exc_info.value.code == 1
-        assert "MCP クエリの実行中にエラーが発生しました: boom" in caplog.text
+        assert caplog.text.count("MCP クエリの実行中にエラーが発生しました") == 1
+        assert "RuntimeError: boom" in caplog.text
         assert history == ["### User (MCP)\n\nq"]
 
 
@@ -1316,7 +1318,8 @@ class TestHandleMcpInteractive:
             _handle_mcp_interactive("/mcp x", _cli_args(), [])
 
         # エラーがログに残ること
-        assert "MCP クエリの実行中にエラーが発生しました: boom" in caplog.text
+        assert caplog.text.count("MCP クエリの実行中にエラーが発生しました") == 1
+        assert "RuntimeError: boom" in caplog.text
 
 
 class TestMain:

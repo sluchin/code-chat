@@ -43,7 +43,6 @@ from code_chat_cli.rag import (
     handle_rag_update,
 )
 from code_chat_lib.api import send_message_stream_with_retry, send_message_with_retry
-from code_chat_lib.gemini_error import format_error
 from code_chat_lib.logger import (
     get_logger,
     log_exception,
@@ -868,9 +867,9 @@ def _query_mcp(
             )
         )
     # Gemini API・MCP サーバー・認証設定など原因が多岐にわたり特定できない. 1 回のクエリの失敗で対話を終了させないよう,
-    # 広く捕捉してログに記録し, 呼び出し元に結果を返す.
-    except Exception as e:  # noqa: BLE001 # pylint: disable=broad-exception-caught
-        logger.error("MCP クエリの実行中にエラーが発生しました: %s", format_error(e))
+    # 広く捕捉してログに記録し (このクエリの失敗は, ここで 1 回だけ記録する), 呼び出し元に結果を返す.
+    except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+        log_exception(logger, "MCP クエリの実行中にエラーが発生しました")
         return False
 
     print(result_text)
