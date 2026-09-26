@@ -200,7 +200,7 @@ def _build_send_text(
         send_text = _append_rag_context(send_text, user_input, rag_service)
 
     if cli_args.write_mode:
-        send_text += "\n\n(※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください)"
+        send_text += Prompts.WRITE_MODE_REQUEST_SUFFIX
 
     return send_text
 
@@ -325,7 +325,7 @@ def _build_context_prompt(cli_args: Any, rag_service: Any | None = None) -> str:
     """
     prompt_text = cli_args.prompt or ""
     if cli_args.write_mode and prompt_text:
-        prompt_text += "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください."
+        prompt_text += Prompts.WRITE_MODE_REQUEST_SUFFIX
 
     parts = [
         "以下のソースコード・テキストを読み込んで, 今後の指示に対応してください.\n",
@@ -431,7 +431,7 @@ def _handle_prompt_mode(
             )
 
     if cli_args.write_mode:
-        send_text += "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください."
+        send_text += Prompts.WRITE_MODE_REQUEST_SUFFIX
 
     print(f"You > {prompt_text}")
     chat_history.append(f"### User\n\n{prompt_text}")

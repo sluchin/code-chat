@@ -40,6 +40,9 @@ Analyze the following git diff and generate a concise, professional Git commit m
 """
     """ファイル直接上書き生成モード（writeモード）用のシステム指示テキスト."""
 
+    WRITE_MODE_REQUEST_SUFFIX: str = "\n\n※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください."
+    """writeモードで, 送信するプロンプトの末尾に付加する, 出力形式の指示."""
+
     REVIEW_PROMPT_TEMPLATE: str = """\
 あなたはプロのソフトウェアエンジニアです. 以下のコード差分（diff）またはファイル内容を詳細にレビューしてください.
 

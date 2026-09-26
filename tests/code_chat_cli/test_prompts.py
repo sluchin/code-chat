@@ -22,6 +22,11 @@ class TestPrompts:
         assert "SAMPLE" in rendered
         assert "{" not in rendered
 
+    def test_prompts_write_mode_request_suffix_success(self):
+        """writeモードの出力形式の指示が, 改行で始まり, 空でない文字列として定義されているか検証."""
+        assert Prompts.WRITE_MODE_REQUEST_SUFFIX.startswith("\n\n")
+        assert "完全なコード全体" in Prompts.WRITE_MODE_REQUEST_SUFFIX
+
     def test_prompts_system_instruction_success(self):
         """システム指示が, 空でない文字列として定義されているか検証."""
         assert Prompts.DEFAULT_SYSTEM_INSTRUCTION.strip()
