@@ -365,18 +365,7 @@ def _fetch_response_text(chat: Any, prompt: str, is_write_mode: bool) -> str:
         _log_cache_usage(getattr(response, "usage_metadata", None))
         return response_text
 
-    print("Gemini > ", end="", flush=True)
-    chunks = []
-    usage = None
-    for chunk in send_message_stream_with_retry(chat, prompt):
-        if chunk.text:
-            print(chunk.text, end="", flush=True)
-            chunks.append(chunk.text)
-        # 使用状況は, 最後のチャンクにだけ含まれるため, 取得できた最新の値を保持する
-        usage = getattr(chunk, "usage_metadata", None) or usage
-    print("\n")
-    _log_cache_usage(usage)
-    return "".join(chunks)
+    return _stream_chat_response(chat, prompt)
 
 
 def _handle_context_mode(
