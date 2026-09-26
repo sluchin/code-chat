@@ -217,6 +217,17 @@ class TestUpdate:
         assert "キャッシュを更新しました" in out
         assert "cachedContents/new" in out
 
+    def test_update_ttl_success(self, target_dir):
+        """指定した保持時間 (省略時は 3600 秒) で, キャッシュが再作成されるか検証."""
+        client = _client()
+        client.caches.create.return_value = _cache("new")
+
+        ContextCache(client).update("m", str(target_dir))
+        ContextCache(client).update("m", str(target_dir), 120)
+
+        ttls = [c.kwargs["config"].ttl for c in client.caches.create.call_args_list]
+        assert ttls == ["3600s", "120s"]
+
     def test_update_create_failure(self, target_dir):
         """再作成に失敗した場合は, 既存のキャッシュを削除せずに CacheError が送出されるか検証."""
         old = _cache("old", display_name=ContextCache._display_name(str(target_dir)))
