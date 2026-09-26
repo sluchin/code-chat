@@ -70,7 +70,7 @@ class Indexer:
         """
         self.input_dirs = input_dirs
         # 対象とする拡張子のデフォルト設定
-        self.suffixes = suffixes or TARGET_EXTENSIONS
+        self.suffixes = suffixes or sorted(TARGET_EXTENSIONS)
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
 
@@ -181,7 +181,7 @@ class Indexer:
                 if not file_path.is_file():
                     continue
 
-                if file_path.suffix.lower() not in TARGET_EXTENSIONS:
+                if file_path.suffix.lower() not in self.suffixes:
                     continue
 
                 # 走査対象のディレクトリ配下に除外対象または隠しフォルダが含まれている場合はスキップ
