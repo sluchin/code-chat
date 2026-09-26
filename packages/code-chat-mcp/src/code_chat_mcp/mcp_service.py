@@ -9,7 +9,7 @@ from types import TracebackType
 from typing import Any, Self
 
 from code_chat_mcp.mcp_config import McpConfig, McpServerConfig
-from code_chat_mcp.mcp_server_process import McpServerProcess
+from code_chat_mcp.mcp_server_connection import McpServerConnection
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class McpToolInfo:
 
 
 class McpService:
-    """CLI サブコマンド等から呼び出され, MCP サーバープロセスの管理・テストを実行するサービス."""
+    """CLI サブコマンド等から呼び出され, MCP サーバーへの接続の管理・テストを実行するサービス."""
 
     def __init__(self, config_path: Path | None = None) -> None:
         """設定ファイルをロードして McpService を初期化します.
@@ -37,8 +37,8 @@ class McpService:
         self.config_path = config_path
         config = McpConfig(config_path)
         self.servers: dict[str, McpServerConfig] = config.servers
-        # _processes 属性を初期化
-        self._processes: dict[str, McpServerProcess] = {}
+        # _connections 属性を初期化
+        self._connections: dict[str, McpServerConnection] = {}
 
     async def __aenter__(self) -> Self:
         """非同期コンテキストマネージャーのエントリーポイント.
@@ -78,14 +78,14 @@ class McpService:
 
         """
         server = self._get_server_or_fail(server_name)
-        process = McpServerProcess(
+        connection = McpServerConnection(
             command=server.command,
             args=server.args,
             env=server.env or None,
         )
 
         async def _run() -> None:
-            result = await process.call_tool(tool_name, arguments or {})
+            result = await connection.call_tool(tool_name, arguments or {})
             print(f"=== Execution Result: {tool_name} ===")
             print(result)
 
@@ -104,15 +104,15 @@ class McpService:
             if not config.enabled:
                 continue
 
-            process = McpServerProcess(
+            connection = McpServerConnection(
                 command=config.command,
                 args=config.args,
                 env=config.env or None,
             )
 
             try:
-                # McpServerProcess からツール一覧を取得
-                tools = await process.get_tools()
+                # McpServerConnection からツール一覧を取得
+                tools = await connection.get_tools()
                 for tool in tools:
                     all_tools.append(
                         McpToolInfo(
@@ -160,20 +160,20 @@ class McpService:
         await self._test_servers_async()
 
     async def start_all_servers(self) -> None:
-        """有効になっている全 MCP サーバープロセスを起動します."""
+        """有効になっている全 MCP サーバーへの接続を登録します."""
         for name, config in self.servers.items():
             if not config.enabled:
                 continue
-            process = McpServerProcess(
+            connection = McpServerConnection(
                 command=config.command,
                 args=config.args,
                 env=config.env or None,
             )
-            self._processes[name] = process
+            self._connections[name] = connection
 
     async def stop_all_servers(self) -> None:
-        """起動中の全 MCP サーバープロセスを停止・クリーンアップします."""
-        self._processes.clear()
+        """登録済みの全 MCP サーバーへの接続を破棄・クリーンアップします."""
+        self._connections.clear()
 
     async def call_tool(
         self,
@@ -192,10 +192,10 @@ class McpService:
             Any: ツール実行結果.
 
         """
-        process = self._processes.get(server_name)
-        if not process:
+        connection = self._connections.get(server_name)
+        if not connection:
             raise ValueError(f"Server '{server_name}' is not running.")
-        return await process.call_tool(tool_name, arguments or {})
+        return await connection.call_tool(tool_name, arguments or {})
 
     def _get_server_or_fail(self, server_name: str) -> McpServerConfig:
         """サーバー名が存在するか検証し, 無ければ終了します.
@@ -228,7 +228,7 @@ class McpService:
 
             print(f"[{config.name}] Connecting... ", end="", flush=True)
 
-            process = McpServerProcess(
+            connection = McpServerConnection(
                 command=config.command,
                 args=config.args,
                 env=config.env or None,
@@ -236,7 +236,7 @@ class McpService:
 
             try:
                 # 実際に Stdio セッションを開き, list_tools を呼び出す
-                tools = await process.get_tools()
+                tools = await connection.get_tools()
                 print(f"[OK] Successfully fetched {len(tools)} tools.")
 
                 # 取得したツール名を軽くプレビュー表示

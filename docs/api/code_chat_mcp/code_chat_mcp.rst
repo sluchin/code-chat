@@ -12,10 +12,10 @@ code\_chat\_mcp.mcp\_config module
    :show-inheritance:
    :undoc-members:
 
-code\_chat\_mcp.mcp\_server\_process module
--------------------------------------------
+code\_chat\_mcp.mcp\_server\_connection module
+----------------------------------------------
 
-.. automodule:: code_chat_mcp.mcp_server_process
+.. automodule:: code_chat_mcp.mcp_server_connection
    :members:
    :show-inheritance:
    :undoc-members:

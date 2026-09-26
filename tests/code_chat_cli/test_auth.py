@@ -29,7 +29,7 @@ from google.oauth2.credentials import Credentials
 
 def _utcnow() -> datetime.datetime:
     """google-auth が扱う naive な UTC 現在時刻を返す."""
-    return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    return datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
 
 
 def _credentials(**overrides) -> Credentials:
@@ -203,9 +203,11 @@ class TestLogin:
         if client_secret:
             monkeypatch.setenv(CLIENT_SECRET_ENV, client_secret)
 
-        with patch("code_chat_cli.auth.InstalledAppFlow") as flow_cls:
-            with pytest.raises(OAuthError, match=CLIENT_ID_ENV):
-                login(tmp_path / "oauth_token.json")
+        with (
+            patch("code_chat_cli.auth.InstalledAppFlow") as flow_cls,
+            pytest.raises(OAuthError, match=CLIENT_ID_ENV),
+        ):
+            login(tmp_path / "oauth_token.json")
 
         flow_cls.from_client_config.assert_not_called()
 

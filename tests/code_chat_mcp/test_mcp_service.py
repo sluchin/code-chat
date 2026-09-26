@@ -40,14 +40,14 @@ def _tool(name, description="desc", schema=None):
     return SimpleNamespace(name=name, description=description, inputSchema=schema or {})
 
 
-def _fake_process(tools=None, error=None, call_result="ok"):
-    process = MagicMock()
+def _fake_connection(tools=None, error=None, call_result="ok"):
+    connection = MagicMock()
     if error:
-        process.get_tools = AsyncMock(side_effect=error)
+        connection.get_tools = AsyncMock(side_effect=error)
     else:
-        process.get_tools = AsyncMock(return_value=tools or [])
-    process.call_tool = AsyncMock(return_value=call_result)
-    return process
+        connection.get_tools = AsyncMock(return_value=tools or [])
+    connection.call_tool = AsyncMock(return_value=call_result)
+    return connection
 
 
 class TestInit:
@@ -63,12 +63,12 @@ class TestAsyncContextManager:
     """`McpService.__aenter__ / __aexit__` のテスト."""
 
     def test_async_context_manager_starts_and_stops_success(self, service):
-        """async with でプロセス管理オブジェクトが登録・解放されるか検証."""
+        """async with でサーバーへの接続オブジェクトが登録・解放されるか検証."""
 
         async def _run():
             async with service as svc:
-                running = set(svc._processes)
-            return running, dict(service._processes)
+                running = set(svc._connections)
+            return running, dict(service._connections)
 
         running, after = asyncio.run(_run())
 
@@ -81,24 +81,28 @@ class TestRun:
 
     def test_run_executes_tool_and_prints_success(self, service, capsys):
         """run が単発でツールを実行し, 結果を出力するか検証."""
-        process = _fake_process(call_result="RESULT")
+        connection = _fake_connection(call_result="RESULT")
 
-        with patch("code_chat_mcp.mcp_service.McpServerProcess", return_value=process):
+        with patch(
+            "code_chat_mcp.mcp_service.McpServerConnection", return_value=connection
+        ):
             service.run("git", "status", {"x": 1})
 
         out = capsys.readouterr().out
         assert "=== Execution Result: status ===" in out
         assert "RESULT" in out
-        process.call_tool.assert_awaited_once_with("status", {"x": 1})
+        connection.call_tool.assert_awaited_once_with("status", {"x": 1})
 
     def test_run_without_arguments(self, service):
         """arguments 省略時でも実行できるか検証."""
-        process = _fake_process()
+        connection = _fake_connection()
 
-        with patch("code_chat_mcp.mcp_service.McpServerProcess", return_value=process):
+        with patch(
+            "code_chat_mcp.mcp_service.McpServerConnection", return_value=connection
+        ):
             service.run("git", "status")
 
-        process.call_tool.assert_awaited_once_with("status", {})
+        connection.call_tool.assert_awaited_once_with("status", {})
 
 
 class TestGetAllTools:
@@ -108,9 +112,11 @@ class TestGetAllTools:
         """全サーバーのツールが McpToolInfo として集約されるか検証."""
         service.servers["off"] = McpServerConfig(name="off", command="x", enabled=False)
         schema = {"type": "object"}
-        process = _fake_process(tools=[_tool("status", "show", schema)])
+        connection = _fake_connection(tools=[_tool("status", "show", schema)])
 
-        with patch("code_chat_mcp.mcp_service.McpServerProcess", return_value=process):
+        with patch(
+            "code_chat_mcp.mcp_service.McpServerConnection", return_value=connection
+        ):
             tools = asyncio.run(service.get_all_tools())
 
         assert [(t.server_name, t.name) for t in tools] == [
@@ -121,12 +127,12 @@ class TestGetAllTools:
 
     def test_get_all_tools_continues_on_error_exception(self, service, caplog):
         """あるサーバーの取得に失敗しても, 他のサーバーの処理を継続するか検証."""
-        failing = _fake_process(error=RuntimeError("boom"))
-        working = _fake_process(tools=[_tool("ok_tool")])
+        failing = _fake_connection(error=RuntimeError("boom"))
+        working = _fake_connection(tools=[_tool("ok_tool")])
 
         with (
             patch(
-                "code_chat_mcp.mcp_service.McpServerProcess",
+                "code_chat_mcp.mcp_service.McpServerConnection",
                 side_effect=[failing, working],
             ),
             caplog.at_level(logging.ERROR),
@@ -140,9 +146,11 @@ class TestGetAllTools:
         """description が None のツールも, スキーマとともにそのまま保持されるか検証."""
         service.servers = {"git": service.servers["git"]}
         schema = {"type": "object", "properties": {"a": {"type": "string"}}}
-        process = _fake_process(tools=[_tool("a", None, schema)])
+        connection = _fake_connection(tools=[_tool("a", None, schema)])
 
-        with patch("code_chat_mcp.mcp_service.McpServerProcess", return_value=process):
+        with patch(
+            "code_chat_mcp.mcp_service.McpServerConnection", return_value=connection
+        ):
             tools = asyncio.run(service.get_all_tools())
 
         assert tools == [McpToolInfo("git", "a", None, schema)]
@@ -181,11 +189,13 @@ class TestTestConnection:
     def test_test_connection_success(self, service, capsys, caplog):
         """成功・失敗・無効サーバーが集計されて表示されるか検証."""
         service.servers["off"] = McpServerConfig(name="off", command="x", enabled=False)
-        ok = _fake_process(tools=[_tool("t1", None), _tool("t2", "described")])
-        ng = _fake_process(error=RuntimeError("down"))
+        ok = _fake_connection(tools=[_tool("t1", None), _tool("t2", "described")])
+        ng = _fake_connection(error=RuntimeError("down"))
 
         with (
-            patch("code_chat_mcp.mcp_service.McpServerProcess", side_effect=[ok, ng]),
+            patch(
+                "code_chat_mcp.mcp_service.McpServerConnection", side_effect=[ok, ng]
+            ),
             caplog.at_level(logging.ERROR),
         ):
             asyncio.run(service.test_connection())
@@ -213,27 +223,27 @@ class TestStartAllServers:
     """`McpService.start_all_servers` のテスト."""
 
     def test_start_all_servers_skips_disabled(self, service):
-        """無効なサーバーはプロセス登録されないか検証."""
+        """無効なサーバーは接続が登録されないか検証."""
         service.servers["off"] = McpServerConfig(name="off", command="x", enabled=False)
 
         asyncio.run(service.start_all_servers())
 
-        assert "off" not in service._processes
-        assert set(service._processes) == {"git", "fs"}
+        assert "off" not in service._connections
+        assert set(service._connections) == {"git", "fs"}
 
 
 class TestCallTool:
     """`McpService.call_tool` のテスト."""
 
-    def test_call_tool_delegates_to_process_success(self, service):
-        """起動済みサーバーのプロセスへ委譲されるか検証."""
-        process = _fake_process(call_result="done")
-        service._processes["git"] = process
+    def test_call_tool_delegates_to_connection_success(self, service):
+        """登録済みサーバーの接続へ委譲されるか検証."""
+        connection = _fake_connection(call_result="done")
+        service._connections["git"] = connection
 
         result = asyncio.run(service.call_tool("git", "status", {"a": 1}))
 
         assert result == "done"
-        process.call_tool.assert_awaited_once_with("status", {"a": 1})
+        connection.call_tool.assert_awaited_once_with("status", {"a": 1})
 
     def test_call_tool_requires_running_server_failure(self, service):
         """起動していないサーバーのツール呼び出しは ValueError になるか検証."""
@@ -242,12 +252,12 @@ class TestCallTool:
 
     def test_call_tool_defaults_arguments_to_empty(self, service):
         """arguments 省略時は空辞書で呼び出されるか検証."""
-        process = _fake_process()
-        service._processes["git"] = process
+        connection = _fake_connection()
+        service._connections["git"] = connection
 
         asyncio.run(service.call_tool("git", "status"))
 
-        process.call_tool.assert_awaited_once_with("status", {})
+        connection.call_tool.assert_awaited_once_with("status", {})
 
 
 class TestGetServerOrFail:

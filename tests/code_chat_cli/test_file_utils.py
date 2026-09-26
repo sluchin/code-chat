@@ -66,25 +66,14 @@ class TestReadPathContent:
 
         assert exc_info.value.code == 1
 
-    def test_read_path_content_directory_file_read_error_exception(self, tmp_path):
+    def test_read_path_content_directory_file_read_error_exception(
+        self, valid_and_error_files, fail_read_text
+    ):
         """ディレクトリ内の特定ファイル読み込み時に例外が発生した場合, ログを出力してそのファイルをスキップするか検証."""
-        valid_file = tmp_path / "valid.py"
-        valid_file.write_text("print('ok')", encoding="utf-8")
+        valid_file, error_file = valid_and_error_files
 
-        error_file = tmp_path / "error.py"
-        error_file.write_text("print('error')", encoding="utf-8")
-
-        original_read_text = Path.read_text
-
-        def custom_read_text(path_obj, *args, **kwargs):
-            if path_obj.name == "error.py":
-                raise OSError("Read failure test")
-            return original_read_text(path_obj, *args, **kwargs)
-
-        with patch(
-            "pathlib.Path.read_text", autospec=True, side_effect=custom_read_text
-        ):
-            result = read_path_content(str(tmp_path))
+        with fail_read_text("error.py", OSError("Read failure test")):
+            result = read_path_content(str(valid_file.parent))
 
         assert f"=== File: {valid_file} ===\nprint('ok')" in result
         assert str(error_file) not in result
