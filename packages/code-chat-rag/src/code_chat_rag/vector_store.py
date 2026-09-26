@@ -147,6 +147,7 @@ class VectorStore:
         path = Path(self.output_dir)
         try:
             path.mkdir(parents=True, exist_ok=True)
+        # 作成に失敗しても, 直後の存在確認で判断する
         except OSError as e:
             logger.warning("ディレクトリ '%s' の作成に失敗しました: %s", path, e)
 

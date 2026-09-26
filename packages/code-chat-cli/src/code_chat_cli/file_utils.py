@@ -57,6 +57,7 @@ def read_path_content(target_path: str) -> str:
                 file_path = Path(root) / file
                 if file_path.suffix.lower() in Constants.TEXT_EXTENSIONS:
                     try:
+                        # ディレクトリ配下は, 文字コードの不一致が 1 ファイルあっても止めないよう, デコードできない文字を無視する
                         text = file_path.read_text(encoding="utf-8", errors="ignore")
                         contents.append(f"=== File: {file_path} ===\n{text}")
                         loaded_files.append(file_path)

@@ -132,6 +132,7 @@ class QueryHandler:
                     ]
                 )
 
+                # 長い結果は, 表示だけ先頭の 100 文字に省略する (Gemini には全文を渡す)
                 print(
                     f"[MCP Tool Result] {result_text[:100]}..."
                     if len(result_text) > 100
@@ -210,6 +211,7 @@ class QueryHandler:
             if key in disallowed_keys:
                 continue
 
+            # ネストした辞書や, リスト内の辞書も, 再帰的に処理する
             if isinstance(value, dict):
                 sanitized[key] = self._sanitize_schema(value)
             elif isinstance(value, list):

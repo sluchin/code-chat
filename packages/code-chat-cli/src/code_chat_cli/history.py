@@ -10,6 +10,7 @@ from code_chat_cli.logger import get_logger
 HAVE_READLINE = False
 readline: Any = None
 
+# readline は Windows にないため, pyreadline3 で代替する. どちらもない場合は, 履歴なしで動作する
 try:
     import readline
 
@@ -57,6 +58,7 @@ def setup_readline_history() -> None:
         if HISTORY_FILE.exists() and hasattr(readline, "read_history_file"):
             try:
                 readline.read_history_file(str(HISTORY_FILE))
+            # 履歴を読み込めなくても, 履歴なしで続行する
             except OSError:
                 pass
 
@@ -72,6 +74,7 @@ def save_readline_history() -> None:
             # ディレクトリがない場合は作成して保存
             HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
             readline.write_history_file(str(HISTORY_FILE))
+        # 履歴を保存できなくても, 終了処理を妨げない
         except OSError:
             pass
 

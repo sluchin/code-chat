@@ -149,6 +149,7 @@ class McpService:
 
     async def _stop_all_servers(self) -> None:
         """登録済みの全 MCP サーバーへの接続を破棄・クリーンアップします."""
+        # 接続は, ツールの呼び出しごとにサブプロセスを起動・終了するため, 登録を破棄するだけでよい
         self._connections.clear()
 
     async def call_tool(

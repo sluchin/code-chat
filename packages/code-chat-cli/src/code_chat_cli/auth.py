@@ -64,9 +64,11 @@ def _save_credentials(credentials: Credentials, token_path: Path | None = None) 
     """
     path = token_path or _get_token_path()
     path.parent.mkdir(parents=True, exist_ok=True)
+    # 他のユーザーに読ませないよう, 作成時から所有者のみの権限 (0o600) で開く
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(credentials.to_json())
+    # 既存のファイルには, 作成時の権限が適用されないため, 改めて設定する
     path.chmod(0o600)
     return path
 
@@ -161,6 +163,7 @@ def get_credentials(interactive: bool) -> Credentials:
         print("OAuth ログインが必要です. ブラウザで認証してください")
         return login()
 
+    # クライアントの設定がない場合は, ログインを案内する前に, 設定の手順を案内する
     if not os.getenv(CLIENT_ID_ENV) or not os.getenv(CLIENT_SECRET_ENV):
         raise OAuthError(SETUP_MESSAGE)
     raise OAuthError("OAuth ログインが必要です. code-chat --login を実行してください.")
@@ -185,6 +188,7 @@ def build_httpx_clients(
     """
 
     def apply_bearer(request: httpx.Request) -> None:
+        # 期限切れの場合は, リクエストの直前に更新する
         if not credentials.valid:
             try:
                 credentials.refresh(Request())
@@ -193,10 +197,12 @@ def build_httpx_clients(
                     "OAuth トークンの更新に失敗しました. code-chat --login で再ログインしてください."
                 ) from e
             _save_credentials(credentials, token_path)
+        # SDK が付与した API キーのヘッダーを外し, Bearer トークンで認証する
         request.headers.pop("x-goog-api-key", None)
         request.headers["Authorization"] = f"Bearer {credentials.token}"
 
     async def apply_bearer_async(request: httpx.Request) -> None:
+        # 非同期クライアント用. 同期版の処理をそのまま呼び出す
         apply_bearer(request)
 
     sync_hooks: list[Callable[[httpx.Request], None]] = [apply_bearer]

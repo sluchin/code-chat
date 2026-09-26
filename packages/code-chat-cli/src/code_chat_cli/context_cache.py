@@ -106,6 +106,7 @@ class ContextCache:
             print(f"キャッシュを削除しました: {name}")
             return
 
+        # ID の指定がない場合は, このツールで作成した全てのキャッシュを削除する
         caches = self._list_code_chat_caches()
         if not caches:
             print("削除対象のキャッシュはありません")
@@ -153,6 +154,7 @@ class ContextCache:
             raise CacheError(
                 "使用できるキャッシュがありません. code-chat cache create で作成してください"
             )
+        # 最も新しく作成されたキャッシュを選ぶ
         return max(caches, key=lambda c: c.create_time)
 
     @staticmethod
@@ -206,6 +208,7 @@ class ContextCache:
         """
         tokens = cache.usage_metadata.total_token_count if cache.usage_metadata else "-"
         print(f"  ID: {cache.name}")
+        # display_name の接頭辞を除いて, 対象のパスだけを表示する
         print(
             f"    対象: {(cache.display_name or '')[len(ContextCache.DISPLAY_PREFIX) :]}"
         )
@@ -220,6 +223,7 @@ class ContextCache:
             list[Any]: `display_name` が `code-chat:` で始まる CachedContent のリスト.
 
         """
+        # 一覧はページ単位で取得されるため, list() で全件を取得するまでを 1 回の呼び出しとして, リトライする
         return [
             cache
             for cache in call_with_retry(lambda: list(self.client.caches.list()))

@@ -109,6 +109,7 @@ def _run_interactive_loop(
     while True:
         try:
             user_input = input("You > ").strip()
+        # Ctrl+C / Ctrl+D は, 会話の終了として扱う
         except (KeyboardInterrupt, EOFError):
             print()
             print("会話を終了します.")
@@ -189,6 +190,7 @@ def _build_send_text(
     send_text = user_input
     files = cli_args.files
 
+    # -f と --rag は併用できないため (parse_args で検証済み), ファイルの指定がある場合は RAG を使わない
     if files:
         files_context = _load_files_context(files)
         if files_context:
@@ -267,6 +269,7 @@ def _stream_chat_response(chat: Any, send_text: str) -> str:
         if chunk.text:
             print(chunk.text, end="", flush=True)
             chunks.append(chunk.text)
+        # 使用状況は, 最後のチャンクにだけ含まれるため, 取得できた最新の値を保持する
         usage = getattr(chunk, "usage_metadata", None) or usage
     print("\n")
     _log_cache_usage(usage)
@@ -368,6 +371,7 @@ def _fetch_response_text(chat: Any, prompt: str, is_write_mode: bool) -> str:
         if chunk.text:
             print(chunk.text, end="", flush=True)
             chunks.append(chunk.text)
+        # 使用状況は, 最後のチャンクにだけ含まれるため, 取得できた最新の値を保持する
         usage = getattr(chunk, "usage_metadata", None) or usage
     print("\n")
     _log_cache_usage(usage)
@@ -460,6 +464,7 @@ def _setup_cli_logging(cli_args: Any) -> None:
         cli_args (Any): コマンドライン引数の名前空間オブジェクト.
 
     """
+    # 一覧やコミットメッセージは, 出力をそのまま使うため, -D 指定時を除いて INFO ログを抑制する
     if not cli_args.debug_mode and (
         cli_args.list_models or cli_args.generate_commit_msg
     ):
@@ -482,6 +487,7 @@ def _log_cache_usage(usage: Any) -> None:
     """
     cached = getattr(usage, "cached_content_token_count", None)
     total = getattr(usage, "prompt_token_count", None)
+    # 使用状況を取得できない場合は, 何も出力しない
     if not isinstance(total, int) or total <= 0:
         return
 
@@ -521,6 +527,7 @@ def _resolve_cache_settings(
         sys.exit(1)
 
     logger.info("キャッシュを使用します: %s (モデル: %s)", cache.name, cache.model)
+    # モデル名は `models/` の有無だけが異なる場合があるため, 接頭辞を除いて比較する
     if cache.model.removeprefix("models/") != cli_args.model.removeprefix("models/"):
         logger.info("キャッシュのモデルで実行します (指定: %s)", cli_args.model)
     return cache.model, _build_chat_config(cli_args.write_mode, cache.name)
@@ -540,6 +547,7 @@ def _handle_cache_subcommand(client: Any, cli_args: Any) -> None:
     context_cache = ContextCache(client)
 
     try:
+        # 各アクションは, 実行後に終了する (通常の対話処理には進まない)
         if action == "create":
             context_cache.create(cli_args.model, target or ".", cli_args.cache_ttl)
             sys.exit(0)
@@ -648,6 +656,7 @@ def _handle_dry_run(cli_args: Any, config: types.GenerateContentConfig) -> None:
 
     if cli_args.context:
         print("\n--- [収集されたコンテキストプレビュー] ---")
+        # 長いコンテキストは, 先頭の 300 文字だけをプレビューする
         preview = cli_args.context[:300] + (
             "..." if len(cli_args.context) > 300 else ""
         )
@@ -664,6 +673,7 @@ def _handle_subcommands(client: Any, cli_args: Any) -> None:
 
     """
     subcommand = cli_args.subcommand
+    # サブコマンドなしの場合は, --list-models と --generate-commit-msg を処理する (どちらも実行後に終了する)
     if subcommand is None:
         logger.info("chat サブコマンドを実行します")
         list_models = cli_args.list_models
@@ -701,6 +711,7 @@ def _handle_subcommands(client: Any, cli_args: Any) -> None:
         logger.info("cache サブコマンドを実行します")
         _handle_cache_subcommand(client, cli_args)
 
+    # --review は, サブコマンドの処理のあとに判定し, 実行後に終了する
     review = cli_args.review
     if review:
         try:
@@ -823,6 +834,7 @@ def _build_chat_config(
         types.GenerateContentConfig: 設定された生成設定オブジェクト.
 
     """
+    # システム指示はキャッシュに含まれているため, ここでは指定しない
     if cached_content:
         return types.GenerateContentConfig(
             cached_content=cached_content,
@@ -831,6 +843,7 @@ def _build_chat_config(
             ),
         )
 
+    # ファイルの書き換えでは, 出力のばらつきを抑えるため, 温度を低くする
     if is_write_mode:
         return types.GenerateContentConfig(
             system_instruction=Prompts.WRITE_MODE_SYSTEM_INSTRUCTION,
@@ -861,6 +874,7 @@ def _handle_mcp_single_turn(
         rag_service (Any | None, optional): RAGサービス. Defaults to None.
 
     """
+    # プロンプトの指定がなければ, 標準入力・ファイルのコンテキストをプロンプトとして使う
     prompt = cli_args.prompt or cli_args.context
     if not prompt:
         logger.error("MCP 実行用のプロンプトまたはコンテキストを指定してください")
@@ -868,6 +882,7 @@ def _handle_mcp_single_turn(
 
     config_path = getattr(cli_args, "config_path", None)
     chat_history.append(f"### User (MCP)\n\n{prompt}")
+    # --rag との併用時は, 検索したコンテキストをプロンプトに付加する
     send_prompt = (
         _append_rag_context(prompt, prompt, rag_service) if rag_service else prompt
     )
@@ -920,6 +935,7 @@ def _handle_mcp_interactive(
 
     config_path = getattr(cli_args, "config_path", None)
     chat_history.append(f"### User (MCP)\n\n{prompt}")
+    # --rag との併用時は, 検索したコンテキストをプロンプトに付加する
     send_prompt = (
         _append_rag_context(prompt, prompt, rag_service) if rag_service else prompt
     )
@@ -970,6 +986,7 @@ def main() -> None:
             _handle_dry_run(cli_args, config)
             sys.exit(0)
 
+        # ログインは, 実行後に終了する
         if cli_args.login:
             _handle_login()
 
@@ -983,6 +1000,7 @@ def main() -> None:
             rag_service = RagService(input_dirs=input_dirs, output_dir=output_dir)
 
         model = cli_args.model
+        # キャッシュはモデルに紐づくため, モデルと生成設定を, キャッシュのものに置き換える
         if cli_args.cache:
             model, config = _resolve_cache_settings(client, cli_args)
 

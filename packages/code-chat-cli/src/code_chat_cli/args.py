@@ -202,6 +202,7 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
         debug_mode = True
         log_level = "DEBUG"
 
+    # サブコマンドの前後どちらに指定しても有効にするため, 引数リストも直接確認する
     trace_mode = bool(raw_args.trace_mode or "--trace" in args)
 
     return CliArgs(
@@ -250,8 +251,10 @@ def _split_prompt_tokens(args: list[str]) -> tuple[list[str], list[str]]:
     i = 0
     while i < len(args):
         token = args[i]
+        # 単独の "-" は, オプションではなく, 位置引数として扱う
         if token.startswith("-") and token != "-":
             options.append(token)
+            # 値を取るオプションの次の引数は, 位置引数ではなく, オプションの値として扱う
             if token in _VALUE_OPTIONS and i + 1 < len(args):
                 i += 1
                 options.append(args[i])
