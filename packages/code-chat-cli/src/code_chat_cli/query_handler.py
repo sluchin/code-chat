@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 class QueryHandler:
     """Gemini API と MCP サーバー間の Tool Calling 対話ループを管理するクラス."""
 
+    MAX_TOOL_ROUNDS = 20
+    """ツールの呼び出しを繰り返す回数の上限 (モデルがツールを呼び続けて, 終わらなくなることを防ぐ)."""
+
     def __init__(
         self,
         gemini_client: genai.Client,
@@ -70,6 +73,9 @@ class QueryHandler:
         Returns:
             str: Gemini からの最終回答テキスト.
 
+        Raises:
+            RuntimeError: ツールの呼び出しが `MAX_TOOL_ROUNDS` 回を超えても終わらない場合.
+
         """
         # 各 MCP サーバーからツール一覧を取得し,
         # "server_name__tool_name" 形式で Gemini 用へ変換
@@ -87,8 +93,8 @@ class QueryHandler:
         # 会話履歴メッセージの初期化
         contents: list[Any] = [user_prompt]
 
-        # Tool Calling ループ (ツールの呼び出し要求がなくなるまで反復)
-        while True:
+        # Tool Calling ループ (ツールの呼び出し要求がなくなるまで, 上限の回数まで反復)
+        for _ in range(self.MAX_TOOL_ROUNDS):
             logger.info("Gemini API にリクエストを送信中...")
             response = self._generate_content_with_retry(
                 contents=contents,
@@ -157,6 +163,10 @@ class QueryHandler:
                 )
 
             contents.append(types.Content(role="user", parts=response_parts))
+
+        raise RuntimeError(
+            f"ツールの呼び出しが {self.MAX_TOOL_ROUNDS} 回を超えたため, 処理を中断しました"
+        )
 
     def _format_tools_for_gemini(
         self, mcp_tools: list[McpToolInfo]
