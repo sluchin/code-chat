@@ -11,7 +11,6 @@ import logging
 import os
 import subprocess
 import sys
-from pathlib import Path
 from typing import Any
 
 from google.genai import types
@@ -175,7 +174,7 @@ def _build_send_text(
     cli_args: Any,
     rag_service: Any | None,
 ) -> str:
-    """ユーザー入力にファイルや RAG, Writeモード指示を統合した送信テキストを構築します.
+    """ユーザー入力に RAG, Writeモード指示を統合した送信テキストを構築します.
 
     Args:
         user_input (str): ユーザーからの入力文字列.
@@ -187,40 +186,15 @@ def _build_send_text(
 
     """
     send_text = user_input
-    files = cli_args.files
 
-    # -f と --rag は併用できないため (parse_args で検証済み), ファイルの指定がある場合は RAG を使わない
-    if files:
-        files_context = _load_files_context(files)
-        if files_context:
-            send_text = f"{send_text}\n\n" + "\n\n".join(files_context)
-    elif rag_service:
+    # -f のファイルは, 起動時に読み込んで単発のモードで送信する (対話モードには, ファイルの内容は来ない)
+    if rag_service:
         send_text = _append_rag_context(send_text, user_input, rag_service)
 
     if cli_args.write_mode:
         send_text += Prompts.WRITE_MODE_REQUEST_SUFFIX
 
     return send_text
-
-
-def _load_files_context(files: list[str]) -> list[str]:
-    """指定されたファイル群の内容を取得してコンテキスト文字列のリストを作成します.
-
-    Args:
-        files (list[str]): 読み込み対象のファイルパスリスト.
-
-    Returns:
-        list[str]: 読み込まれたファイル内容のコンテキスト文字列リスト.
-
-    """
-    files_context = []
-    for file_path in files:
-        try:
-            content = Path(file_path).read_text(encoding="utf-8")
-            files_context.append(f"--- File: {file_path} ---\n{content}")
-        except (OSError, UnicodeDecodeError) as e:
-            logger.warning("ファイル %s の読み込みに失敗しました: %s", file_path, e)
-    return files_context
 
 
 def _append_rag_context(
