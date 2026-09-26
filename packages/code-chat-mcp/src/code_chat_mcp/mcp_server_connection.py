@@ -31,7 +31,8 @@ class McpServerConnection:
         Args:
             command (str): 実行コマンド (例: "uvx", "node", "python").
             args (list[str] | None): 引数リスト (例: ["mcp-server-git"]).
-            env (dict[str, str] | None): 環境変数 (省略時は親プロセスの環境変数を継承).
+            env (dict[str, str] | None): サーバーに追加で渡す環境変数. 親プロセスの環境変数は,
+                MCP SDK の既定の一部 (HOME, LOGNAME, PATH, SHELL, TERM, USER) だけが引き継がれる.
 
         """
         self.command = command
