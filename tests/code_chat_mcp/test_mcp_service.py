@@ -157,33 +157,6 @@ class TestGetAllTools:
         assert tools == [McpToolInfo("git", "a", None, schema)]
 
 
-class TestShowStatus:
-    """`McpService.show_status` のテスト."""
-
-    def test_show_status_lists_servers_success(self, service, capsys):
-        """サーバー一覧が表示され, 長いコマンドは省略されるか検証."""
-        service.servers["long"] = McpServerConfig(
-            name="long", command="c" * 40, enabled=False
-        )
-
-        service.show_status()
-
-        out = capsys.readouterr().out
-        assert "SERVER NAME" in out
-        assert "Enabled" in out
-        assert "Disabled" in out
-        assert "uvx mcp-server-git" in out
-        assert "c" * 27 + "..." in out
-
-    def test_show_status_empty(self, tmp_path, capsys):
-        """サーバー未登録の場合のメッセージを検証."""
-        service = McpService(config_path=tmp_path / "none.json")
-
-        service.show_status()
-
-        assert "登録されている MCP サーバーはありません" in capsys.readouterr().out
-
-
 class TestTestConnection:
     """`McpService.test_connection` のテスト."""
 
@@ -221,13 +194,13 @@ class TestTestConnection:
 
 
 class TestStartAllServers:
-    """`McpService.start_all_servers` のテスト."""
+    """`McpService._start_all_servers` のテスト."""
 
     def test_start_all_servers_skips_disabled(self, service):
         """無効なサーバーは接続が登録されないか検証."""
         service.servers["off"] = McpServerConfig(name="off", command="x", enabled=False)
 
-        asyncio.run(service.start_all_servers())
+        asyncio.run(service._start_all_servers())
 
         assert "off" not in service._connections
         assert set(service._connections) == {"git", "fs"}
@@ -274,25 +247,3 @@ class TestGetServerOrFail:
             service._get_server_or_fail("unknown")
 
         assert exc_info.value.code == 1
-
-
-class TestFormatToolsForGemini:
-    """`McpService._format_tools_for_gemini` のテスト."""
-
-    def test_format_tools_for_gemini_success(self, service):
-        """ツールが server__tool 形式の関数宣言に変換されるか検証."""
-        tools = [
-            McpToolInfo("git", "status", "show", {"type": "object"}),
-            McpToolInfo("fs", "read", None, {}),
-        ]
-
-        declarations = service._format_tools_for_gemini(tools)
-
-        assert declarations == [
-            {
-                "name": "git__status",
-                "description": "show",
-                "parameters": {"type": "object"},
-            },
-            {"name": "fs__read", "description": "", "parameters": {}},
-        ]

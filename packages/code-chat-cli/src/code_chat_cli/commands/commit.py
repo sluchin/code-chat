@@ -1,10 +1,7 @@
 """コミットメッセージ自動生成サブコマンドの処理."""
 
-import logging
 import subprocess
 from typing import Any
-
-from google.genai.errors import APIError, ClientError, ServerError
 
 from code_chat_cli.api import send_message_stream_with_retry
 from code_chat_cli.git_utils import get_git_diff
@@ -51,34 +48,15 @@ def handle_commit_generation(client: Any, model_name: str, lang: str = "en") -> 
         )
         prompt = template.format(diff=diff_text)
 
-        try:
-            response_stream = send_message_stream_with_retry(
-                chat=client.chats.create(model=model_name), prompt=prompt
-            )
+        # 失敗した場合の APIError は, 呼び出し元 (chat) が概要とヒントを 1 回だけ出力する
+        response_stream = send_message_stream_with_retry(
+            chat=client.chats.create(model=model_name), prompt=prompt
+        )
 
-            for chunk in response_stream:
-                print(chunk.text, end="", flush=True)
-            print()
-
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            error_detail = (
-                str(e) if logger.isEnabledFor(logging.DEBUG) else type(e).__name__
-            )
-            logger.error(
-                "コミットメッセージの生成中にエラーが発生しました: %s",
-                error_detail,
-            )
-            raise
+        for chunk in response_stream:
+            print(chunk.text, end="", flush=True)
+        print()
 
     except subprocess.CalledProcessError as e:
         logger.error("Git コマンドの実行に失敗しました: %s", e)
-        raise
-    except (APIError, ServerError, ClientError) as e:
-        error_detail = (
-            str(e) if logger.isEnabledFor(logging.DEBUG) else type(e).__name__
-        )
-        logger.error("Gemini API でエラーが発生しました: %s", error_detail)
-        raise
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.error("予期せぬエラーが発生しました: %s", e)
         raise

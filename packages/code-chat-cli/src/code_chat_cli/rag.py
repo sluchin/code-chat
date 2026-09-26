@@ -5,7 +5,7 @@ from pathlib import Path  # pylint: disable=unused-import
 from code_chat_rag.indexer import Indexer
 from code_chat_rag.rag_service import RagService
 
-from code_chat_cli.logger import get_logger
+from code_chat_cli.logger import get_logger, log_exception
 
 logger = get_logger(__name__)
 
@@ -38,8 +38,10 @@ def handle_rag_create(
         # フルパス（絶対パス）を取得
         full_db_path = Path(output_dir).resolve()
         print(f"インデックス作成完了: {count} チャンク追加 (Database: {full_db_path})")
-    except Exception:  # pylint: disable=broad-exception-caught
-        logger.exception("handle_index 実行中にエラーが発生しました")
+    # langchain / chroma / Embedding API が送出する例外は種類が多く, 特定できないため広く捕捉する
+    # ログに記録するだけで, 呼び出し元には伝えない.
+    except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+        log_exception(logger, "handle_index 実行中にエラーが発生しました")
 
 
 def handle_rag_update(
@@ -70,8 +72,10 @@ def handle_rag_update(
         # フルパス（絶対パス）を取得
         full_db_path = Path(output_dir).resolve()
         print(f"インデックス作成完了: {count} チャンク追加 (Database: {full_db_path})")
-    except Exception:  # pylint: disable=broad-exception-caught
-        logger.exception("handle_index 実行中にエラーが発生しました")
+    # langchain / chroma / Embedding API が送出する例外は種類が多く, 特定できないため広く捕捉する
+    # ログに記録するだけで, 呼び出し元には伝えない.
+    except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+        log_exception(logger, "handle_index 実行中にエラーが発生しました")
 
 
 def handle_rag_rm(
@@ -87,8 +91,10 @@ def handle_rag_rm(
         logger.info("インデックス初期化を開始します")
         service = RagService(output_dir=output_dir)
         service.clear()
-    except Exception:  # pylint: disable=broad-exception-caught
-        logger.exception("handle_index 実行中にエラーが発生しました")
+    # langchain / chroma / Embedding API が送出する例外は種類が多く, 特定できないため広く捕捉する
+    # ログに記録するだけで, 呼び出し元には伝えない.
+    except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+        log_exception(logger, "handle_index 実行中にエラーが発生しました")
 
 
 def handle_rag_status(input_dirs: list[str], output_dir: str) -> None:

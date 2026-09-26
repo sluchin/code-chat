@@ -85,13 +85,13 @@ def handle_write_mode_confirmation(
 
     if confirm == "y":
         for path_str, code in changes.items():
-            apply_file_modification(path_str, code)
+            _apply_file_modification(path_str, code)
             logger.info("ファイルを更新しました: %s", path_str)
     else:
         logger.info("上書きをキャンセルしました.")
 
 
-def apply_file_modification(target_path: str, new_code: str) -> None:
+def _apply_file_modification(target_path: str, new_code: str) -> None:
     """指定された単一ファイルへ修正後コードを書き込みます.
 
     安全なバックアップファイルを生成した上で,
@@ -110,7 +110,7 @@ def apply_file_modification(target_path: str, new_code: str) -> None:
     try:
         # バックアップファイルの作成
         if path.exists():
-            create_safe_backup(path)
+            _create_safe_backup(path)
 
         # 新しいコードの書き込み
         path.write_text(new_code, encoding="utf-8")
@@ -119,7 +119,7 @@ def apply_file_modification(target_path: str, new_code: str) -> None:
         logger.exception("ファイルの書き換えに失敗しました.")
 
 
-def create_safe_backup(path: Path) -> Path | None:
+def _create_safe_backup(path: Path) -> Path | None:
     """ファイルを安全にバックアップします.
 
     - 初回バックアップとして `.bak.orig` を保護作成します.
@@ -294,37 +294,6 @@ def _cleanup_old_backups(path: Path, max_keep: int) -> None:
                 logger.debug("古いバックアップを削除しました: %s", old_bak)
             except OSError:
                 pass
-
-
-def apply_multi_file_changes(model_response: str, allowed_paths: list[str]) -> None:
-    """LLMのレスポンスからファイルパスとコードブロックを抽出し, 対象ファイルに書き込みます.
-
-    Args:
-        model_response (str): LLMからのテキスト出力.
-        allowed_paths (list[str]): -f で指定された安全な書き込み対象パスリスト.
-
-    """
-    # ```python:path/to/file.py や ### File: path/to/file.py などを検出するパターン
-    pattern = r"```(?:\w+:)?([^\n]+)\n(.*?)```"
-    matches = re.findall(pattern, model_response, re.DOTALL)
-
-    if not matches:
-        logger.warning("書き込み対象のコードブロックが抽出できませんでした")
-        return
-
-    for target_path_str, code_content in matches:
-        target_path_str = target_path_str.strip()
-
-        # 指定された -f のリストに含まれているか安全性を確認
-        if target_path_str in allowed_paths:
-            path = Path(target_path_str)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(code_content.lstrip(), encoding="utf-8")
-            logger.info("ファイルを更新しました: %s", target_path_str)
-        else:
-            logger.warning(
-                "指定外のパスへの書き込みをスキップしました: %s", target_path_str
-            )
 
 
 def _extract_file_changes(

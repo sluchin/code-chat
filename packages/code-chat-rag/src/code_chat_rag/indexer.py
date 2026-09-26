@@ -116,6 +116,8 @@ class Indexer:
                 )
                 file_docs = loader.load()
                 documents.extend(file_docs)
+            # LanguageParser (tree-sitter) の解析失敗は例外の種類が多岐にわたり特定できない.
+            # 失敗した場合は TextLoader にフォールバックするため, 広く捕捉する.
             except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
                 # tree-sitter 未インストールや構文解析失敗時
                 # フォールバック: TextLoader でプレーンテキストとして読み込む
@@ -126,7 +128,7 @@ class Indexer:
                         autodetect_encoding=True,
                     )
                     documents.extend(fallback_loader.load())
-                except Exception as e:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+                except RuntimeError as e:
                     logger.warning(
                         "ファイル '%s' の読み込みに失敗しました: %s", file_path, e
                     )

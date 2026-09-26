@@ -210,7 +210,7 @@ code-chat "テスト" -f ./src/main.py --dry-run
 | `--rag` | RAG 検索によるコンテキスト注入 (`--mcp` と併用可) |
 | `--mcp` | MCP ツール連携 (`--rag` と併用可) |
 | `-a, --auto-save` | 対話ログを `<日時>_chat.md` に自動保存 |
-| `-D, --debug` / `--log-level` / `--trace` | ログ出力の制御 |
+| `-D, --debug` / `--log-level` / `--trace` | ログ出力の制御 (`--trace` は、ライブラリの通信ログと、Gemini API エラー時のトレースバックも出力) |
 | `--dry-run` | API 呼び出しを行わず引数と読み込み内容を表示 |
 
 ## RAG (コードベース検索)
@@ -348,6 +348,8 @@ uv run pre-commit autoupdate
 > **Note:** 型チェック (Mypy) は `uv run pre-commit run mypy --all-files` で実行してください。
 
 ## トラブルシューティング
+
+Gemini API のエラー (429、503、404 など) の原因と対処、`code-chat` のリトライ動作は、[ERRORS.md](ERRORS.md) にまとめています。
 
 ### `uv run pytest` 実行時に `unrecognized arguments: --cov=...` エラーが発生する
 

@@ -3,7 +3,7 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-# -- Project information -----------------------------------------------------
+# Project information
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 import os
@@ -13,7 +13,7 @@ project = "code-chat"
 copyright = "2026, Tetsuya Higashi"
 author = "Tetsuya Higashi"
 
-# -- General configuration ---------------------------------------------------
+# General configuration
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 # ソースコードの存在するディレクトリをパスに追加 (docs/ から見た相対パス)
@@ -32,7 +32,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 language = "ja"
 
-# -- Options for HTML output -------------------------------------------------
+# Options for HTML output
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 # html_theme = 'alabaster'

@@ -41,7 +41,7 @@ SETUP_MESSAGE = f"""OAuth ログインの設定がありません. 次の手順�
 API キーを使う場合は, export GEMINI_API_KEY='your-api-key' を設定してください."""
 
 
-def get_token_path() -> Path:
+def _get_token_path() -> Path:
     """OAuth トークンの保存先パスを返す.
 
     Returns:
@@ -51,7 +51,7 @@ def get_token_path() -> Path:
     return Path.home() / ".config" / "code-chat" / "oauth_token.json"
 
 
-def save_credentials(credentials: Credentials, token_path: Path | None = None) -> Path:
+def _save_credentials(credentials: Credentials, token_path: Path | None = None) -> Path:
     """認証情報を所有者のみ読み書き可能なファイルとして保存する.
 
     Args:
@@ -62,7 +62,7 @@ def save_credentials(credentials: Credentials, token_path: Path | None = None) -
         Path: 保存したファイルのパス.
 
     """
-    path = token_path or get_token_path()
+    path = token_path or _get_token_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -71,7 +71,7 @@ def save_credentials(credentials: Credentials, token_path: Path | None = None) -
     return path
 
 
-def load_credentials(token_path: Path | None = None) -> Credentials | None:
+def _load_credentials(token_path: Path | None = None) -> Credentials | None:
     """保存済みの認証情報を読み込み, 期限切れならリフレッシュして返す.
 
     Args:
@@ -81,7 +81,7 @@ def load_credentials(token_path: Path | None = None) -> Credentials | None:
         Credentials | None: 有効な認証情報. 未保存・破損・失効の場合は None.
 
     """
-    path = token_path or get_token_path()
+    path = token_path or _get_token_path()
     if not path.is_file():
         return None
 
@@ -97,7 +97,7 @@ def load_credentials(token_path: Path | None = None) -> Credentials | None:
         except RefreshError as e:
             logger.warning("トークンの更新に失敗しました. 再ログインが必要です: %s", e)
             return None
-        save_credentials(credentials, path)
+        _save_credentials(credentials, path)
 
     return credentials
 
@@ -135,7 +135,7 @@ def login(token_path: Path | None = None) -> Credentials:
     # prompt="consent" で, 再ログイン時にもリフレッシュトークンを確実に受け取る
     credentials = flow.run_local_server(port=0, prompt="consent")
 
-    path = save_credentials(credentials, token_path)
+    path = _save_credentials(credentials, token_path)
     logger.info("OAuth トークンを保存しました: %s", path)
     return credentials  # type: ignore[no-any-return]
 
@@ -153,7 +153,7 @@ def get_credentials(interactive: bool) -> Credentials:
         OAuthError: 設定がない場合, または非対話環境で未ログインの場合.
 
     """
-    credentials = load_credentials()
+    credentials = _load_credentials()
     if credentials is not None:
         return credentials
 
@@ -192,7 +192,7 @@ def build_httpx_clients(
                 raise OAuthError(
                     "OAuth トークンの更新に失敗しました. code-chat --login で再ログインしてください."
                 ) from e
-            save_credentials(credentials, token_path)
+            _save_credentials(credentials, token_path)
         request.headers.pop("x-goog-api-key", None)
         request.headers["Authorization"] = f"Bearer {credentials.token}"
 
@@ -208,5 +208,10 @@ def build_httpx_clients(
 
 
 def is_interactive() -> bool:
-    """標準入力が端末に接続されているか (ブラウザでのログインを開始してよいか) を返す."""
+    """標準入力が端末に接続されているか (ブラウザでのログインを開始してよいか) を返す.
+
+    Returns:
+        bool: 標準入力が端末に接続されている場合は True.
+
+    """
     return sys.stdin.isatty()

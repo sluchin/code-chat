@@ -14,13 +14,13 @@ from code_chat_cli.auth import (
     CLIENT_ID_ENV,
     CLIENT_SECRET_ENV,
     SCOPES,
+    _get_token_path,
+    _load_credentials,
+    _save_credentials,
     build_httpx_clients,
     get_credentials,
-    get_token_path,
     is_interactive,
-    load_credentials,
     login,
-    save_credentials,
 )
 from code_chat_cli.oauth_error import OAuthError
 from google.auth.exceptions import RefreshError
@@ -57,25 +57,25 @@ def _expired_credentials() -> Credentials:
 
 
 class TestGetTokenPath:
-    """`get_token_path` のテスト."""
+    """`_get_token_path` のテスト."""
 
     def test_get_token_path_success(self, monkeypatch, tmp_path):
         """トークンの保存先がホーム配下の ~/.config/code-chat/oauth_token.json になるか検証."""
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
         assert (
-            get_token_path() == tmp_path / ".config" / "code-chat" / "oauth_token.json"
+            _get_token_path() == tmp_path / ".config" / "code-chat" / "oauth_token.json"
         )
 
 
 class TestSaveCredentials:
-    """`save_credentials` のテスト."""
+    """`_save_credentials` のテスト."""
 
     def test_save_credentials_success(self, tmp_path):
         """親ディレクトリが作成され, 所有者のみ読み書き可能なファイルで保存されるか検証."""
         path = tmp_path / "nested" / "oauth_token.json"
 
-        result = save_credentials(_credentials(), path)
+        result = _save_credentials(_credentials(), path)
 
         assert result == path
         assert json.loads(path.read_text(encoding="utf-8"))["refresh_token"] == (
@@ -89,7 +89,7 @@ class TestSaveCredentials:
         path.write_text("{}", encoding="utf-8")
         path.chmod(0o644)
 
-        save_credentials(_credentials(), path)
+        _save_credentials(_credentials(), path)
 
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
@@ -97,21 +97,21 @@ class TestSaveCredentials:
         """保存先を省略した場合は既定のパスに保存されるか検証."""
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
-        result = save_credentials(_credentials())
+        result = _save_credentials(_credentials())
 
-        assert result == get_token_path()
+        assert result == _get_token_path()
         assert result.is_file()
 
 
 class TestLoadCredentials:
-    """`load_credentials` のテスト."""
+    """`_load_credentials` のテスト."""
 
     def test_load_credentials_success(self, tmp_path):
         """保存済みの有効なトークンが読み込まれるか検証."""
         path = tmp_path / "oauth_token.json"
-        save_credentials(_credentials(), path)
+        _save_credentials(_credentials(), path)
 
-        result = load_credentials(path)
+        result = _load_credentials(path)
 
         assert result is not None
         assert result.token == "access-token"
@@ -120,7 +120,7 @@ class TestLoadCredentials:
     def test_load_credentials_refreshes_expired_success(self, tmp_path):
         """期限切れのトークンがリフレッシュされ, 保存し直されるか検証."""
         path = tmp_path / "oauth_token.json"
-        save_credentials(_expired_credentials(), path)
+        _save_credentials(_expired_credentials(), path)
 
         def fake_refresh(credentials, _request):
             credentials.token = "new-token"
@@ -129,7 +129,7 @@ class TestLoadCredentials:
         with patch.object(
             Credentials, "refresh", autospec=True, side_effect=fake_refresh
         ) as refresh:
-            result = load_credentials(path)
+            result = _load_credentials(path)
 
         refresh.assert_called_once()
         assert result is not None
@@ -141,25 +141,25 @@ class TestLoadCredentials:
         path = tmp_path / "oauth_token.json"
         path.write_text("not json", encoding="utf-8")
 
-        assert load_credentials(path) is None
+        assert _load_credentials(path) is None
         assert "読み込めませんでした" in caplog.text
 
     def test_load_credentials_refresh_error_exception(self, tmp_path, caplog):
         """リフレッシュトークンが失効している場合は, 警告を出して None を返すか検証."""
         path = tmp_path / "oauth_token.json"
-        save_credentials(_expired_credentials(), path)
+        _save_credentials(_expired_credentials(), path)
 
         with patch.object(
             Credentials, "refresh", side_effect=RefreshError("invalid_grant")
         ):
-            result = load_credentials(path)
+            result = _load_credentials(path)
 
         assert result is None
         assert "再ログインが必要です" in caplog.text
 
     def test_load_credentials_missing_file(self, tmp_path):
         """トークンファイルが存在しない場合は None を返すか検証."""
-        assert load_credentials(tmp_path / "missing.json") is None
+        assert _load_credentials(tmp_path / "missing.json") is None
 
 
 class TestLogin:
@@ -220,7 +220,7 @@ class TestGetCredentials:
         credentials = _credentials()
 
         with (
-            patch("code_chat_cli.auth.load_credentials", return_value=credentials),
+            patch("code_chat_cli.auth._load_credentials", return_value=credentials),
             patch("code_chat_cli.auth.login") as login_mock,
         ):
             result = get_credentials(interactive=True)
@@ -233,7 +233,7 @@ class TestGetCredentials:
         credentials = _credentials()
 
         with (
-            patch("code_chat_cli.auth.load_credentials", return_value=None),
+            patch("code_chat_cli.auth._load_credentials", return_value=None),
             patch("code_chat_cli.auth.login", return_value=credentials) as login_mock,
         ):
             result = get_credentials(interactive=True)
@@ -247,7 +247,7 @@ class TestGetCredentials:
         monkeypatch.setenv(CLIENT_SECRET_ENV, "secret")
 
         with (
-            patch("code_chat_cli.auth.load_credentials", return_value=None),
+            patch("code_chat_cli.auth._load_credentials", return_value=None),
             patch("code_chat_cli.auth.login") as login_mock,
             pytest.raises(OAuthError, match="--login"),
         ):
@@ -261,7 +261,7 @@ class TestGetCredentials:
         monkeypatch.delenv(CLIENT_SECRET_ENV, raising=False)
 
         with (
-            patch("code_chat_cli.auth.load_credentials", return_value=None),
+            patch("code_chat_cli.auth._load_credentials", return_value=None),
             pytest.raises(OAuthError, match=CLIENT_SECRET_ENV),
         ):
             get_credentials(interactive=False)
@@ -316,7 +316,7 @@ class TestBuildHttpxClients:
         client, async_client = build_httpx_clients(credentials, path)
         request = httpx.Request("POST", "https://generativelanguage.googleapis.com/")
 
-        with patch("code_chat_cli.auth.save_credentials") as save:
+        with patch("code_chat_cli.auth._save_credentials") as save:
             client.event_hooks["request"][0](request)
         client.close()
         asyncio.run(async_client.aclose())

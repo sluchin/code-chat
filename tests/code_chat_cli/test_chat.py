@@ -3,6 +3,7 @@
 
 import io
 import logging
+import subprocess
 import sys
 from dataclasses import asdict
 from types import SimpleNamespace
@@ -29,10 +30,10 @@ from code_chat_cli.chat import (
     _require_rag_api_key,
     _resolve_cache_settings,
     _retrieve_rag_context,
+    _run_interactive_loop,
+    _run_single_turn_mode,
     _setup_cli_logging,
     main,
-    run_interactive_loop,
-    run_single_turn_mode,
 )
 from code_chat_cli.cli_args import CliArgs
 from code_chat_cli.oauth_error import OAuthError
@@ -50,7 +51,7 @@ def _chunk(text):
 
 
 class TestRunSingleTurnMode:
-    """`run_single_turn_mode` のテスト."""
+    """`_run_single_turn_mode` のテスト."""
 
     def test_run_single_turn_mode_mcp_success(self):
         """--mcp 指定時は MCP のワンショット処理に振り分けられるか検証."""
@@ -62,7 +63,7 @@ class TestRunSingleTurnMode:
         with patch(
             "code_chat_cli.chat.handle_mcp_run", new=AsyncMock(return_value="clean")
         ) as run:
-            run_single_turn_mode(MagicMock(), args, history)
+            _run_single_turn_mode(MagicMock(), args, history)
 
         # プロンプトが MCP に渡され, 履歴に User → Gemini の順で記録されること
         run.assert_awaited_once_with(
@@ -90,7 +91,7 @@ class TestRunSingleTurnMode:
 
         # 実行 (書き込みの確認プロンプトは表示させない)
         with patch("code_chat_cli.chat.handle_write_mode_confirmation"):
-            run_single_turn_mode(mock_chat, cli_args, chat_history)
+            _run_single_turn_mode(mock_chat, cli_args, chat_history)
 
         # chat_history[0] にファイル名とバイトサイズが含まれているか検証
         assert len(chat_history) > 0
@@ -107,7 +108,7 @@ class TestRunSingleTurnMode:
 
 
 class TestRunInteractiveLoop:
-    """`run_interactive_loop` のテスト."""
+    """`_run_interactive_loop` のテスト."""
 
     def test_run_interactive_loop_exit_command_success(
         self, monkeypatch, mock_gemini_client
@@ -172,7 +173,7 @@ class TestRunInteractiveLoop:
             patch("code_chat_cli.chat.setup_readline_history"),
             patch("code_chat_cli.chat._handle_mcp_interactive") as handler,
         ):
-            run_interactive_loop(chat, _cli_args(), [])
+            _run_interactive_loop(chat, _cli_args(), [])
 
         # /mcp は MCP 処理に振り分けられ, 通常の Gemini 送信は行われないこと
         handler.assert_called_once()
@@ -500,6 +501,16 @@ class TestSetupCliLogging:
         # INFO ログを抑制する処理が呼ばれること
         suppress.assert_called_once_with()
 
+    def test_setup_cli_logging_utility_command_trace_success(self):
+        """モデル一覧などの INFO ログ抑制時でも, --trace の指定が反映されるか検証."""
+        with (
+            patch("code_chat_cli.chat.suppress_info_logs"),
+            patch("code_chat_cli.chat.set_trace") as set_trace,
+        ):
+            _setup_cli_logging(_cli_args(list_models=True, trace_mode=True))
+
+        set_trace.assert_called_once_with(True)
+
     def test_setup_cli_logging_debug_mode_success(self):
         """デバッグモードでは DEBUG レベルで初期化されるか検証."""
         # ロギングの初期化処理をモック化して, 呼び出しを検証する
@@ -671,14 +682,14 @@ class TestHandleCacheSubcommand:
         assert exc_info.value.code == 1
         assert "無料枠では利用できません" in caplog.text
 
-    def test_handle_cache_subcommand_unexpected_error_failure(self, caplog):
-        """予期しない例外が発生した場合は, ログを出力して終了コード 1 で終了するか検証."""
+    def test_handle_cache_subcommand_api_error_failure(self, caplog):
+        """Gemini API のエラーが発生した場合は, ログを出力して終了コード 1 で終了するか検証."""
         args = _cli_args(subcommand="cache", subcommand_action="list")
 
         with (
             patch(
                 "code_chat_cli.context_cache.ContextCache.list_caches",
-                side_effect=RuntimeError("boom"),
+                side_effect=APIError(500, {"error": {"message": "boom"}}),
             ),
             pytest.raises(SystemExit) as exc_info,
         ):
@@ -686,6 +697,19 @@ class TestHandleCacheSubcommand:
 
         assert exc_info.value.code == 1
         assert "cache (list) コマンドの実行中にエラーが発生しました" in caplog.text
+
+    def test_handle_cache_subcommand_unexpected_error_failure(self):
+        """Gemini API 以外の予期しない例外は, 握りつぶさずに呼び出し元 (main) へ伝わるか検証."""
+        args = _cli_args(subcommand="cache", subcommand_action="list")
+
+        with (
+            patch(
+                "code_chat_cli.context_cache.ContextCache.list_caches",
+                side_effect=RuntimeError("boom"),
+            ),
+            pytest.raises(RuntimeError, match="boom"),
+        ):
+            _handle_cache_subcommand(MagicMock(), args)
 
 
 class TestRequireRagApiKey:
@@ -893,13 +917,32 @@ class TestHandleSubcommands:
         )
         assert exc_info.value.code == 0
 
+    @pytest.mark.parametrize(
+        "error",
+        [
+            APIError(500, {"error": {"message": "boom"}}),
+            subprocess.CalledProcessError(128, ["git", "diff"]),
+            FileNotFoundError("git"),
+        ],
+    )
+    def test_handle_subcommands_commit_msg_failure(self, error, caplog):
+        """--generate-commit-msg で Gemini API・git のエラーが発生した場合, ログを出力して終了コード 1 で終了するか検証."""
+        with (
+            patch("code_chat_cli.chat.handle_commit_generation", side_effect=error),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            _handle_subcommands(MagicMock(), _cli_args(generate_commit_msg=True))
+
+        assert exc_info.value.code == 1
+        assert "generate_commit_msg" in caplog.text
+
     def test_handle_subcommands_list_models_failure(self):
         """--list-models の実行中に例外が発生した場合, 終了コード 1 で終了するか検証."""
         # モデル一覧の取得で例外を発生させる
         with (
             patch(
                 "code_chat_cli.chat.handle_list_models",
-                side_effect=RuntimeError,
+                side_effect=APIError(500, {"error": {"message": "boom"}}),
             ),
             pytest.raises(SystemExit) as exc_info,
         ):
@@ -948,7 +991,7 @@ class TestHandleSubcommands:
         with (
             patch(
                 "code_chat_cli.chat.handle_code_review",
-                side_effect=RuntimeError,
+                side_effect=APIError(500, {"error": {"message": "boom"}}),
             ),
             pytest.raises(SystemExit) as exc_info,
         ):
@@ -1156,6 +1199,24 @@ class TestHandleMcpSingleTurn:
             "MCP 実行用のプロンプトまたはコンテキストを指定してください" in caplog.text
         )
         assert not history
+
+    def test_handle_mcp_single_turn_api_error_exception(self, caplog):
+        """MCP 実行中の Gemini API のエラーは, 概要とヒントに整理されて記録されるか検証."""
+        args = _cli_args(mcp=True, prompt="q")
+
+        with patch(
+            "code_chat_cli.chat.handle_mcp_run",
+            new=AsyncMock(
+                side_effect=APIError(
+                    503, {"error": {"message": "high demand", "status": "UNAVAILABLE"}}
+                )
+            ),
+        ):
+            _handle_mcp_single_turn(args, [])
+
+        assert "[HTTP 503 UNAVAILABLE]" in caplog.text
+        assert "ヒント: " in caplog.text
+        assert "'error'" not in caplog.text
 
     def test_handle_mcp_single_turn_exception(self, caplog):
         """MCP 実行が失敗した場合はエラーを記録し, 履歴に応答を残さないか検証."""
@@ -1550,6 +1611,37 @@ class TestMain:
         # API エラーは捕捉され, 終了コード 1 で終了すること
         assert exc_info.value.code == 1
 
+    def test_main_api_error_summary_failure(
+        self, monkeypatch, mock_gemini_client, caplog
+    ):
+        """Gemini API のエラーは, 辞書の全文ではなく, 概要とヒントだけがトレースバックなしで 1 回出力されるか検証."""
+        mock_gemini_client["chat"].send_message_stream.side_effect = APIError(
+            400,
+            {"error": {"message": "API key not valid", "status": "INVALID_ARGUMENT"}},
+        )
+        monkeypatch.setattr("sys.stdin", io.StringIO("テスト\nexit\n"))
+        monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+        monkeypatch.setattr("sys.argv", ["chat.py"])
+
+        # ログ設定 (ルートのハンドラの入れ替え) を避け, caplog で記録を検証する
+        with (
+            patch("code_chat_cli.chat._setup_cli_logging"),
+            pytest.raises(SystemExit),
+        ):
+            main()
+
+        messages = [
+            r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR
+        ]
+        assert len(messages) == 1
+        assert (
+            "Gemini API エラーにより処理を中断しました: [HTTP 400 INVALID_ARGUMENT]"
+            in messages[0]
+        )
+        assert "API キーが無効です" in messages[0]
+        assert "ヒント: " in messages[0]
+        assert caplog.records[-1].exc_info is None
+
     @pytest.mark.parametrize(
         "file_exception",
         [
@@ -1644,7 +1736,7 @@ class TestMain:
         exception_type: type[BaseException],
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """run_interactive_loop 実行時に KeyboardInterrupt や EOFError が発生した際,
+        """_run_interactive_loop 実行時に KeyboardInterrupt や EOFError が発生した際,
            except ブロックを通って sys.exit(0) で正常終了することを検証する.
 
         Args:
@@ -1665,9 +1757,9 @@ class TestMain:
             patch("code_chat_cli.chat.get_gemini_client"),
             patch("code_chat_cli.chat._handle_subcommands"),
             patch("code_chat_cli.chat._build_chat_config"),
-            # run_interactive_loop が呼び出された際に指定の例外を送出させる
+            # _run_interactive_loop が呼び出された際に指定の例外を送出させる
             patch(
-                "code_chat_cli.chat.run_interactive_loop",
+                "code_chat_cli.chat._run_interactive_loop",
                 side_effect=exception_type,
             ),
             patch("code_chat_cli.chat.save_history_if_needed"),

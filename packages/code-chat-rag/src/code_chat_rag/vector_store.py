@@ -126,7 +126,8 @@ class VectorStore:
                     logger.info("%d 件のチャンクを削除しました", len(all_ids))
 
             logger.info("VectorStore のクリアが完了しました")
-        except Exception:  # pylint: disable=broad-exception-caught
+        # 例外の種類を問わず, ログに記録してから再送出する (握りつぶさない).
+        except Exception:
             logger.exception("VectorStore のクリア処理中にエラーが発生しました")
             raise
 

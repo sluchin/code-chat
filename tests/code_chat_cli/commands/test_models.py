@@ -1,10 +1,13 @@
 # pylint: disable=redefined-outer-name
 """`code_chat_cli.commands.models` モジュールのテスト."""
 
+import logging
 from unittest.mock import MagicMock
 
 import pytest
 from code_chat_cli.commands.models import handle_list_models
+from code_chat_cli.logger import set_trace
+from google.genai.errors import APIError
 
 
 class TestHandleListModels:
@@ -20,3 +23,30 @@ class TestHandleListModels:
 
         # 18-20行目の try-except ブロックが確実に通過されたことを検証
         mock_client.models.list.assert_called_once()
+
+    @pytest.mark.parametrize("trace", [False, True])
+    def test_handle_list_models_api_error_failure(
+        self, mock_client: MagicMock, caplog, trace
+    ) -> None:
+        """Gemini API のエラーは再送出され, トレースバックは --trace 指定時だけ出力されるか検証する."""
+        mock_client.models.list.side_effect = APIError(
+            403, {"error": {"message": "PERMISSION_DENIED"}}
+        )
+        set_trace(trace)
+
+        try:
+            with (
+                caplog.at_level(logging.ERROR),
+                pytest.raises(APIError, match="PERMISSION_DENIED"),
+            ):
+                handle_list_models(mock_client)
+        finally:
+            set_trace(False)
+
+        record = next(
+            r
+            for r in caplog.records
+            if "モデル一覧の取得に失敗しました" in r.getMessage()
+        )
+        assert "PERMISSION_DENIED" in record.getMessage() or trace
+        assert (record.exc_info is not None) is trace

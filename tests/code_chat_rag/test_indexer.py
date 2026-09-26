@@ -120,7 +120,7 @@ class TestLoadAndChunk:
         """どちらのローダーでも読み込めないファイルは警告してスキップされるか検証する."""
         (tmp_path / "main.py").write_text("x", encoding="utf-8")
         mock_generic_loader_cls.from_filesystem.side_effect = RuntimeError("no parser")
-        mock_text_loader_cls.return_value.load.side_effect = OSError("unreadable")
+        mock_text_loader_cls.return_value.load.side_effect = RuntimeError("unreadable")
 
         chunks = Indexer(input_dirs=[str(tmp_path)]).load_and_chunk()
 

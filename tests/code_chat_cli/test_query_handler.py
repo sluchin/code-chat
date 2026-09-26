@@ -71,6 +71,12 @@ class TestIsRateLimitError:
         assert QueryHandler._is_rate_limit_error(APIError(500, {})) is False
         assert QueryHandler._is_rate_limit_error(ValueError("429")) is False
 
+    def test_is_rate_limit_error_daily_quota(self):
+        """1 日あたりの上限 (RPD) の 429 は, 待っても回復しないためリトライ対象にならないか検証."""
+        error = APIError(429, {"error": {"message": "GenerateRequestsPerDay exceeded"}})
+
+        assert QueryHandler._is_rate_limit_error(error) is False
+
 
 class TestInit:
     """`QueryHandler.__init__` のテスト."""
@@ -98,6 +104,17 @@ class TestGenerateContentWithRetry:
 
         assert client.models.generate_content.call_count == 1
 
+    def test_generate_content_with_retry_daily_quota_failure(self, handler, client):
+        """1 日あたりの上限は, リトライせずに送出されるか検証."""
+        client.models.generate_content.side_effect = APIError(
+            429, {"error": {"message": "GenerateRequestsPerDay exceeded"}}
+        )
+
+        with pytest.raises(APIError):
+            handler._generate_content_with_retry(contents=["x"], config=MagicMock())
+
+        assert client.models.generate_content.call_count == 1
+
     def test_generate_content_with_retry_retries_on_rate_limit_exception(
         self, handler, client
     ):
@@ -110,6 +127,36 @@ class TestGenerateContentWithRetry:
 
         assert result == "ok"
         assert client.models.generate_content.call_count == 2
+
+    def test_generate_content_with_retry_logs_retry_exception(
+        self, handler, client, caplog
+    ):
+        """リトライの待機に入る前に, 原因と再試行の回数が警告として出力されるか検証 (無言で待たない)."""
+        minute_limit = APIError(
+            429,
+            {
+                "error": {
+                    "message": "quota exceeded, limit: 5",
+                    "status": "RESOURCE_EXHAUSTED",
+                    "details": [
+                        {
+                            "violations": [
+                                {
+                                    "quotaId": "GenerateRequestsPerMinutePerProjectPerModel-FreeTier"
+                                }
+                            ]
+                        }
+                    ],
+                }
+            },
+        )
+        client.models.generate_content.side_effect = [minute_limit, "ok"]
+
+        handler._generate_content_with_retry(contents=["x"], config=MagicMock())
+
+        assert "レート制限のため" in caplog.text
+        assert "(1/5)" in caplog.text
+        assert "1 分あたりのリクエスト上限" in caplog.text
 
 
 class TestRun:

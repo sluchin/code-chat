@@ -28,7 +28,7 @@ class TestInit:
 
 
 class TestLoadMcpConfig:
-    """`McpConfig.load_mcp_config` のテスト."""
+    """`McpConfig._load_mcp_config` のテスト."""
 
     def test_load_mcp_config_success(self, tmp_path):
         """サーバー定義が読み込まれ, 省略項目に既定値が入るか検証."""

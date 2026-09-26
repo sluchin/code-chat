@@ -91,7 +91,7 @@ class TestExplainApiError:
 
     def test_explain_api_error_other_success(self):
         """その他のエラーの場合, 元のメッセージを含めて返すか検証."""
-        error = APIError(500, {"error": {"message": "boom"}})
+        error = APIError(401, {"error": {"message": "boom"}})
 
         assert "boom" in ContextCache._explain_api_error(error)
 

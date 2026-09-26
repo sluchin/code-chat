@@ -48,6 +48,8 @@ class McpServerConnection:
             env=self.env,
         )
 
+    # 内部 (get_tools / call_tool) からしか使われないが, 「MCP サーバーへ接続する」公開 API として自然なため,
+    # 例外的に `_` を付けずに公開メソッドとしている.
     @asynccontextmanager
     async def connect(self) -> AsyncGenerator[ClientSession, None]:
         """サブプロセスとして MCP サーバーを起動し, Stdio パイプによるセッションを確立します.
@@ -76,7 +78,9 @@ class McpServerConnection:
                 await session.initialize()
                 logger.debug("MCP サーバーセッションの初期化が完了しました")
                 yield session
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        # MCP サーバー (外部プロセス) 由来の例外は, MCP SDK・anyio (ExceptionGroup)・OSError など多岐にわたる.
+        # 例外の種類を問わず, ログに記録してから再送出する (握りつぶさない).
+        except Exception as e:
             logger.error(
                 "MCP サーバープロセスの通信中にエラーが発生しました (%s %s): %s",
                 self.command,
@@ -97,6 +101,8 @@ class McpServerConnection:
                 response = await session.list_tools()
                 logger.info("%d 個の MCP ツールを取得しました", len(response.tools))
                 return response.tools
+        # MCP サーバー (外部プロセス) 由来の例外は, MCP SDK・anyio (ExceptionGroup)・OSError など多岐にわたる.
+        # 広く捕捉し, 取得できない場合は空リストを返す.
         except Exception:  # noqa: BLE001  # fmt: skip # pylint: disable=broad-exception-caught
             # トレースバックを抑止
             return []

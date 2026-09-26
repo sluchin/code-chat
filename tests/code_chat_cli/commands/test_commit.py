@@ -1,6 +1,5 @@
 """`code_chat_cli.commands.commit` モジュールのテスト."""
 
-import logging
 import subprocess
 from unittest.mock import MagicMock, patch
 
@@ -57,38 +56,15 @@ class TestHandleCommitGeneration:
         ):
             handle_commit_generation(mock_client, "gemini-flash-latest")
 
-    def test_handle_commit_generation_suppresses_traceback_failure(
+    def test_handle_commit_generation_api_error_failure(
         self,
         mock_client: MagicMock,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """API例外発生時に例外が呼び出し元へ伝播し, ログにエラーメッセージが出力されることを検証する."""
-        with (
-            patch(
-                "code_chat_cli.commands.commit.get_git_diff",
-                return_value="diff --git a/file.py...",
-            ),
-            patch(
-                "code_chat_cli.commands.commit.send_message_stream_with_retry",
-                side_effect=Exception("API Connection Failed"),
-            ),
-            # 発生した Exception をキャッチする
-            pytest.raises(Exception, match="API Connection Failed"),
-        ):
-            handle_commit_generation(mock_client, "gemini-flash-latest")
+        """Gemini API のエラーは, ここでは記録せず, そのまま呼び出し元 (chat) へ伝わるか検証する.
 
-        # logging モジュールで出力されたログメッセージの検証
-        assert "API Connection Failed" in caplog.text
-
-    def test_handle_commit_generation_api_error_non_debug_failure(
-        self,
-        mock_client: MagicMock,
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        """非 DEBUG モード時に APIError が発生した場合, 型名がログに出力され再送出されることを検証する."""
-        # 対象ロガーのログレベルを INFO に設定して logger.isEnabledFor(logging.DEBUG) を False にする
-        caplog.set_level(logging.INFO, logger="code_chat_cli.commands.commit")
-
+        エラーの概要とヒントは, 呼び出し元が 1 回だけ出力する (二重に出力しない).
+        """
         api_error = APIError(400, {"error": {"message": "Bad Request"}})
 
         with (
@@ -104,21 +80,13 @@ class TestHandleCommitGeneration:
         ):
             handle_commit_generation(mock_client, "gemini-flash-latest")
 
-        # False ルートが通り, 型名 (APIError) がログに含まれることを検証
-        assert "Gemini API でエラーが発生しました: APIError" in caplog.text
+        assert not caplog.records
 
-    def test_handle_commit_generation_api_error_debug_failure(
+    def test_handle_commit_generation_unexpected_error_failure(
         self,
         mock_client: MagicMock,
-        caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """DEBUG モード時に APIError が発生した場合, エラーの詳細文字列がログに出力され再送出されることを検証する."""
-        # 対象ロガーのログレベルを DEBUG に設定して logger.isEnabledFor(logging.DEBUG) を True にする
-        caplog.set_level(logging.DEBUG, logger="code_chat_cli.commands.commit")
-
-        error_message = "Detailed API Error Message"
-        api_error = APIError(500, {"error": {"message": error_message}})
-
+        """Gemini API 以外の予期しない例外も, 握りつぶさずに呼び出し元へ伝わるか検証する."""
         with (
             patch(
                 "code_chat_cli.commands.commit.get_git_diff",
@@ -126,14 +94,11 @@ class TestHandleCommitGeneration:
             ),
             patch(
                 "code_chat_cli.commands.commit.send_message_stream_with_retry",
-                side_effect=api_error,
+                side_effect=Exception("API Connection Failed"),
             ),
-            pytest.raises(APIError),
+            pytest.raises(Exception, match="API Connection Failed"),
         ):
             handle_commit_generation(mock_client, "gemini-flash-latest")
-
-        # True ルートが通り, 詳細文字列 (str(e)) がログに含まれることを検証
-        assert error_message in caplog.text
 
     def test_handle_commit_generation_no_diff(
         self,
