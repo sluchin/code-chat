@@ -5,6 +5,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from code_chat_cli.client import get_gemini_client
+from code_chat_cli.constants import Constants
 from code_chat_cli.gemini_error import find_api_error
 from code_chat_cli.logger import get_logger, log_exception
 from code_chat_cli.query_handler import QueryHandler
@@ -20,6 +21,7 @@ async def handle_mcp_run(
     use_oauth: bool = False,
     model_name: str | None = None,
     cached_content: str | None = None,
+    max_tool_rounds: int = Constants.DEFAULT_MAX_TOOL_ROUNDS,
 ) -> str:
     """McpService のライフサイクルを管理し, Gemini へのクエリとツール実行を行います.
 
@@ -31,6 +33,7 @@ async def handle_mcp_run(
         use_oauth (bool): OAuth で認証するかどうか. Defaults to False.
         model_name (str | None): 使用する Gemini モデル名. 省略時は QueryHandler の既定モデル.
         cached_content (str | None): 使用するキャッシュ名. 省略時はキャッシュを使わない.
+        max_tool_rounds (int): ツールの呼び出しを繰り返す回数の上限. 省略時は 20 回.
 
     Returns:
         str: Gemini からの最終回答テキスト.
@@ -49,6 +52,7 @@ async def handle_mcp_run(
                 mcp_service=mcp_service,
                 model_name=model_name,
                 cached_content=cached_content,
+                max_tool_rounds=max_tool_rounds,
             )
 
             logger.info("ユーザープロンプトの処理を開始します: %s", user_prompt)

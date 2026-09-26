@@ -62,6 +62,7 @@ class TestInit:
         assert handler.client is client
         assert handler.mcp_service is mcp_service
         assert handler.model_name == "gemini-3.5-flash"
+        assert handler.max_tool_rounds == 20
 
     def test_init_model_and_cache_success(self, client, mcp_service):
         """モデルとキャッシュ名の指定が, 属性に反映されるか検証."""
@@ -216,17 +217,19 @@ class TestRun:
         ]
         assert mcp_service.call_tool.await_count == 2
 
-    def test_run_tool_rounds_limit_failure(self, handler, client, mcp_service):
-        """モデルがツールを呼び続ける場合は, 上限の回数で中断して例外を送出するか検証."""
+    @pytest.mark.parametrize("rounds", [20, 3])
+    def test_run_tool_rounds_limit_failure(self, client, mcp_service, rounds):
+        """モデルがツールを呼び続ける場合は, 指定した上限の回数で中断して例外を送出するか検証."""
+        handler = QueryHandler(client, mcp_service, max_tool_rounds=rounds)
         client.models.generate_content.return_value = _response(
             function_calls=[_call("a__x")]
         )
 
-        with pytest.raises(RuntimeError, match="回を超えたため"):
+        with pytest.raises(RuntimeError, match=f"{rounds} 回を超えたため"):
             asyncio.run(handler.run("q"))
 
-        assert client.models.generate_content.call_count == QueryHandler.MAX_TOOL_ROUNDS
-        assert mcp_service.call_tool.await_count == QueryHandler.MAX_TOOL_ROUNDS
+        assert client.models.generate_content.call_count == rounds
+        assert mcp_service.call_tool.await_count == rounds
 
     def test_run_handles_empty_response(self, handler, client):
         """テキストもコンテンツも無いレスポンスでも空文字を返すか検証."""

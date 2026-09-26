@@ -7,12 +7,22 @@ import argparse
 import sys
 
 from code_chat_cli.cli_args import CliArgs
+from code_chat_cli.constants import Constants
 from code_chat_cli.file_utils import read_path_content
 from code_chat_cli.logger import get_logger
 
 logger = get_logger(__name__)
 _SUBCOMMANDS = ("rag", "cache", "mcp")
-_VALUE_OPTIONS = {"-f", "--file", "-m", "--model", "-p", "--provider", "--log-level"}
+_VALUE_OPTIONS = {
+    "-f",
+    "--file",
+    "-m",
+    "--model",
+    "-p",
+    "--provider",
+    "--log-level",
+    "--max-tool-rounds",
+}
 
 
 # pylint: disable=too-many-locals,too-many-statements
@@ -202,6 +212,7 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
         files=file_targets,
         rag=raw_args.rag,
         mcp=raw_args.mcp,
+        max_tool_rounds=raw_args.max_tool_rounds,
         cache=raw_args.cache,
         model=raw_args.model,
         provider=raw_args.provider,
@@ -355,6 +366,14 @@ def _build_main_execution_parser(
         help="MCP サーバーとの連携を有効化",
     )
     parser.add_argument(
+        "--max-tool-rounds",
+        type=_positive_int,
+        default=Constants.DEFAULT_MAX_TOOL_ROUNDS,
+        dest="max_tool_rounds",
+        metavar="N",
+        help=f"--mcp 時に, ツールの呼び出しを繰り返す回数の上限 (デフォルト: {Constants.DEFAULT_MAX_TOOL_ROUNDS})",
+    )
+    parser.add_argument(
         "-c",
         "--cache",
         nargs="?",
@@ -399,6 +418,28 @@ def _build_main_execution_parser(
         help="対話ログや出力結果を自動保存",
     )
     return parser
+
+
+def _positive_int(value: str) -> int:
+    """引数の文字列を, 1 以上の整数に変換する (argparse の `type` に指定する).
+
+    Args:
+        value (str): コマンドラインで指定された文字列.
+
+    Returns:
+        int: 1 以上の整数.
+
+    Raises:
+        argparse.ArgumentTypeError: 1 以上の整数ではない場合.
+
+    """
+    try:
+        number = int(value)
+    except ValueError:
+        number = 0
+    if number < 1:
+        raise argparse.ArgumentTypeError(f"1 以上の整数を指定してください: {value}")
+    return number
 
 
 def _read_stdin_content() -> str:

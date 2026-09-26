@@ -899,6 +899,7 @@ def _query_mcp(
                 use_oauth=cli_args.oauth,
                 model_name=cli_args.model,
                 cached_content=_cached_content_name(cli_args),
+                max_tool_rounds=cli_args.max_tool_rounds,
             )
         )
     # Gemini API・MCP サーバー・認証設定など原因が多岐にわたり特定できない. 1 回のクエリの失敗で対話を終了させないよう,

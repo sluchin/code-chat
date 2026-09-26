@@ -6,6 +6,8 @@
 
 from dataclasses import dataclass, field
 
+from code_chat_cli.constants import Constants
+
 
 # pylint: disable=too-many-instance-attributes
 @dataclass
@@ -33,6 +35,9 @@ class CliArgs:
 
     mcp: bool = False
     """`--mcp` による MCP 連携の有効化フラグ."""
+
+    max_tool_rounds: int = Constants.DEFAULT_MAX_TOOL_ROUNDS
+    """`--max-tool-rounds` による, MCP のツール呼び出しを繰り返す回数の上限."""
 
     cache: bool | str = False
     """`-c`/`--cache` による Context Caching 利用指定 (True または Cache ID 文字列)."""

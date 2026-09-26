@@ -201,6 +201,30 @@ class TestParseArgs:
         assert args.cache is True
         assert args.mcp is True
 
+    def test_parse_args_max_tool_rounds_success(self, monkeypatch):
+        """--max-tool-rounds は, 既定が 20 で, 指定した値が反映され, 値がプロンプトにならないか検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py", "質問です"])
+        default = parse_args()
+        monkeypatch.setattr(
+            "sys.argv", ["chat.py", "--mcp", "--max-tool-rounds", "5", "質問です"]
+        )
+        specified = parse_args()
+
+        assert default.max_tool_rounds == 20
+        assert specified.max_tool_rounds == 5
+        assert specified.prompt == "質問です"
+
+    @pytest.mark.parametrize("value", ["0", "-1", "abc"])
+    def test_parse_args_max_tool_rounds_failure(self, monkeypatch, capsys, value):
+        """--max-tool-rounds に 1 以上の整数以外を指定すると, 引数のエラーになるか検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py", f"--max-tool-rounds={value}", "q"])
+
+        with pytest.raises(SystemExit) as exc_info:
+            parse_args()
+
+        assert exc_info.value.code == 2
+        assert "1 以上の整数を指定してください" in capsys.readouterr().err
+
     def test_parse_args_cache_subcommand_success(self, monkeypatch):
         """cache create の対象パスと --ttl が解析されるか検証."""
         monkeypatch.setattr(

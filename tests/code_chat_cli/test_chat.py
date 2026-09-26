@@ -76,6 +76,7 @@ class TestRunSingleTurnMode:
             use_oauth=False,
             model_name="gemini-flash-latest",
             cached_content=None,
+            max_tool_rounds=20,
         )
         assert history == ["### User (MCP)\n\ngit status", "### Gemini (MCP)\n\nclean"]
 
@@ -1244,6 +1245,17 @@ class TestHandleMcpSingleTurn:
             _handle_mcp_single_turn(args, [])
 
         assert run.await_args.kwargs["use_oauth"] is True
+
+    def test_handle_mcp_single_turn_max_tool_rounds_success(self):
+        """--max-tool-rounds の値が, MCP に引き継がれるか検証."""
+        args = _cli_args(mcp=True, prompt="q", max_tool_rounds=7)
+
+        with patch(
+            "code_chat_cli.chat.handle_mcp_run", new=AsyncMock(return_value="answer")
+        ) as run:
+            _handle_mcp_single_turn(args, [])
+
+        assert run.await_args.kwargs["max_tool_rounds"] == 7
 
     def test_handle_mcp_single_turn_cache_success(self):
         """解決済みのモデルとキャッシュ名が, MCP に引き継がれるか検証."""
