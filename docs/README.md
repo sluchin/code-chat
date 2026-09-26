@@ -76,13 +76,15 @@ uv run sphinx-autobuild docs docs/_build/html
 
 ```text
 .
-├── DOCUMENTATION.md        # 本ガイド
-├── pyproject.toml          # uv の依存関係管理
-├── src/                    # Python ソースコード
+├── pyproject.toml          # uv の依存関係管理 (workspace)
+├── packages/               # Python ソースコード (uv workspace)
+│   ├── code-chat-cli/      #   CLI 本体 (code_chat_cli)
+│   ├── code-chat-rag/      #   RAG (code_chat_rag)
+│   └── code-chat-mcp/      #   MCP (code_chat_mcp)
 └── docs/                   # Sphinx ドキュメント用ディレクトリ
     ├── conf.py             # Sphinx 設定ファイル (パス指定, 拡張子, テーマ設定)
     ├── index.rst           # ドキュメントのトップページ（目次）
-    ├── api/                # sphinx-apidoc によって自動生成される .rst 群
+    ├── api/                # sphinx-apidoc によって自動生成される .rst 群 (パッケージごと)
     ├── Makefile            # ビルド用コマンド設定
     └── _build/             # 生成された HTML の出力先 (git 追跡対象外)
 
@@ -97,7 +99,9 @@ uv run sphinx-autobuild docs docs/_build/html
 ```make
 # apidoc と html ビルドを一括実行するターゲット
 apidoc:
-	uv run sphinx-apidoc -f -o api ../src/gemini_app
+	uv run sphinx-apidoc -f -o api/code_chat_cli ../packages/code-chat-cli/src/code_chat_cli
+	uv run sphinx-apidoc -f -o api/code_chat_rag ../packages/code-chat-rag/src/code_chat_rag
+	uv run sphinx-apidoc -f -o api/code_chat_mcp ../packages/code-chat-mcp/src/code_chat_mcp
 	@$(SPHINXBUILD) -M html "." "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 ```

@@ -24,4 +24,5 @@ help:
 apidoc:
 	uv run sphinx-apidoc -f -o api/code_chat_cli ../packages/code-chat-cli/src/code_chat_cli
 	uv run sphinx-apidoc -f -o api/code_chat_rag ../packages/code-chat-rag/src/code_chat_rag
+	uv run sphinx-apidoc -f -o api/code_chat_mcp ../packages/code-chat-mcp/src/code_chat_mcp
 	@$(SPHINXBUILD) -M html "." "$(BUILDDIR)" $(SPHINXOPTS) $(O)

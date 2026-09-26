@@ -1,9 +1,11 @@
 """pytest の共通フィクスチャ定義モジュール."""
 
+from dataclasses import asdict
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+from code_chat_cli.args import CliArgs
 
 
 @pytest.fixture
@@ -16,27 +18,9 @@ def mock_client() -> MagicMock:
 
 @pytest.fixture
 def mock_args():
-    """parse_args の全属性を網羅した SimpleNamespace モック."""
+    """parse_args の戻り値 (CliArgs と同じ属性) を SimpleNamespace で模したモック."""
     with patch("code_chat_cli.chat.parse_args") as mock_parse:
-        args = SimpleNamespace(
-            prompt=None,
-            target_path=None,
-            output_path=None,
-            auto_save=False,
-            write_mode=False,
-            model="gemini-flash-latest",
-            debug=False,
-            log_level="INFO",
-            list_models=False,
-            generate_commit_msg=False,
-            review=False,
-            staged=False,
-            context=None,
-            command=None,
-            repo_path=".",
-            query=None,
-            top_k=5,
-        )
+        args = SimpleNamespace(**asdict(CliArgs(model="gemini-flash-latest")))
         mock_parse.return_value = args
         yield mock_parse
 

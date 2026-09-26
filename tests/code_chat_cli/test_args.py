@@ -1,12 +1,10 @@
 """引数パーサーおよびコンテキスト収集機能のテスト."""
 
 import io
-from pathlib import Path
-from unittest import mock
 from unittest.mock import patch
 
 import pytest
-from code_chat_cli.args import _read_stdin_content, parse_args, read_path_content
+from code_chat_cli.args import _read_stdin_content, parse_args
 
 
 @pytest.fixture(autouse=True)
@@ -15,226 +13,183 @@ def mock_stdin(monkeypatch):
     monkeypatch.setattr("sys.stdin", io.StringIO(""))
 
 
-def test_read_path_content_single_file(tmp_path):
-    """単一ファイルが正常に読み込まれ, ヘッダーが付与された文字列が返るか検証."""
-    file_path = tmp_path / "sample.py"
-    file_path.write_text("print('hello')", encoding="utf-8")
+class TestParseArgs:
+    """`parse_args` のテスト."""
 
-    result = read_path_content(str(file_path))
+    def test_parse_args_default_success(self, monkeypatch):
+        """引数を何も指定しない場合, デフォルト値（INFO）が設定されるか検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py"])
+        args = parse_args()
 
-    assert result == f"=== File: {file_path} ===\nprint('hello')"
+        assert args.prompt == ""
+        assert args.debug_mode is False
+        assert args.log_level == "INFO"
+        assert args.subcommand is None
+        assert args.output_dir == "./.chroma_db"
 
+    def test_parse_args_prompt_success(self, monkeypatch):
+        """サブコマンドなしでプロンプト文字列を指定した場合に正しく取得できるか検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py", "コードをレビューして"])
+        args = parse_args()
 
-def test_read_path_content_not_exists():
-    """存在しないパスを指定した場合, sys.exit(1) で終了するか検証."""
-    with pytest.raises(SystemExit) as exc_info:
-        read_path_content("non_existent_file.txt")
+        assert args.prompt == "コードをレビューして"
+        assert args.subcommand is None
 
-    assert exc_info.value.code == 1
+    def test_parse_args_debug_short_option_success(self, monkeypatch):
+        """-D フラグ指定時に debug が True になるか検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py", "-D"])
+        args = parse_args()
 
+        assert args.debug_mode is True
 
-def test_read_path_content_file_read_error(tmp_path):
-    """単一ファイルの読み込み時に例外が発生した場合, sys.exit(1) で終了するか検証."""
-    file_path = tmp_path / "error_file.txt"
-    file_path.write_text("content", encoding="utf-8")
+    def test_parse_args_debug_long_option_success(self, monkeypatch):
+        """--debug フラグ指定時に debug が True になるか検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py", "--debug"])
+        args = parse_args()
 
-    with (
-        patch.object(Path, "read_text", side_effect=OSError("Permission denied")),
-        pytest.raises(SystemExit) as exc_info,
+        assert args.debug_mode is True
+
+    def test_parse_args_log_level_custom_success(self, monkeypatch):
+        """--log-level で大文字・小文字問わず正しく取得できるか検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py", "--log-level", "debug"])
+        args = parse_args()
+
+        assert args.log_level == "DEBUG"
+
+    def test_parse_args_with_stdin_context_success(self, monkeypatch):
+        """標準入力（パイプ等）から入力がある場合, context に [標準入力] ヘッダー付きで格納されるか検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py"])
+
+        monkeypatch.setattr("sys.stdin", io.StringIO("パイプからのテストデータ"))
+        monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+
+        args = parse_args()
+
+        assert "--- [標準入力] ---" in args.context
+        assert "パイプからのテストデータ" in args.context
+
+    def test_parse_args_with_file_context_success(self, monkeypatch, tmp_path):
+        """-f / --file オプション指定時, context にファイル内容が格納されるか検証."""
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("ファイルの中身", encoding="utf-8")
+
+        monkeypatch.setattr("sys.argv", ["chat.py", "-f", str(test_file)])
+        monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+
+        args = parse_args()
+
+        assert f"--- [パス入力: {test_file}] ---" in args.context
+        assert "ファイルの中身" in args.context
+
+    def test_parse_args_rag_create_subcommand_success(self, monkeypatch):
+        """rag create サブコマンドと --input_dirs の複数指定, --output_dir の解析を検証."""
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "cchat",
+                "rag",
+                "create",
+                "--input_dirs",
+                "/tmp/a",
+                "/tmp/b",
+                "--output_dir",
+                "/tmp/db",
+            ],
+        )
+        args = parse_args()
+
+        assert args.subcommand == "rag"
+        assert args.subcommand_action == "create"
+        assert args.input_dirs == ["/tmp/a", "/tmp/b"]
+        assert args.output_dir == "/tmp/db"
+
+    def test_parse_args_rag_update_single_input_dir_success(self, monkeypatch):
+        """--input_dirs に 1 つのパスを渡しても文字単位に分解されないことを検証."""
+        monkeypatch.setattr(
+            "sys.argv", ["cchat", "rag", "update", "--input_dirs", "src"]
+        )
+        args = parse_args()
+
+        assert args.subcommand_action == "update"
+        assert args.input_dirs == ["src"]
+
+    def test_parse_args_prompt_with_options_success(self, monkeypatch):
+        """位置引数のプロンプトがオプションと混在しても, サブコマンドとして誤認されないことを検証."""
+        monkeypatch.setattr(
+            "sys.argv", ["chat.py", "hello", "world", "-m", "gemini-x", "-f", "a.py"]
+        )
+        with patch("code_chat_cli.args.read_path_content", return_value="content"):
+            args = parse_args()
+
+        assert args.prompt == "hello world"
+        assert args.model == "gemini-x"
+        assert args.files == ["a.py"]
+        assert args.subcommand is None
+
+    def test_parse_args_review_staged_success(self, monkeypatch):
+        """--review と --staged が解析されるか検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py", "--review", "--staged"])
+        args = parse_args()
+
+        assert args.review is True
+        assert args.staged is True
+
+    def test_parse_args_login_success(self, monkeypatch):
+        """--login が解析されるか検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py", "--login"])
+        args = parse_args()
+
+        assert args.login is True
+        assert args.oauth is False
+
+    def test_parse_args_oauth_success(self, monkeypatch):
+        """--oauth が解析されるか検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py", "--oauth", "こんにちは"])
+        args = parse_args()
+
+        assert args.oauth is True
+        assert args.login is False
+
+    @pytest.mark.parametrize("option", ["--rag", "--mcp"])
+    def test_parse_args_file_with_rag_or_mcp_failure(
+        self, monkeypatch, tmp_path, capsys, option
     ):
-        read_path_content(str(file_path))
+        """-f と --rag / --mcp を同時に指定した場合に, エラー (終了コード 2) で終了するか検証."""
+        target = tmp_path / "a.py"
+        target.write_text("print('a')", encoding="utf-8")
+        monkeypatch.setattr("sys.argv", ["chat.py", option, "-f", str(target), "q"])
 
-    assert exc_info.value.code == 1
+        with pytest.raises(SystemExit) as exc_info:
+            parse_args()
 
+        assert exc_info.value.code == 2
+        assert "-f/--file は --rag / --mcp と併用できません" in capsys.readouterr().err
 
-def test_read_path_content_directory_file_read_error(tmp_path):
-    """ディレクトリ内の特定ファイル読み込み時に例外が発生した場合, ログを出力してそのファイルをスキップするか検証."""
-    valid_file = tmp_path / "valid.py"
-    valid_file.write_text("print('ok')", encoding="utf-8")
+    def test_parse_args_invalid_log_level_failure(self, monkeypatch):
+        """無効な --log-level を指定した場合に SystemExit (エラー) になるか検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py", "--log-level", "INVALID_LEVEL"])
 
-    error_file = tmp_path / "error.py"
-    error_file.write_text("print('error')", encoding="utf-8")
+        with pytest.raises(SystemExit):
+            parse_args()
 
-    original_read_text = Path.read_text
 
-    def custom_read_text(path_obj, *args, **kwargs):
-        if path_obj.name == "error.py":
-            raise OSError("Read failure test")
-        return original_read_text(path_obj, *args, **kwargs)
+class TestReadStdinContent:
+    """`_read_stdin_content` のテスト."""
 
-    with patch("pathlib.Path.read_text", autospec=True, side_effect=custom_read_text):
-        result = read_path_content(str(tmp_path))
+    def test_read_stdin_content_pipe_success(self, monkeypatch):
+        """パイプ入力等の場合（isatty가 False）, 入力テキストが返るか検証."""
+        monkeypatch.setattr("sys.stdin", io.StringIO("パイプからの入力内容"))
+        monkeypatch.setattr("sys.stdin.isatty", lambda: False)
 
-    assert f"=== File: {valid_file} ===\nprint('ok')" in result
-    assert str(error_file) not in result
+        result = _read_stdin_content()
 
+        assert result == "パイプからの入力内容"
 
-def test_read_path_content_directory(tmp_path):
-    """ディレクトリ指定時, 対象拡張子のみ読み込まれ除外対象ディレクトリがスキップされるか検証."""
-    valid_file1 = tmp_path / "valid.py"
-    valid_file1.write_text("code", encoding="utf-8")
+    def test_read_stdin_content_tty(self, monkeypatch):
+        """端末（tty）入力の場合（isatty True）, 空文字列が返るか検証."""
+        monkeypatch.setattr("sys.stdin", io.StringIO("入力文字列"))
+        monkeypatch.setattr("sys.stdin.isatty", lambda: True)
 
-    sub_dir = tmp_path / "sub"
-    sub_dir.mkdir()
-    valid_file2 = sub_dir / "valid.md"
-    valid_file2.write_text("markdown", encoding="utf-8")
+        result = _read_stdin_content()
 
-    ignored_file = tmp_path / "ignored.exe"
-    ignored_file.write_text("binary", encoding="utf-8")
-
-    git_dir = tmp_path / ".git"
-    git_dir.mkdir()
-    hidden_file = git_dir / "hidden.py"
-    hidden_file.write_text("git_code", encoding="utf-8")
-
-    result = read_path_content(str(tmp_path))
-
-    assert f"=== File: {valid_file1} ===\ncode" in result
-    assert f"=== File: {valid_file2} ===\nmarkdown" in result
-
-    assert str(ignored_file) not in result
-    assert str(hidden_file) not in result
-
-
-def test_read_path_content_empty_directory(tmp_path):
-    """対象ファイルが存在しないディレクトリを指定した場合, 空文字列が返るか検証."""
-    empty_dir = tmp_path / "empty_dir"
-    empty_dir.mkdir()
-
-    result = read_path_content(str(empty_dir))
-
-    assert result == ""
-
-
-def test_read_path_content_other_path_type():
-    """ファイルでもディレクトリでもない特殊なパス（ソケット等）の場合, 空文字列が返るか検証."""
-    mock_path = mock.MagicMock()
-    mock_path.exists.return_value = True
-    mock_path.is_file.return_value = False
-    mock_path.is_dir.return_value = False
-
-    with patch("code_chat_cli.args.Path", return_value=mock_path):
-        result = read_path_content("/dev/null")
-
-    assert result == ""
-
-
-def test_read_stdin_content_pipe(monkeypatch):
-    """パイプ入力等の場合（isatty가 False）, 入力テキストが返るか検証."""
-    monkeypatch.setattr("sys.stdin", io.StringIO("パイプからの入力内容"))
-    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
-
-    result = _read_stdin_content()
-
-    assert result == "パイプからの入力内容"
-
-
-def test_read_stdin_content_tty(monkeypatch):
-    """端末（tty）入力の場合（isatty True）, 空文字列が返るか検証."""
-    monkeypatch.setattr("sys.stdin", io.StringIO("入力文字列"))
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
-
-    result = _read_stdin_content()
-
-    assert result == ""
-
-
-def test_parse_args_default(monkeypatch):
-    """引数を何も指定しない場合, デフォルト値（INFO）が設定されるか検証."""
-    monkeypatch.setattr("sys.argv", ["chat.py"])
-    args = parse_args()
-
-    assert args.prompt == ""
-    assert args.debug_mode is False
-    assert args.log_level == "INFO"
-    assert args.subcommand is None
-    assert args.output_dir == "."
-
-
-def test_parse_args_prompt(monkeypatch):
-    """サブコマンドなしでプロンプト文字列を指定した場合に正しく取得できるか検証."""
-    monkeypatch.setattr("sys.argv", ["chat.py", "コードをレビューして"])
-    args = parse_args()
-
-    assert args.prompt == "コードをレビューして"
-    assert args.subcommand is None
-
-
-def test_parse_args_debug_short_option(monkeypatch):
-    """-D フラグ指定時に debug が True になるか検証."""
-    monkeypatch.setattr("sys.argv", ["chat.py", "-D"])
-    args = parse_args()
-
-    assert args.debug_mode is True
-
-
-def test_parse_args_debug_long_option(monkeypatch):
-    """--debug フラグ指定時に debug が True になるか検証."""
-    monkeypatch.setattr("sys.argv", ["chat.py", "--debug"])
-    args = parse_args()
-
-    assert args.debug_mode is True
-
-
-def test_parse_args_log_level_custom(monkeypatch):
-    """--log-level で大文字・小文字問わず正しく取得できるか検証."""
-    monkeypatch.setattr("sys.argv", ["chat.py", "--log-level", "debug"])
-    args = parse_args()
-
-    assert args.log_level == "DEBUG"
-
-
-def test_parse_args_invalid_log_level(monkeypatch):
-    """無効な --log-level を指定した場合に SystemExit (エラー) になるか検証."""
-    monkeypatch.setattr("sys.argv", ["chat.py", "--log-level", "INVALID_LEVEL"])
-
-    with pytest.raises(SystemExit):
-        parse_args()
-
-
-def test_parse_args_with_stdin_context(monkeypatch):
-    """標準入力（パイプ等）から入力がある場合, context に [標準入力] ヘッダー付きで格納されるか検証."""
-    monkeypatch.setattr("sys.argv", ["chat.py"])
-
-    monkeypatch.setattr("sys.stdin", io.StringIO("パイプからのテストデータ"))
-    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
-
-    args = parse_args()
-
-    assert "--- [標準入力] ---" in args.context
-    assert "パイプからのテストデータ" in args.context
-
-
-def test_parse_args_with_file_context(monkeypatch, tmp_path):
-    """-f / --file オプション指定時, context にファイル内容が格納されるか検証."""
-    test_file = tmp_path / "test.txt"
-    test_file.write_text("ファイルの中身", encoding="utf-8")
-
-    monkeypatch.setattr("sys.argv", ["chat.py", "-f", str(test_file)])
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
-
-    args = parse_args()
-
-    assert f"--- [パス入力: {test_file}] ---" in args.context
-    assert "ファイルの中身" in args.context
-
-
-def test_parse_args_rag_index_subcommand(monkeypatch):
-    """index サブコマンドの指定および --repo-path の解析を検証."""
-    monkeypatch.setattr("sys.argv", ["cchat", "index", "-r", "/tmp/repo"])
-    args = parse_args()
-
-    assert args.subcommand == "index"
-    assert args.output_dir == "/tmp/repo"
-
-
-def test_parse_args_rag_ask_subcommand(monkeypatch):
-    """ask サブコマンドの指定, query, --repo-path, --top-k の解析を検証."""
-    monkeypatch.setattr(
-        "sys.argv",
-        ["cchat", "ask", "how to build?", "-r", "/tmp/repo", "-k", "10"],
-    )
-    args = parse_args()
-
-    assert args.subcommand == "ask"
-    assert args.output_dir == "/tmp/repo"
+        assert result == ""

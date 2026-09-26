@@ -15,7 +15,7 @@ def handle_code_review(
     client: Any,
     model_name: str,
     staged: bool = False,
-    file_path: str | None = None,
+    file_path: str | list[str] | None = None,
 ) -> None:
     """コード差分または指定ファイルを解析し, LLM によるコードレビュー結果を表示する.
 
@@ -24,8 +24,8 @@ def handle_code_review(
         model_name (str): 使用する Gemini モデル名.
         staged (bool, optional): True の場合, git diff の --cached
             (ステージング済み) 差分を対象にする. Defaults to False.
-        file_path (str | None, optional): レビュー対象のファイルまたは
-            ディレクトリのパス. 指定された場合は git diff ではなく
+        file_path (str | list[str] | None, optional): レビュー対象のファイルまたは
+            ディレクトリのパス (複数指定可). 指定された場合は git diff ではなく
             ファイル内容全体をレビューする. Defaults to None.
 
     """
@@ -36,7 +36,8 @@ def handle_code_review(
             "-f オプションが指定されたため, ファイル/ディレクトリをコンテキストとして読み込みます: %s",
             file_path,
         )
-        target_code = read_path_content(file_path)
+        paths = [file_path] if isinstance(file_path, str) else file_path
+        target_code = "\n\n".join(read_path_content(p) for p in paths)
     else:
         logger.info("git diff から変更差分を取得してレビューを実施します.")
         target_code = _get_git_diff(staged)

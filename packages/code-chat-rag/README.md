@@ -25,7 +25,6 @@ service = CodeRagService(persist_directory="./.chroma_db")
 chunk_count = service.index_repository("/path/to/target/repo")
 
 print(f"Indexed {chunk_count} chunks successfully.")
-
 ```
 
 ---
@@ -43,7 +42,6 @@ query = "ChromaDB への接続処理を行っているモジュールはどれ�
 for token in service.ask_stream(query):
     print(token, end="", flush=True)
 print()
-
 ```
 
 ---
@@ -55,7 +53,6 @@ print()
 ```python
 answer = service.ask("認証処理のロジックについて解説してください.")
 print(answer)
-
 ```
 
 ---

@@ -36,7 +36,7 @@ dev = [
 addopts = [
     "--cov=packages/code-chat-cli/src/code_chat_cli",
     "--cov=packages/code-chat-rag/src/code_chat_rag",
-    "--cov=packages/code-chat-rag/src/code_chat_mcp",
+    "--cov=packages/code-chat-mcp/src/code_chat_mcp",
     "--cov-report=term-missing",
 ]
 testpaths = ["tests"]
@@ -48,6 +48,9 @@ pythonpath = [
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
+
+[tool.coverage.report]
+fail_under = 100
 
 [tool.pylint.master]
 ignore-paths = [

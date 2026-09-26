@@ -76,27 +76,19 @@ def save_readline_history() -> None:
             pass
 
 
-def save_history_if_needed(
-    chat_history: list[str], output_file: str | None, auto_save: bool
-) -> None:
+def save_history_if_needed(chat_history: list[str], auto_save: bool) -> None:
     """必要に応じて対話履歴をファイルに保存します.
 
-    対話履歴が存在し, 保存先ファイルパスが指定されているか自動保存が有効な場合に
-    対話ログをファイルへ保存します.
+    対話履歴が存在し, 自動保存が有効な場合に,
+    タイムスタンプ付きのファイル名 (`<日時>_chat.md`) で対話ログを保存します.
 
     Args:
         chat_history (list[str]): 保存対象の対話履歴リスト.
-        output_file (str | None): 保存先のファイルパス. 指定がない場合は None.
-        auto_save (bool): ファイルパス未指定時にタイムスタンプ付きファイル名を生成して保存するかどうか.
+        auto_save (bool): 自動保存が有効かどうか.
 
     """
-    if not chat_history:
+    if not chat_history or not auto_save:
         return
 
-    target_path = output_file
-    if auto_save and not target_path:
-        timestamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
-        target_path = f"{timestamp}_chat.md"
-
-    if target_path:
-        save_chat_history(target_path, chat_history)
+    timestamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
+    save_chat_history(f"{timestamp}_chat.md", chat_history)

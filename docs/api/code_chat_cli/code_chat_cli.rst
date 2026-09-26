@@ -28,6 +28,14 @@ code\_chat\_cli.args module
    :show-inheritance:
    :undoc-members:
 
+code\_chat\_cli.auth module
+---------------------------
+
+.. automodule:: code_chat_cli.auth
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 code\_chat\_cli.chat module
 ---------------------------
 
@@ -48,6 +56,14 @@ code\_chat\_cli.constants module
 --------------------------------
 
 .. automodule:: code_chat_cli.constants
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+code\_chat\_cli.file\_utils module
+----------------------------------
+
+.. automodule:: code_chat_cli.file_utils
    :members:
    :show-inheritance:
    :undoc-members:
@@ -76,14 +92,6 @@ code\_chat\_cli.history module
    :show-inheritance:
    :undoc-members:
 
-code\_chat\_cli.index module
-----------------------------
-
-.. automodule:: code_chat_cli.index
-   :members:
-   :show-inheritance:
-   :undoc-members:
-
 code\_chat\_cli.logger module
 -----------------------------
 
@@ -92,10 +100,34 @@ code\_chat\_cli.logger module
    :show-inheritance:
    :undoc-members:
 
+code\_chat\_cli.mcp module
+--------------------------
+
+.. automodule:: code_chat_cli.mcp
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 code\_chat\_cli.prompts module
 ------------------------------
 
 .. automodule:: code_chat_cli.prompts
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+code\_chat\_cli.query\_handler module
+-------------------------------------
+
+.. automodule:: code_chat_cli.query_handler
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+code\_chat\_cli.rag module
+--------------------------
+
+.. automodule:: code_chat_cli.rag
    :members:
    :show-inheritance:
    :undoc-members:

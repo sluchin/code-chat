@@ -5,8 +5,8 @@ from collections import defaultdict
 from pathlib import Path
 
 from code_chat_mcp.mcp_service import McpService, McpToolInfo
-from google import genai
 
+from code_chat_cli.client import get_gemini_client
 from code_chat_cli.logger import get_logger
 from code_chat_cli.query_handler import QueryHandler
 
@@ -16,6 +16,7 @@ logger = get_logger(__name__)
 async def handle_mcp_run(
     user_prompt: str,
     config_path: Path | str | None = None,
+    use_oauth: bool = False,
 ) -> str:
     """McpService のライフサイクルを管理し, Gemini へのクエリとツール実行を行います.
 
@@ -35,8 +36,8 @@ async def handle_mcp_run(
 
         # async with で MCP サーバープロセスの自動起動・自動クリーンアップを行う
         async with McpService(config_path=config) as mcp_service:
-            # クライアントの初期化（必要に応じて環境変数 GEMINI_API_KEY を参照）
-            client = genai.Client()
+            # クライアントの初期化（API キーまたは OAuth 認証）
+            client = get_gemini_client(use_oauth=use_oauth)
             handler = QueryHandler(gemini_client=client, mcp_service=mcp_service)
 
             logger.info("ユーザープロンプトの処理を開始します: %s", user_prompt)

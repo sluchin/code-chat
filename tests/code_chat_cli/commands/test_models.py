@@ -1,68 +1,22 @@
 # pylint: disable=redefined-outer-name
-"""モデル一覧の取得および表示処理を行うサブコマンドモジュール."""
+"""`code_chat_cli.commands.models` モジュールのテスト."""
 
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from code_chat_cli.chat import (
-    main,
-)
 from code_chat_cli.commands.models import handle_list_models
 
 
-def test_main_list_models_option(monkeypatch, mock_gemini_client, mock_args, capsys):
-    """--list-models 指定時にモデル一覧を表示して正常終了するか検証."""
-    mock_args.return_value.list_models = True
+class TestHandleListModels:
+    """`handle_list_models` のテスト."""
 
-    # モデルのモックを作成（SimpleNamespace を使用）
-    mock_model = SimpleNamespace(
-        name="models/gemini-flash-latest",
-        display_name="Gemini Flash Latest",
-        supported_actions=["generateContent"],
-        supported_generation_methods=["generateContent"],
-    )
+    def test_handle_list_models_failure(self, mock_client: MagicMock) -> None:
+        """model.list() で例外が発生した場合, 例外がログ出力されて再送出されることを検証する."""
+        # client.models.list() が例外を発生させるようにモックを設定
+        mock_client.models.list.side_effect = Exception("API Error")
 
-    # models.list() の戻り値としてモックのリストを設定
-    mock_gemini_client["client"].models.list.return_value = [mock_model]
+        with pytest.raises(Exception, match="API Error"):
+            handle_list_models(mock_client)
 
-    monkeypatch.setattr("sys.argv", ["chat.py", "--list-models"])
-
-    with pytest.raises(SystemExit) as exc_info:
-        main()
-
-    assert exc_info.value.code == 0
-    captured = capsys.readouterr()
-
-    # 期待するモデル名が出力に含まれているか検証
-    assert "- gemini-flash-latest (Gemini Flash Latest)" in captured.out
-
-
-def test_main_list_models_exception(monkeypatch, mock_gemini_client, mock_args):
-    """--list-models 指定時に API エラー等の例外が発生した場合, sys.exit(1) で終了するか検証."""
-    mock_args.return_value.list_models = True
-
-    # models.list() 呼び出し時に Exception を発生させる
-    mock_gemini_client["client"].models.list.side_effect = Exception(
-        "API connection error"
-    )
-
-    monkeypatch.setattr("sys.argv", ["chat.py", "--list-models"])
-
-    with pytest.raises(SystemExit) as exc_info:
-        main()
-
-    # ステータスコード 1 で終了したことを検証
-    assert exc_info.value.code == 1
-
-
-def test_handle_list_models_exception(mock_client: MagicMock) -> None:
-    """model.list() で例外が発生した場合, 例外がログ出力されて再送出されることを検証する."""
-    # client.models.list() が例外を発生させるようにモックを設定
-    mock_client.models.list.side_effect = Exception("API Error")
-
-    with pytest.raises(Exception, match="API Error"):
-        handle_list_models(mock_client)
-
-    # 18-20行目の try-except ブロックが確実に通過されたことを検証
-    mock_client.models.list.assert_called_once()
+        # 18-20行目の try-except ブロックが確実に通過されたことを検証
+        mock_client.models.list.assert_called_once()

@@ -27,7 +27,7 @@ def handle_rag_create(
         logger.debug("RagService の初期化を開始します")
         service = RagService(output_dir=output_dir)
 
-        if not dryrun:
+        if dryrun:
             print("[DRY-RUN] インデックスの更新対象ファイルを計算します...")
             _handle_dryrun(input_dirs=input_dirs)
             return
@@ -59,7 +59,7 @@ def handle_rag_update(
         logger.debug("RagService の初期化を開始します")
         service = RagService(output_dir=output_dir)
 
-        if not dryrun:
+        if dryrun:
             print("[DRY-RUN] インデックスの更新対象ファイルを計算します...")
             _handle_dryrun(input_dirs=input_dirs)
             return

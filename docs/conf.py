@@ -9,7 +9,7 @@
 import os
 import sys
 
-project = "gemini-app"
+project = "code-chat"
 copyright = "2026, Tetsuya Higashi"
 author = "Tetsuya Higashi"
 
@@ -19,6 +19,7 @@ author = "Tetsuya Higashi"
 # ソースコードの存在するディレクトリをパスに追加 (docs/ から見た相対パス)
 sys.path.insert(0, os.path.abspath("../packages/code-chat-cli/src"))
 sys.path.insert(0, os.path.abspath("../packages/code-chat-rag/src"))
+sys.path.insert(0, os.path.abspath("../packages/code-chat-mcp/src"))
 
 extensions = [
     "sphinx.ext.autodoc",
