@@ -24,7 +24,7 @@ class TestInit:
         config = McpConfig()
 
         assert config.config_path == tmp_path / ".config" / "code-chat" / "mcp.json"
-        assert config.servers == {}
+        assert not config.servers
 
 
 class TestLoadMcpConfig:
@@ -65,7 +65,7 @@ class TestLoadMcpConfig:
         with caplog.at_level(logging.WARNING):
             config = McpConfig(tmp_path / "missing.json")
 
-        assert config.servers == {}
+        assert not config.servers
         assert "MCP 設定ファイルが見つかりません" in caplog.text
 
     def test_load_mcp_config_invalid_json_exception(self, tmp_path, caplog):
@@ -76,7 +76,7 @@ class TestLoadMcpConfig:
         with caplog.at_level(logging.ERROR):
             config = McpConfig(path)
 
-        assert config.servers == {}
+        assert not config.servers
         assert "MCP 設定ファイルの読み込みに失敗しました" in caplog.text
 
     def test_load_mcp_config_disabled_servers_are_skipped(self, tmp_path):
@@ -100,4 +100,4 @@ class TestLoadMcpConfig:
         """mcpServers キーが無い場合は空になるか検証."""
         config = McpConfig(_write_config(tmp_path / "mcp.json", {}))
 
-        assert config.servers == {}
+        assert not config.servers

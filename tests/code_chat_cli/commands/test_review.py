@@ -233,37 +233,20 @@ class TestHandleCodeReview:
     def test_handle_code_review_directory_read_exception(
         self,
         mock_client: MagicMock,
-        tmp_path: Path,
-        # capsys: pytest.CaptureFixture[str],
+        valid_and_error_files: tuple[Path, Path],
+        fail_read_text,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         """ディレクトリ走査中に特定ファイルの読み込み例外が発生した際, スキップログが出力され処理が継続することを検証する."""
-        # テキストファイルを配置
-        valid_file = tmp_path / "valid.py"
-        valid_file.write_text("print('ok')", encoding="utf-8")
-
-        error_file = tmp_path / "error.py"
-        error_file.write_text("print('error')", encoding="utf-8")
+        valid_file, _ = valid_and_error_files
 
         # Path.read_text の呼び出しで特定ファイルのみ例外を発生させる
-        original_read_text = Path.read_text
-
-        def mock_read_text(self: Path, *args: object, **kwargs: object) -> str:
-            if self.name == "error.py":
-                raise PermissionError("アクセスが拒否されました")
-            return original_read_text(self, *args, **kwargs)  # type: ignore[arg-type]
-
-        with patch.object(Path, "read_text", side_effect=mock_read_text, autospec=True):
+        with fail_read_text("error.py", PermissionError("アクセスが拒否されました")):
             handle_code_review(
-                mock_client, "gemini-flash-latest", file_path=str(tmp_path)
+                mock_client, "gemini-flash-latest", file_path=str(valid_file.parent)
             )
 
         assert "読み込みをスキップしました" in caplog.text
-        # captured = capsys.readouterr()
-        # assert "スキップ (読み込み失敗):" in captured.err
-        # assert "アクセスが拒否されました" in captured.err
-        # 正常なファイルのみでレビューが実行されたか検証
-        # mock_client.models.generate_content_stream.assert_called_once()
 
     def test_handle_code_review_exception_handling_exception(
         self,

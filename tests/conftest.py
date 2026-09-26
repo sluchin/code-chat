@@ -1,6 +1,7 @@
 """pytest の共通フィクスチャ定義モジュール."""
 
 from dataclasses import asdict
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -49,3 +50,31 @@ def mock_gemini_client(mock_client):
             "client": mock_client,
             "chat": mock_chat,
         }
+
+
+@pytest.fixture
+def valid_and_error_files(tmp_path: Path) -> tuple[Path, Path]:
+    """同じディレクトリに, 読める `valid.py` と, 読み込みを失敗させる対象の `error.py` を作成する."""
+    valid_file = tmp_path / "valid.py"
+    valid_file.write_text("print('ok')", encoding="utf-8")
+
+    error_file = tmp_path / "error.py"
+    error_file.write_text("print('error')", encoding="utf-8")
+    return valid_file, error_file
+
+
+@pytest.fixture
+def fail_read_text():
+    """特定のファイル名だけ `Path.read_text` で例外を発生させる patch を作成するファクトリ."""
+
+    def factory(file_name: str, error: Exception):
+        original_read_text = Path.read_text
+
+        def read_text(path_obj: Path, *args, **kwargs):
+            if path_obj.name == file_name:
+                raise error
+            return original_read_text(path_obj, *args, **kwargs)
+
+        return patch.object(Path, "read_text", side_effect=read_text, autospec=True)
+
+    return factory

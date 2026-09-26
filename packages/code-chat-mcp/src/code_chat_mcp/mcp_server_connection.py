@@ -1,4 +1,4 @@
-"""ローカル MCP サーバープロセスのライフサイクル管理および MCP 公式 SDK との通信モジュール."""
+"""MCP サーバーへの接続 (サブプロセスの起動と MCP セッションの確立) およびツール取得・呼び出しを行うモジュール."""
 
 import logging
 from collections.abc import AsyncGenerator
@@ -12,8 +12,12 @@ from mcp.client.stdio import stdio_client
 logger = logging.getLogger(__name__)
 
 
-class McpServerProcess:
-    """MCP 公式 SDK (`mcp`) を使用してローカルの MCP サーバープロセスを起動し, Stdio パイプ通信経由でツール取得や呼び出しを仲介するクラス."""
+class McpServerConnection:
+    """MCP サーバー 1 台への接続を表すクラス.
+
+    MCP 公式 SDK (`mcp`) を使用して, ローカルの MCP サーバーをサブプロセスとして起動し,
+    Stdio パイプ通信経由でツール取得や呼び出しを仲介します.
+    """
 
     def __init__(
         self,
@@ -21,7 +25,7 @@ class McpServerProcess:
         args: list[str] | None = None,
         env: dict[str, str] | None = None,
     ) -> None:
-        """McpServerProcess インスタンスを初期化します.
+        """McpServerConnection インスタンスを初期化します.
 
         Args:
             command (str): 実行コマンド (例: "uvx", "node", "python").
