@@ -28,7 +28,6 @@ from code_chat_cli.chat import (
     _handle_prompt_mode,
     _handle_rag_subcommand,
     _handle_subcommands,
-    _load_files_context,
     _log_cache_usage,
     _query_mcp,
     _require_rag_api_key,
@@ -279,19 +278,6 @@ class TestHandleSlashCommand:
 class TestBuildSendText:
     """`_build_send_text` のテスト."""
 
-    def test_build_send_text_files_success(self, tmp_path):
-        """files 指定時はファイル内容が付加されるか検証."""
-        # 読み込ませるファイルを用意
-        target = tmp_path / "a.py"
-        target.write_text("x = 1", encoding="utf-8")
-
-        # 実行: files 指定で送信テキストを構築
-        text = _build_send_text("explain", _cli_args(files=[str(target)]), None)
-
-        # 入力の後ろにファイル名の見出し付きで内容が付加されること
-        assert text.startswith("explain\n\n--- File:")
-        assert "x = 1" in text
-
     def test_build_send_text_rag_write_mode_success(self):
         """RAG コンテキストと Write モードの指示が付加されるか検証."""
         # RAG サービスが関連コード "ctx" を返すようにモック化
@@ -304,32 +290,6 @@ class TestBuildSendText:
         # RAG のコンテキストと Write モードの指示が, 両方付加されること
         assert "--- [関連する参照コード (RAG)] ---\nctx" in text
         assert "完全なコード全体" in text
-
-    def test_build_send_text_unreadable_files(self, tmp_path):
-        """読み込めるファイルが無い場合は入力がそのまま返るか検証."""
-        # 存在しないファイルだけを指定して実行
-        text = _build_send_text("q", _cli_args(files=[str(tmp_path / "none")]), None)
-
-        # 読み込めなかった場合は, 入力がそのまま返ること
-        assert text == "q"
-
-
-class TestLoadFilesContext:
-    """`_load_files_context` のテスト."""
-
-    def test_load_files_context_success(self, tmp_path, caplog):
-        """読み込めたファイルのみがコンテキスト化され, 失敗は警告されるか検証."""
-        # 読み込めるファイルと, 存在しないファイルを用意
-        good = tmp_path / "a.py"
-        good.write_text("print('a')", encoding="utf-8")
-        missing = tmp_path / "missing.py"
-
-        # 実行
-        result = _load_files_context([str(good), str(missing)])
-
-        # 読み込めたファイルだけが結果に含まれ, 失敗は警告ログに残ること
-        assert result == [f"--- File: {good} ---\nprint('a')"]
-        assert "の読み込みに失敗しました" in caplog.text
 
 
 class TestAppendRagContext:
