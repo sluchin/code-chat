@@ -34,7 +34,7 @@ Gemini API を使用してローカルソースコードの参照・対話・自
 - 🛡️ **開発基盤**
   - `ruff` / `pylint` / `mypy` / `pytest` / `pre-commit` によるチェック。
 
-> **未実装**: `-p/--provider` は現時点では `gemini` のみ対応です。
+> **未実装**: `-p/--provider` は現時点では `gemini` のみ対応です (それ以外の値は、引数のエラーになります)。
 
 コマンドとオプションの一覧は [COMMANDS.md](COMMANDS.md) も参照してください。
 

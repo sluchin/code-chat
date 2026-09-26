@@ -400,6 +400,8 @@ def _build_main_execution_parser(
         "-p",
         "--provider",
         type=str,
+        # gemini 以外は未実装のため, 指定しても無視されることがないよう, 引数のエラーにする
+        choices=["gemini"],
         default="gemini",
         help="使用する LLM プロバイダ (デフォルト: gemini)",
     )
