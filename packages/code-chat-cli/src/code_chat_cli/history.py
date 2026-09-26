@@ -45,7 +45,7 @@ def save_chat_history(file_path: str, history: list[str]) -> None:
         # 親ディレクトリが存在しない場合は作成
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("\n\n".join(history), encoding="utf-8")
-        logger.info("対話ログを '%s' に保存しました.", file_path)
+        print(f"対話ログを '{file_path}' に保存しました.")
     except OSError:
         logger.exception("対話ログファイルの保存に失敗しました.")
 

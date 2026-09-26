@@ -86,9 +86,8 @@ def handle_write_mode_confirmation(
     if confirm == "y":
         for path_str, code in changes.items():
             _apply_file_modification(path_str, code)
-            logger.info("ファイルを更新しました: %s", path_str)
     else:
-        logger.info("上書きをキャンセルしました.")
+        print("上書きをキャンセルしました.")
 
 
 def _apply_file_modification(target_path: str, new_code: str) -> None:
@@ -114,7 +113,7 @@ def _apply_file_modification(target_path: str, new_code: str) -> None:
 
         # 新しいコードの書き込み
         path.write_text(new_code, encoding="utf-8")
-        logger.info("'%s' を更新しました.", path)
+        print(f"'{path}' を更新しました.")
     except OSError:
         logger.exception("ファイルの書き換えに失敗しました.")
 
@@ -145,7 +144,7 @@ def _create_safe_backup(path: Path) -> Path | None:
     if not orig_bak.exists():
         try:
             orig_bak.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
-            logger.info("初回オリジナルバックアップを作成しました: %s", orig_bak)
+            print(f"初回オリジナルバックアップを作成しました: {orig_bak}")
         except OSError as e:
             logger.warning("オリジナルバックアップの作成に失敗しました: %s", e)
 

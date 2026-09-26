@@ -165,7 +165,7 @@ class TestLoadCredentials:
 class TestLogin:
     """`login` のテスト."""
 
-    def test_login_success(self, monkeypatch, tmp_path):
+    def test_login_success(self, monkeypatch, tmp_path, capsys):
         """環境変数のクライアント情報で認証フローが実行され, トークンが保存されるか検証."""
         monkeypatch.setenv(CLIENT_ID_ENV, "env-client-id")
         monkeypatch.setenv(CLIENT_SECRET_ENV, "env-client-secret")
@@ -187,6 +187,7 @@ class TestLogin:
             port=0, prompt="consent"
         )
         assert path.is_file()
+        assert f"OAuth トークンを保存しました: {path}" in capsys.readouterr().out
 
     @pytest.mark.parametrize(
         ("client_id", "client_secret"),
@@ -228,7 +229,7 @@ class TestGetCredentials:
         assert result is credentials
         login_mock.assert_not_called()
 
-    def test_get_credentials_interactive_login_success(self):
+    def test_get_credentials_interactive_login_success(self, capsys):
         """トークンが無く対話端末の場合は, ログインを開始してその結果を返すか検証."""
         credentials = _credentials()
 
@@ -240,6 +241,7 @@ class TestGetCredentials:
 
         assert result is credentials
         login_mock.assert_called_once_with()
+        assert "ブラウザで認証してください" in capsys.readouterr().out
 
     def test_get_credentials_not_logged_in_failure(self, monkeypatch):
         """非対話環境でトークンが無い場合は, --login の実行を促す OAuthError が発生するか検証."""

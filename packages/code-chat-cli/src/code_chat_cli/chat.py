@@ -111,14 +111,14 @@ def _run_interactive_loop(
             user_input = input("You > ").strip()
         except (KeyboardInterrupt, EOFError):
             print()
-            logger.info("会話を終了します.")
+            print("会話を終了します.")
             sys.exit(0)
 
         if not user_input:
             continue
 
         if user_input.lower() in ["exit", "quit", "q"]:
-            logger.info("会話を終了します.")
+            print("会話を終了します.")
             break
 
         # スラッシュコマンド処理 (/save など)
@@ -603,7 +603,7 @@ def _handle_login() -> None:
         print(str(e), file=sys.stderr)
         sys.exit(1)
 
-    logger.info("OAuth で実行するには, --oauth オプションを指定してください")
+    print("OAuth で実行するには, --oauth オプションを指定してください")
     sys.exit(0)
 
 
@@ -994,7 +994,7 @@ def main() -> None:
             _run_interactive_loop(chat, cli_args, chat_history, rag_service=rag_service)
 
     except (KeyboardInterrupt, EOFError):
-        logger.info("\n[Ctrl+C] 会話を終了します")
+        print("\n[Ctrl+C] 会話を終了します")
         sys.exit(0)
     except (APIError, ServerError, ClientError):
         log_exception(logger, "Gemini API エラーにより処理を中断しました")
