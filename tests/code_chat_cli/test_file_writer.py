@@ -6,13 +6,12 @@ from unittest.mock import patch
 
 import pytest
 from code_chat_cli.file_writer import (
+    _apply_file_modification,
     _cleanup_old_backups,
+    _create_safe_backup,
     _extract_file_changes,
     _is_partial_code,
     _sanitize_code_output,
-    apply_file_modification,
-    apply_multi_file_changes,
-    create_safe_backup,
     handle_write_mode_confirmation,
 )
 
@@ -23,7 +22,7 @@ class TestHandleWriteModeConfirmation:
     def test_handle_write_mode_confirmation_user_accepts_success(
         self, monkeypatch, tmp_path
     ):
-        """ユーザーが 'y' と入力した場合, apply_file_modification が呼び出されて上書きされるか検証."""
+        """ユーザーが 'y' と入力した場合, _apply_file_modification が呼び出されて上書きされるか検証."""
         target_file = tmp_path / "target.py"
         target_file.write_text("print('old')", encoding="utf-8")
 
@@ -77,7 +76,7 @@ class TestHandleWriteModeConfirmation:
 
 
 class TestApplyFileModification:
-    """`apply_file_modification` のテスト."""
+    """`_apply_file_modification` のテスト."""
 
     def test_apply_file_modification_success(self, tmp_path):
         """正常系: .bak バックアップが作成され, 元ファイルが新しい内容で上書きされるか検証."""
@@ -85,7 +84,7 @@ class TestApplyFileModification:
         target_file.write_text("original_code", encoding="utf-8")
 
         new_code = "updated_code"
-        apply_file_modification(str(target_file), new_code)
+        _apply_file_modification(str(target_file), new_code)
 
         bak_orig = tmp_path / "sample.py.bak.orig"
         assert bak_orig.exists()
@@ -99,7 +98,7 @@ class TestApplyFileModification:
         non_existent_file = tmp_path / "non_existent.py"
 
         # 存在しないパスを指定（ログを出力して終了）
-        apply_file_modification(str(non_existent_file), "new_code")
+        _apply_file_modification(str(non_existent_file), "new_code")
 
         bak_file = tmp_path / "non_existent.py.bak"
         assert not non_existent_file.exists()
@@ -113,17 +112,17 @@ class TestApplyFileModification:
         # read_text または write_text で例外を発生させる
         with patch.object(Path, "write_text", side_effect=OSError("Write error")):
             # 例外を発生させても関数内部で catch されるため, エラー無く終了することを確認
-            apply_file_modification(str(target_file), "new_code")
+            _apply_file_modification(str(target_file), "new_code")
 
 
 class TestCreateSafeBackup:
-    """`create_safe_backup` のテスト."""
+    """`_create_safe_backup` のテスト."""
 
     def test_create_safe_backup_not_exists(self, tmp_path: Path) -> None:
         """存在しないファイルパスを指定した場合, None が返されること."""
         non_existent_path = tmp_path / "non_existent.py"
 
-        result = create_safe_backup(non_existent_path)
+        result = _create_safe_backup(non_existent_path)
 
         assert result is None
 
@@ -132,7 +131,7 @@ class TestCreateSafeBackup:
         dir_path = tmp_path / "test_dir"
         dir_path.mkdir()
 
-        result = create_safe_backup(dir_path)
+        result = _create_safe_backup(dir_path)
 
         assert result is None
 
@@ -278,30 +277,6 @@ class TestCleanupOldBackups:
         ):
             # 例外が発生しても例外が送出されず正常終了することを確認
             _cleanup_old_backups(target_file, max_keep=1)
-
-
-class TestApplyMultiFileChanges:
-    """`apply_multi_file_changes` のテスト."""
-
-    def test_apply_multi_file_changes_writes_only_allowed_paths_success(
-        self, tmp_path, caplog
-    ):
-        """許可されたパスのコードブロックのみが書き込まれるか検証."""
-        allowed = tmp_path / "sub" / "a.py"
-        denied = tmp_path / "b.py"
-        response = f"```python:{allowed}\n  print('a')\n```\n```python:{denied}\nprint('b')\n```\n"
-
-        apply_multi_file_changes(response, [str(allowed)])
-
-        assert allowed.read_text(encoding="utf-8") == "print('a')\n"
-        assert not denied.exists()
-        assert "指定外のパスへの書き込みをスキップしました" in caplog.text
-
-    def test_apply_multi_file_changes_without_code_blocks(self, caplog):
-        """コードブロックが無い場合は警告のみ出力されるか検証."""
-        apply_multi_file_changes("no code here", ["a.py"])
-
-        assert "書き込み対象のコードブロックが抽出できませんでした" in caplog.text
 
 
 class TestExtractFileChanges:

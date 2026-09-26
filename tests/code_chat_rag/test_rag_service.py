@@ -127,24 +127,6 @@ class TestClear:
         mock_dependencies["vs_inst"].clear.assert_called_once_with()
 
 
-class TestQuery:
-    """`RagService.query` のテスト."""
-
-    @patch.object(RagService, "_build_chain")
-    def test_query_success(self, mock_build_chain):
-        """ask メソッドがチェーンをビルドし invoke を呼び出すか検証する."""
-        mock_chain = MagicMock()
-        mock_chain.invoke.return_value = "This is an answer."
-        mock_build_chain.return_value = mock_chain
-
-        service = RagService()
-        answer = service.query("How to run this?", k=3)
-
-        assert answer == "This is an answer."
-        mock_build_chain.assert_called_once_with(k=3)
-        mock_chain.invoke.assert_called_once_with("How to run this?")
-
-
 class TestQueryStream:
     """`RagService.query_stream` のテスト."""
 

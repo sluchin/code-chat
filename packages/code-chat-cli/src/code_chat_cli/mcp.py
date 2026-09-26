@@ -8,7 +8,8 @@ from code_chat_mcp.mcp_service import McpService
 from code_chat_mcp.mcp_tool_info import McpToolInfo
 
 from code_chat_cli.client import get_gemini_client
-from code_chat_cli.logger import get_logger
+from code_chat_cli.gemini_error import find_api_error
+from code_chat_cli.logger import get_logger, log_exception
 from code_chat_cli.query_handler import QueryHandler
 
 logger = get_logger(__name__)
@@ -45,8 +46,11 @@ async def handle_mcp_run(
             result_text = await handler.run(user_prompt)
             return result_text
 
-    except Exception:  # pylint: disable=broad-exception-caught
-        logger.exception("handle_mcp_run 実行中にエラーが発生しました")
+    # 例外の種類を問わず, ログに記録してから再送出する (握りつぶさない).
+    except Exception as e:
+        # Gemini API のエラーは, 呼び出し元が概要とヒントを 1 回だけ出力するため, ここでは記録しない
+        if find_api_error(e) is None:
+            log_exception(logger, "handle_mcp_run 実行中にエラーが発生しました")
         raise
 
 

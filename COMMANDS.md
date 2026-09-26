@@ -42,14 +42,14 @@ code-chat [PROMPT] [OPTIONS]
 | `-w, --write` | フラグ | `False` | 生成・修正結果を対象ファイル (`-f`) に書き込み・適用 (実行前に確認あり) |
 | `-a, --auto-save` | フラグ | `False` | 終了時に対話ログを `<日時>_chat.md` として自動保存 |
 | `-g, --generate-commit-msg` | フラグ | `False` | Git 差分 (ステージ済みを優先、なければ作業ツリー) からコミットメッセージを生成 |
-| `-r, --review` | フラグ | `False` | `-f` 指定ファイル、または Git 差分のコードレビューを実行 |
+| `-r, --review` | フラグ | `False` | `-f` 指定ファイル、または Git 差分のコードレビューを実行。Gemini API の一時的なエラー (503 など) はリトライし、失敗した場合は終了コード 1 で終了する |
 | `--staged` | フラグ | `False` | `--review` 時に、ステージ済み (`--cached`) の差分を対象にする |
 | `-l, --list-models` | フラグ | `False` | 利用可能な LLM モデルの一覧を表示 |
 | `--login` | フラグ | `False` | ブラウザで Google アカウントに OAuth ログインし、トークンを `~/.config/code-chat/oauth_token.json` に保存して終了。事前に環境変数 `GEMINI_OAUTH_CLIENT_ID` / `GEMINI_OAUTH_CLIENT_SECRET` の設定が必要 |
 | `--oauth` | フラグ | `False` | `GEMINI_API_KEY` ではなく OAuth (`--login` で保存したトークン) で認証する。`GEMINI_API_KEY` が設定されていても OAuth を使う。トークンがなく対話端末の場合は、ブラウザ認証を開始する。RAG (`--rag`, `rag`) の検索は OAuth に対応せず、API キー (`GEMINI_API_KEY`) を使う |
 | `-D, --debug` | フラグ | `False` | デバッグログを出力 (`--log-level DEBUG` と同等) |
 | `--log-level` | 文字列 | `INFO` | ログレベル (`DEBUG` / `INFO` / `WARNING` / `ERROR` / `CRITICAL`) |
-| `--trace` | フラグ | `False` | SDK や HTTP クライアント等のライブラリ内部通信ログを出力 |
+| `--trace` | フラグ | `False` | SDK や HTTP クライアント等のライブラリ内部通信ログを出力。あわせて、Gemini API のエラー時にもトレースバックを出力する (指定しない場合、Gemini API のエラーは、エラー内容だけを出力する。それ以外の例外は、常にトレースバック付き) |
 | `--dry-run` | フラグ | `False` | API 呼び出しを行わず、読み込まれるファイル群や指定引数の確認のみ実行 |
 
 標準入力 (パイプ) にテキストがある場合は、`-f` の内容とあわせてコンテキストとして読み込まれます。

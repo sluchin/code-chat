@@ -9,7 +9,16 @@ from code_chat_mcp.mcp_tool_info import McpToolInfo
 from google import genai
 from google.genai import types
 from google.genai.errors import APIError
-from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
+from tenacity import (
+    RetryCallState,
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
+
+from code_chat_cli.gemini_error import format_error, is_daily_quota_error
+from code_chat_cli.gemini_error_kind import GeminiErrorKind
 
 logger = logging.getLogger(__name__)
 
@@ -43,18 +52,41 @@ class QueryHandler:
             exception (BaseException): 判定対象の例外オブジェクト.
 
         Returns:
-            bool: 429 エラーである場合は True, それ以外は False.
+            bool: リトライすべき 429 エラーである場合は True, それ以外は False.
+                1 日あたりの上限 (RPD) は, 待っても回復しないため False.
 
         """
         if isinstance(exception, APIError):
-            if exception.code == 429:
+            if is_daily_quota_error(exception):
+                return False
+            if exception.code == GeminiErrorKind.HTTP_TOO_MANY_REQUESTS:
                 return True
-            if "429" in str(exception):
+            if str(GeminiErrorKind.HTTP_TOO_MANY_REQUESTS) in str(exception):
                 return True
         return False
 
+    @staticmethod
+    def _log_retry(retry_state: RetryCallState) -> None:
+        """リトライの待機に入る前に, 待機時間と原因を警告として出力します.
+
+        Args:
+            retry_state (RetryCallState): tenacity が保持するリトライの状態.
+
+        """
+        error = retry_state.outcome.exception() if retry_state.outcome else None
+        sleep = retry_state.next_action.sleep if retry_state.next_action else 0
+        max_attempts = getattr(retry_state.retry_object.stop, "max_attempt_number", "?")
+        logger.warning(
+            "Gemini API のレート制限のため, %.0f 秒後に再試行します (%d/%s): %s",
+            sleep,
+            retry_state.attempt_number,
+            max_attempts,
+            format_error(error) if error else "-",
+        )
+
     @retry(
         retry=retry_if_exception(_is_rate_limit_error),
+        before_sleep=_log_retry,
         wait=wait_exponential(multiplier=2, min=5, max=60),
         stop=stop_after_attempt(5),
         reraise=True,

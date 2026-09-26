@@ -9,6 +9,7 @@ import asyncio
 import atexit
 import logging
 import os
+import subprocess
 import sys
 import time  # pylint: disable=unused-import # noqa: F401
 from pathlib import Path  # pylint: disable=unused-import
@@ -28,6 +29,7 @@ from code_chat_cli.commands.models import handle_list_models
 from code_chat_cli.commands.review import handle_code_review
 from code_chat_cli.context_cache import ContextCache
 from code_chat_cli.file_writer import handle_write_mode_confirmation
+from code_chat_cli.gemini_error import format_error
 from code_chat_cli.history import (
     HAVE_READLINE,
     save_chat_history,
@@ -35,7 +37,13 @@ from code_chat_cli.history import (
     save_readline_history,
     setup_readline_history,
 )
-from code_chat_cli.logger import get_logger, setup_logging, suppress_info_logs
+from code_chat_cli.logger import (
+    get_logger,
+    log_exception,
+    set_trace,
+    setup_logging,
+    suppress_info_logs,
+)
 from code_chat_cli.mcp import handle_mcp_run, handle_mcp_status, handle_mcp_test
 from code_chat_cli.oauth_error import OAuthError
 from code_chat_cli.prompts import Prompts
@@ -50,7 +58,7 @@ from code_chat_cli.rag import (
 logger = get_logger(__name__)
 
 
-def run_single_turn_mode(
+def _run_single_turn_mode(
     chat: Any,
     cli_args: Any,
     chat_history: list[str],
@@ -77,7 +85,7 @@ def run_single_turn_mode(
         _handle_prompt_mode(chat, cli_args, chat_history, rag_service)
 
 
-def run_interactive_loop(
+def _run_interactive_loop(
     chat: Any,
     cli_args: Any,
     chat_history: list[str],
@@ -209,7 +217,7 @@ def _load_files_context(files: list[str]) -> list[str]:
         try:
             content = Path(file_path).read_text(encoding="utf-8")
             files_context.append(f"--- File: {file_path} ---\n{content}")
-        except Exception as e:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+        except (OSError, UnicodeDecodeError) as e:
             logger.warning("ファイル %s の読み込みに失敗しました: %s", file_path, e)
     return files_context
 
@@ -293,6 +301,8 @@ def _retrieve_rag_context(rag_service: Any, query: str) -> str:
     """
     try:
         return rag_service.get_context(query)
+    # RAG は補助機能のため, 検索の失敗は警告にとどめ, RAG なしで続行する.
+    # langchain / chroma / Embedding API が送出する例外は種類が多く, 特定できないため広く捕捉する.
     except Exception as e:  # noqa: BLE001 # pylint: disable=broad-exception-caught
         logger.warning("RAGコンテキスト取得時にエラーが発生しました: %s", e)
     return ""
@@ -453,6 +463,7 @@ def _setup_cli_logging(cli_args: Any) -> None:
     if not cli_args.debug_mode and (
         cli_args.list_models or cli_args.generate_commit_msg
     ):
+        set_trace(cli_args.trace_mode)
         suppress_info_logs()
         return
 
@@ -551,8 +562,10 @@ def _handle_cache_subcommand(client: Any, cli_args: Any) -> None:
     except CacheError as e:
         logger.error("%s", e)
         sys.exit(1)
-    except Exception:  # pylint: disable=broad-exception-caught
-        logger.exception("cache (%s) コマンドの実行中にエラーが発生しました", action)
+    except APIError:
+        log_exception(
+            logger, "cache (%s) コマンドの実行中にエラーが発生しました", action
+        )
         sys.exit(1)
 
 
@@ -658,9 +671,9 @@ def _handle_subcommands(client: Any, cli_args: Any) -> None:
             try:
                 handle_list_models(client)
                 sys.exit(0)
-            except Exception:  # pylint: disable=broad-exception-caught
-                logger.exception(
-                    "Chat (list_models) コマンドの実行中にエラーが発生しました"
+            except APIError:
+                log_exception(
+                    logger, "Chat (list_models) コマンドの実行中にエラーが発生しました"
                 )
                 sys.exit(1)
 
@@ -669,9 +682,10 @@ def _handle_subcommands(client: Any, cli_args: Any) -> None:
             try:
                 handle_commit_generation(client, cli_args.model)
                 sys.exit(0)
-            except Exception:  # pylint: disable=broad-exception-caught
-                logger.exception(
-                    "Chat (generate_commit_msg) コマンドの実行中にエラーが発生しました"
+            except (APIError, subprocess.CalledProcessError, OSError):
+                log_exception(
+                    logger,
+                    "Chat (generate_commit_msg) コマンドの実行中にエラーが発生しました",
                 )
                 sys.exit(1)
 
@@ -697,8 +711,8 @@ def _handle_subcommands(client: Any, cli_args: Any) -> None:
                 file_path=cli_args.files,
             )
             sys.exit(0)
-        except Exception:  # pylint: disable=broad-exception-caught
-            logger.exception("review コマンドの実行中にエラーが発生しました")
+        except APIError:
+            log_exception(logger, "review コマンドの実行中にエラーが発生しました")
             sys.exit(1)
 
 
@@ -738,9 +752,13 @@ def _handle_rag_subcommand(cli_args: Any) -> None:
             handle_rag(prompt_str)
             sys.exit(0)
 
-    except Exception:  # pylint: disable=broad-exception-caught
+    # ハンドラの中で送出される langchain / chroma / Embedding API の例外は種類が多く, 特定できないため
+    # 広く捕捉し, ログに記録して終了コード 1 で終了する.
+    except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
         action_name = action or "prompt"
-        logger.exception("RAG (%s) コマンドの実行中にエラーが発生しました", action_name)
+        log_exception(
+            logger, "RAG (%s) コマンドの実行中にエラーが発生しました", action_name
+        )
         sys.exit(1)
 
 
@@ -784,8 +802,10 @@ def _handle_mcp_subcommand(cli_args: Any) -> None:
         logger.error("不明なサブコマンドアクションです: %s", action)
         sys.exit(1)
 
-    except Exception:  # pylint: disable=broad-exception-caught
-        logger.exception("MCP (%s) コマンドの実行中にエラーが発生しました", action)
+    # MCP サーバー (外部プロセス) 由来の例外は, MCP SDK・anyio (ExceptionGroup)・OSError など多岐にわたる.
+    # 広く捕捉し, ログに記録して終了コード 1 で終了する.
+    except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
+        log_exception(logger, "MCP (%s) コマンドの実行中にエラーが発生しました", action)
         sys.exit(1)
 
 
@@ -864,8 +884,10 @@ def _handle_mcp_single_turn(
         )
         print(result_text)
         chat_history.append(f"### Gemini (MCP)\n\n{result_text}")
+    # Gemini API・MCP サーバー・認証設定など原因が多岐にわたり特定できない. 1 回のクエリの失敗で処理を止めないよう,
+    # 広く捕捉してログに記録する.
     except Exception as e:  # noqa: BLE001 # pylint: disable=broad-exception-caught
-        logger.error("MCP クエリの実行中にエラーが発生しました: %s", e)
+        logger.error("MCP クエリの実行中にエラーが発生しました: %s", format_error(e))
 
 
 def _handle_mcp_interactive(
@@ -914,8 +936,10 @@ def _handle_mcp_interactive(
         print(result_text)
         print()
         chat_history.append(f"### Gemini (MCP)\n\n{result_text}")
+    # Gemini API・MCP サーバー・認証設定など原因が多岐にわたり特定できない. 1 回のクエリの失敗で対話を終了させないよう,
+    # 広く捕捉してログに記録し, 次の入力へ進む.
     except Exception as e:  # noqa: BLE001 # pylint: disable=broad-exception-caught
-        logger.error("MCP クエリの実行中にエラーが発生しました: %s", e)
+        logger.error("MCP クエリの実行中にエラーが発生しました: %s", format_error(e))
 
 
 def main() -> None:
@@ -965,19 +989,20 @@ def main() -> None:
         chat = client.chats.create(model=model, config=config)
 
         if cli_args.context or cli_args.prompt:
-            run_single_turn_mode(chat, cli_args, chat_history, rag_service=rag_service)
+            _run_single_turn_mode(chat, cli_args, chat_history, rag_service=rag_service)
         else:
-            run_interactive_loop(chat, cli_args, chat_history, rag_service=rag_service)
+            _run_interactive_loop(chat, cli_args, chat_history, rag_service=rag_service)
 
     except (KeyboardInterrupt, EOFError):
         logger.info("\n[Ctrl+C] 会話を終了します")
         sys.exit(0)
-    except (APIError, ServerError, ClientError) as e:
-        logger.error("Gemini API エラーにより処理を中断しました: %s", e)
+    except (APIError, ServerError, ClientError):
+        log_exception(logger, "Gemini API エラーにより処理を中断しました")
         sys.exit(1)
     except (FileNotFoundError, ValueError, PermissionError):
         logger.exception("ファイル操作でエラーが発生しました")
         sys.exit(1)
+    # 最後の安全網: 想定外の例外も握りつぶさず, ログに記録して終了コード 1 で終了する.
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.critical(
             "予期せぬエラーが発生しました: %s",

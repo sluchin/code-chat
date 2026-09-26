@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from code_chat_cli.commands.review import handle_code_review
+from google.genai.errors import APIError
 
 
 @pytest.fixture
@@ -21,7 +22,7 @@ def mock_client() -> MagicMock:
     chunk2 = MagicMock()
     chunk2.text = "問題ありません."
 
-    client.models.generate_content_stream.return_value = [chunk1, chunk2]
+    client.chats.create.return_value.send_message_stream.return_value = [chunk1, chunk2]
     return client
 
 
@@ -49,7 +50,7 @@ class TestHandleCodeReview:
         captured = capsys.readouterr()
         assert "コードレビューを実行中..." in captured.out
         assert "レビュー結果: 問題ありません." in captured.out
-        mock_client.models.generate_content_stream.assert_called_once()
+        mock_client.chats.create.return_value.send_message_stream.assert_called_once()
 
     def test_handle_code_review_directory_success(
         self,
@@ -77,8 +78,8 @@ class TestHandleCodeReview:
         assert "コードレビューを実行中..." in captured.out
 
         # 生成されたプロンプトに main.py は含まれ, .git/config は含まれないことを確認
-        call_args = mock_client.models.generate_content_stream.call_args
-        prompt = call_args.kwargs["contents"]
+        call_args = mock_client.chats.create.return_value.send_message_stream.call_args
+        prompt = call_args.args[0]
         assert "main.py" in prompt
         assert "git config content" not in prompt
 
@@ -118,7 +119,9 @@ class TestHandleCodeReview:
 
         mock_client = MagicMock()
         mock_response = [MagicMock(text="Good code")]
-        mock_client.models.generate_content_stream.return_value = mock_response
+        mock_client.chats.create.return_value.send_message_stream.return_value = (
+            mock_response
+        )
 
         with patch("code_chat_cli.commands.review.read_path_content") as mock_read:
             mock_read.return_value = "=== File: sample.py ===\nprint('hello')"
@@ -133,13 +136,15 @@ class TestHandleCodeReview:
             # read_path_content が呼び出されたことを検証
             mock_read.assert_called_once_with(str(test_file))
             # API が呼び出されたことを検証
-            mock_client.models.generate_content_stream.assert_called_once()
+            mock_client.chats.create.return_value.send_message_stream.assert_called_once()
 
     def test_handle_code_review_with_git_diff_success(self):
         """file_path が指定されない場合, _get_git_diff を使用してレビューを実行すること."""
         mock_client = MagicMock()
         mock_response = [MagicMock(text="Diff reviewed")]
-        mock_client.models.generate_content_stream.return_value = mock_response
+        mock_client.chats.create.return_value.send_message_stream.return_value = (
+            mock_response
+        )
 
         with patch("code_chat_cli.commands.review._get_git_diff") as mock_diff:
             mock_diff.return_value = "diff --git a/file.py b/file.py"
@@ -152,7 +157,7 @@ class TestHandleCodeReview:
             )
 
             mock_diff.assert_called_once_with(False)
-            mock_client.models.generate_content_stream.assert_called_once()
+            mock_client.chats.create.return_value.send_message_stream.assert_called_once()
 
     def test_handle_code_review_non_existent_path_failure(
         self, mock_client: MagicMock
@@ -210,7 +215,50 @@ class TestHandleCodeReview:
         captured = capsys.readouterr()
         assert "エラー: git diff の実行に失敗しました:" in captured.err
         assert "fatal: not a git repository" in captured.err
-        mock_client.models.generate_content_stream.assert_not_called()
+        mock_client.chats.create.return_value.send_message_stream.assert_not_called()
+
+    def test_handle_code_review_api_error_failure(self) -> None:
+        """Gemini API のエラーは, 握りつぶさずに呼び出し元 (chat) へ伝わるか検証する."""
+        mock_client = MagicMock()
+        mock_client.chats.create.return_value.send_message_stream.side_effect = (
+            APIError(500, {"error": {"message": "API Error"}})
+        )
+
+        with (
+            patch(
+                "code_chat_cli.commands.review._get_git_diff",
+                return_value="def foo(): pass",
+            ),
+            pytest.raises(APIError, match="API Error"),
+        ):
+            handle_code_review(client=mock_client, model_name="gemini-2.5-flash")
+
+    def test_handle_code_review_stream_api_error_failure(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """ストリームの途中で Gemini API のエラーが発生した場合, 出力済みの内容は残り, エラーは伝わるか検証する."""
+
+        # ジェネレータの途中で例外を発生させるイテレータを模擬
+        def error_stream():
+            yield MagicMock(text="一部の応答")
+            raise APIError(500, {"error": {"message": "Stream Error"}})
+
+        mock_client = MagicMock()
+        mock_client.chats.create.return_value.send_message_stream.return_value = (
+            error_stream()
+        )
+
+        with (
+            patch(
+                "code_chat_cli.commands.review._get_git_diff",
+                return_value="def foo(): pass",
+            ),
+            pytest.raises(APIError, match="Stream Error"),
+        ):
+            handle_code_review(client=mock_client, model_name="gemini-2.5-flash")
+
+        assert "一部の応答" in capsys.readouterr().out
 
     @patch("subprocess.run", side_effect=FileNotFoundError)
     def test_handle_code_review_git_not_found_exception(
@@ -228,7 +276,7 @@ class TestHandleCodeReview:
 
         captured = capsys.readouterr()
         assert "エラー: git コマンドが見つかりません." in captured.err
-        mock_client.models.generate_content_stream.assert_not_called()
+        mock_client.chats.create.return_value.send_message_stream.assert_not_called()
 
     def test_handle_code_review_directory_read_exception(
         self,
@@ -248,51 +296,27 @@ class TestHandleCodeReview:
 
         assert "読み込みをスキップしました" in caplog.text
 
-    def test_handle_code_review_exception_handling_exception(
-        self,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """generate_content_stream 実行時に例外が発生した場合の例外処理を検証."""
+    def test_handle_code_review_retries_temporary_error_exception(self) -> None:
+        """一時的なエラー (503) はリトライされ, 成功すればレビュー結果が得られるか検証する."""
         mock_client = MagicMock()
-        # API 呼出時に RuntimeError を発生させる設定
-        mock_client.models.generate_content_stream.side_effect = RuntimeError(
-            "API Error"
-        )
+        stream = mock_client.chats.create.return_value.send_message_stream
+        stream.side_effect = [
+            APIError(
+                503, {"error": {"message": "high demand", "status": "UNAVAILABLE"}}
+            ),
+            [MagicMock(text="OK")],
+        ]
 
-        # git diff で何らかのコードが取得できる状況をモック
-        with patch(
-            "code_chat_cli.commands.review._get_git_diff",
-            return_value="def foo(): pass",
+        with (
+            patch(
+                "code_chat_cli.commands.review._get_git_diff",
+                return_value="def foo(): pass",
+            ),
+            patch("code_chat_cli.api.time.sleep"),
         ):
             handle_code_review(client=mock_client, model_name="gemini-2.5-flash")
 
-        # 標準エラー出力 (sys.stderr) にエラーメッセージが出力されたか確認
-        captured = capsys.readouterr()
-        assert "エラーが発生しました: API Error" in captured.err
-
-    def test_handle_code_review_stream_exception_handling_exception(
-        self,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """ストリームの読み込み途中で例外が発生した場合の例外処理を検証."""
-
-        # ジェネレータの途中で例外を発生させるイテレータを模擬
-        def error_stream():
-            yield MagicMock(text="一部の応答")
-            raise RuntimeError("Stream Error")
-
-        mock_client = MagicMock()
-        mock_client.models.generate_content_stream.return_value = error_stream()
-
-        with patch(
-            "code_chat_cli.commands.review._get_git_diff",
-            return_value="def foo(): pass",
-        ):
-            handle_code_review(client=mock_client, model_name="gemini-2.5-flash")
-
-        captured = capsys.readouterr()
-        assert "一部の応答" in captured.out
-        assert "エラーが発生しました: Stream Error" in captured.err
+        assert stream.call_count == 2
 
     @patch("subprocess.run")
     def test_handle_code_review_empty_diff(
@@ -314,4 +338,4 @@ class TestHandleCodeReview:
 
         captured = capsys.readouterr()
         assert "レビュー対象のコードまたは変更点が見つかりませんでした." in captured.out
-        mock_client.models.generate_content_stream.assert_not_called()
+        mock_client.chats.create.return_value.send_message_stream.assert_not_called()

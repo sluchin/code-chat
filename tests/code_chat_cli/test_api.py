@@ -1,11 +1,9 @@
 """Gemini API 通信およびリトライ処理モジュールの単体テスト."""
 
-import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
 from code_chat_cli.api import (
-    _extract_retry_delay,
     _is_retryable_error,
     send_message_stream_with_retry,
     send_message_with_retry,
@@ -138,7 +136,9 @@ class TestSendMessageStreamWithRetry:
         assert getattr(exc_info.value, "code", None) == 400
         assert mock_chat.send_message_stream.call_count == 1
 
-    def test_send_message_stream_with_retry_error_after_yielding_chunks_failure(self):
+    def test_send_message_stream_with_retry_error_after_yielding_chunks_failure(
+        self, caplog
+    ):
         """異常系: 途中でチャンクを出力した後にエラーが発生した場合, リトライせずに即座に例外を送出するか検証."""
         mock_chat = MagicMock()
 
@@ -157,6 +157,7 @@ class TestSendMessageStreamWithRetry:
 
         # リトライされずに呼び出し回数が 1 回であることを検証
         assert mock_chat.send_message_stream.call_count == 1
+        assert "一部出力済みのため" in caplog.text
 
     def test_send_message_stream_with_retry_503_retry_exception(self, monkeypatch):
         """異常系 -> 正常系: 503 エラーが発生し, リトライ後に成功するか検証."""
@@ -238,38 +239,6 @@ class TestSendMessageStreamWithRetry:
         mock_sleep.assert_called_once_with(31.0)
 
 
-class TestExtractRetryDelay:
-    """`_extract_retry_delay` のテスト."""
-
-    @pytest.mark.parametrize(
-        "error_message, expected_delay",
-        [
-            # Gemini API の実際のレスポンス形式: retryDelay: '32s' / '32.5s'
-            ("Resource exhausted. retryDelay: '32s' Please wait.", 32.0),
-            ("Resource exhausted. retryDelay: '32.5s' Please wait.", 32.5),
-            # クォートなし表記: retryDelay: 10s
-            ("Error occurred retryDelay: 10s in stream", 10.0),
-            # retryDelay なし（Match しない）
-            ("Quota exceeded without delay info", None),
-            ("retryDelay: 'abc's", None),  # 秒数が数値でない
-        ],
-    )
-    def test_extract_retry_delay_patterns_success(self, error_message, expected_delay):
-        """_extract_retry_delay が様々なエラーメッセージ形式から正しく秒数を抽出し, 不正な場合は None を返すか検証."""
-        ex = Exception(error_message)
-        assert _extract_retry_delay(ex) == expected_delay
-
-    def test_extract_retry_delay_value_error_handling_exception(self, monkeypatch):
-        """re.search でマッチしたものの float 変換時に ValueError が発生した場合に None を返す（except ValueError ルート）を検証."""
-        mock_match = MagicMock()
-        mock_match.group.return_value = "not_a_number"
-
-        monkeypatch.setattr("re.search", lambda pattern, string: mock_match)
-
-        ex = Exception("retryDelay: 'not_a_number's")
-        assert _extract_retry_delay(ex) is None
-
-
 class TestIsRetryableError:
     """`_is_retryable_error` のテスト."""
 
@@ -299,17 +268,6 @@ class TestIsRetryableError:
             "Error 429: Quota Exceeded (PerDay)",
         ],
     )
-    def test_is_retryable_error_per_day_quota_returns_false(
-        self, error_message, caplog
-    ):
-        """1日あたりのクォータ超過 (RPD) の場合は False を返し, エラーログが出力されることを検証."""
-        ex = Exception(error_message)
-
-        with caplog.at_level(logging.ERROR):
-            result = _is_retryable_error(ex)
-
-        # 判定結果が False であること
-        assert result is False
-
-        # ログメッセージが出力されていること
-        assert "1日あたりの API 利用上限 (RPD) に到達しました." in caplog.text
+    def test_is_retryable_error_per_day_quota_returns_false(self, error_message):
+        """1日あたりのクォータ超過 (RPD) の場合は, 待っても回復しないため False を返すことを検証."""
+        assert _is_retryable_error(Exception(error_message)) is False

@@ -15,6 +15,7 @@ from google.genai.errors import APIError
 
 from code_chat_cli.cache_error import CacheError
 from code_chat_cli.file_utils import read_path_content
+from code_chat_cli.gemini_error import format_error
 from code_chat_cli.logger import get_logger
 from code_chat_cli.prompts import Prompts
 
@@ -153,32 +154,53 @@ class ContextCache:
 
     @staticmethod
     def _display_name(target: str) -> str:
-        """対象パスから, このツールで作成したキャッシュを識別する display_name を作成します."""
+        """対象パスから, このツールで作成したキャッシュを識別する display_name を作成します.
+
+        Args:
+            target (str): キャッシュ対象のファイル・ディレクトリのパス.
+
+        Returns:
+            str: `code-chat:` の接頭辞に, 対象パスの絶対パスを付けた display_name.
+
+        """
         return f"{ContextCache.DISPLAY_PREFIX}{Path(target).resolve()}"
 
     @staticmethod
     def _normalize_cache_name(cache_id: str) -> str:
-        """キャッシュ ID を `cachedContents/<ID>` の形式に正規化します."""
+        """キャッシュ ID を `cachedContents/<ID>` の形式に正規化します.
+
+        Args:
+            cache_id (str): キャッシュ ID (`cachedContents/<ID>` または `<ID>`).
+
+        Returns:
+            str: `cachedContents/<ID>` の形式のキャッシュ名.
+
+        """
         if cache_id.startswith(ContextCache._NAME_PREFIX):
             return cache_id
         return f"{ContextCache._NAME_PREFIX}{cache_id}"
 
     @staticmethod
     def _explain_api_error(error: APIError) -> str:
-        """キャッシュ API のエラーから, 原因と対処を示すメッセージを作成します."""
-        message = str(error)
-        if "FreeTier" in message:
-            return (
-                "無料枠では Context Caching を利用できません "
-                "(課金を有効にした有料枠のプロジェクトが必要です)"
-            )
-        if "too small" in message:
-            return "コンテキストが小さすぎます (キャッシュには最小トークン数以上が必要です. 例: 1024)"
-        return f"Context Caching の API でエラーが発生しました: {message}"
+        """キャッシュ API のエラーから, 原因と対処を示すメッセージを作成します.
+
+        Args:
+            error (APIError): キャッシュ API が返したエラー.
+
+        Returns:
+            str: 概要とヒントを含むメッセージ.
+
+        """
+        return format_error(error)
 
     @staticmethod
     def _print_cache(cache: Any) -> None:
-        """キャッシュ 1 件の情報を標準出力に表示します."""
+        """キャッシュ 1 件の情報を標準出力に表示します.
+
+        Args:
+            cache (Any): 表示する CachedContent.
+
+        """
         tokens = cache.usage_metadata.total_token_count if cache.usage_metadata else "-"
         print(f"  ID: {cache.name}")
         print(
@@ -189,7 +211,12 @@ class ContextCache:
         print(f"    有効期限: {cache.expire_time}")
 
     def _list_code_chat_caches(self) -> list[Any]:
-        """このツールで作成したキャッシュの一覧を返します."""
+        """このツールで作成したキャッシュの一覧を返します.
+
+        Returns:
+            list[Any]: `display_name` が `code-chat:` で始まる CachedContent のリスト.
+
+        """
         return [
             cache
             for cache in self.client.caches.list()
@@ -198,6 +225,14 @@ class ContextCache:
 
     def _create_cache(self, model: str, target: str, ttl: int) -> Any:
         """対象パスのコンテキストからキャッシュを作成します.
+
+        Args:
+            model (str): キャッシュを使用するモデル名.
+            target (str): コンテキストとして読み込むファイル・ディレクトリのパス.
+            ttl (int): キャッシュの保持時間 (秒).
+
+        Returns:
+            Any: 作成した CachedContent.
 
         Raises:
             CacheError: 読み込めるコンテキストがない場合, または API がエラーを返した場合.

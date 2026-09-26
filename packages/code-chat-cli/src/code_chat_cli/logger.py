@@ -7,13 +7,18 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from code_chat_cli.gemini_error import find_api_error, format_error
+
 # システム固定情報（ホスト名およびプロセスID）
 HOSTNAME = socket.gethostname()
 PID = os.getpid()
 APP_NAME = Path(sys.argv[0]).stem if sys.argv and sys.argv[0] else "python"
 
+# --trace 指定時に DEBUG にする, サードパーティ製ライブラリのロガー
+THIRD_PARTY_LOGGERS = ("httpx", "httpcore", "google", "urllib3")
 
-def syslog_context_filter(record: logging.LogRecord) -> bool:
+
+def _syslog_context_filter(record: logging.LogRecord) -> bool:
     """LogRecord に syslog スタイルの動的タイムスタンプおよびホスト情報を追加するフィルタ.
 
     Args:
@@ -52,7 +57,7 @@ def setup_logging(level_name: str = "INFO", trace: bool = False) -> None:
     # ハンドラを作成し, フィルターを追加する（Logger ではなく Handler に追加）
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(formatter)
-    handler.addFilter(syslog_context_filter)
+    handler.addFilter(_syslog_context_filter)
     handler.setLevel(numeric_level)
 
     # ルートロガーのクリアと設定
@@ -68,17 +73,64 @@ def setup_logging(level_name: str = "INFO", trace: bool = False) -> None:
     app_logger = logging.getLogger("code_chat_cli")
     app_logger.setLevel(numeric_level)
 
-    # サードパーティ製ライブラリのログ制御
-    third_party_loggers = ["httpx", "httpcore", "google", "urllib3"]
+    set_trace(trace)
 
-    if trace:
-        # --trace が指定されている場合のみ, ライブラリの DEBUG / TRACE ログを出す
-        for logger_name in third_party_loggers:
-            logging.getLogger(logger_name).setLevel(logging.DEBUG)
-    else:
-        # 通常時 (-D / --log-level DEBUG の場合含む) はサードパーティの通信ログを抑制
-        for logger_name in third_party_loggers:
-            logging.getLogger(logger_name).setLevel(logging.WARNING)
+
+def set_trace(enabled: bool) -> None:
+    """--trace の有効・無効を設定します.
+
+    有効時は, サードパーティ製ライブラリの DEBUG / TRACE ログを出力し, Gemini API のエラーでも
+    トレースバックを出力します (`log_exception` を参照). 無効時は, 通信ログを抑制します
+    (-D / --log-level DEBUG の場合を含む).
+
+    Args:
+        enabled (bool): --trace が指定されているかどうか.
+
+    """
+    level = logging.DEBUG if enabled else logging.WARNING
+    for logger_name in THIRD_PARTY_LOGGERS:
+        logging.getLogger(logger_name).setLevel(level)
+
+
+def _is_trace_enabled() -> bool:
+    """--trace が有効かどうかを返します (`set_trace` で DEBUG にしたロガーの有無で判定).
+
+    Returns:
+        bool: --trace が有効な場合は True.
+
+    """
+    return all(
+        logging.getLogger(name).level == logging.DEBUG for name in THIRD_PARTY_LOGGERS
+    )
+
+
+def log_exception(logger: logging.Logger, message: str, *args: object) -> None:
+    """処理中の例外をログに出力します. Gemini API のエラーは, 概要とヒントに整理し, トレースバックを省きます.
+
+    Gemini API のエラー (認証エラー, モデル未提供, 上限超過など) は, トレースバックを見ても
+    原因が分からないため, 概要 (HTTP ステータス, 原因) と対処のヒントだけを出力します.
+    レスポンスの詳細は -D (DEBUG), トレースバックは --trace 指定時に出力します.
+    それ以外の例外は, 常にトレースバック付きです.
+    `except` ブロックの中から呼び出してください.
+
+    Args:
+        logger (logging.Logger): 出力先のロガー.
+        message (str): ログメッセージ (`%s` などのプレースホルダーを含めてよい).
+        *args (object): メッセージに埋め込む値.
+
+    """
+    api_error = find_api_error(sys.exc_info()[1])
+    if api_error is None:
+        logger.exception(message, *args)
+        return
+
+    detail = format_error(api_error)
+    if _is_trace_enabled():
+        logger.exception(message + ": %s", *args, detail)
+        return
+
+    logger.error(message + ": %s", *args, detail)
+    logger.debug("エラーの詳細: %s", api_error)
 
 
 def get_logger(name: str) -> logging.Logger:

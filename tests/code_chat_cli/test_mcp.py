@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from code_chat_cli.mcp import handle_mcp_run, handle_mcp_status, handle_mcp_test
 from code_chat_mcp.mcp_tool_info import McpToolInfo
+from google.genai.errors import APIError
 
 
 def _service_cm(service: MagicMock) -> MagicMock:
@@ -71,6 +72,24 @@ class TestHandleMcpRun:
             asyncio.run(handle_mcp_run("hello"))
 
         assert "handle_mcp_run 実行中にエラーが発生しました" in caplog.text
+
+    def test_handle_mcp_run_api_error_failure(self, caplog):
+        """Gemini API のエラーは, 再送出されるが, ここでは記録されないか検証 (呼び出し元が 1 回だけ出力する)."""
+        service_cls = _service_cm(MagicMock())
+        handler = MagicMock()
+        handler.run = AsyncMock(
+            side_effect=APIError(429, {"error": {"message": "quota exceeded"}})
+        )
+
+        with (
+            patch("code_chat_cli.mcp.McpService", service_cls),
+            patch("code_chat_cli.mcp.get_gemini_client"),
+            patch("code_chat_cli.mcp.QueryHandler", return_value=handler),
+            pytest.raises(APIError),
+        ):
+            asyncio.run(handle_mcp_run("hello"))
+
+        assert "handle_mcp_run 実行中にエラーが発生しました" not in caplog.text
 
     def test_handle_mcp_run_default_config_path(self):
         """設定パス未指定の場合は None が渡されるか検証."""

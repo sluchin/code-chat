@@ -25,9 +25,9 @@ class McpConfig:
         """
         path = config_path or Path.home() / ".config" / "code-chat" / "mcp.json"
         self.config_path = path
-        self.servers: dict[str, McpServerConfig] = self.load_mcp_config()
+        self.servers: dict[str, McpServerConfig] = self._load_mcp_config()
 
-    def load_mcp_config(self) -> dict[str, McpServerConfig]:
+    def _load_mcp_config(self) -> dict[str, McpServerConfig]:
         """設定ファイル (mcp.json) から MCP サーバー設定を読み込みます.
 
         Returns:
@@ -59,6 +59,6 @@ class McpConfig:
                     enabled=cfg.get("enabled", True),
                 )
             return servers
-        except Exception:  # pylint: disable=broad-exception-caught
+        except (OSError, ValueError, AttributeError):
             logger.exception("MCP 設定ファイルの読み込みに失敗しました")
             return {}

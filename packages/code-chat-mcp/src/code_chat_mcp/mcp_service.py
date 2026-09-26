@@ -38,7 +38,7 @@ class McpService:
             Self: McpService インスタンス.
 
         """
-        await self.start_all_servers()
+        await self._start_all_servers()
         return self
 
     async def __aexit__(
@@ -55,7 +55,7 @@ class McpService:
             exc_tb (TracebackType | None): トレースバックオブジェクト.
 
         """
-        await self.stop_all_servers()
+        await self._stop_all_servers()
 
     def run(
         self, server_name: str, tool_name: str, arguments: dict | None = None
@@ -113,6 +113,8 @@ class McpService:
                             input_schema=tool.inputSchema,
                         )
                     )
+            # 1 台のサーバーの失敗で, 他のサーバーの処理を止めない.
+            # MCP サーバー (外部プロセス) 由来の例外は, MCP SDK・anyio (ExceptionGroup)・OSError など多岐にわたるため, 広く捕捉する.
             except Exception:  # pylint: disable=broad-exception-caught
                 logger.exception(
                     "MCP サーバー '%s' からのツール取得に失敗しました",
@@ -120,23 +122,6 @@ class McpService:
                 )
 
         return all_tools
-
-    def show_status(self) -> None:
-        """登録されている MCP サーバーの一覧と設定状態を表示します."""
-        if not self.servers:
-            print("登録されている MCP サーバーはありません")
-            return
-
-        print("=== Registered MCP Servers ===")
-        print(f"{'SERVER NAME':<20} {'ENABLED':<10} {'COMMAND':<30}")
-        print("-" * 65)
-
-        for name, config in self.servers.items():
-            status_str = "Enabled" if config.enabled else "Disabled"
-            cmd_str = f"{config.command} {' '.join(config.args)}".strip()
-            if len(cmd_str) > 30:
-                cmd_str = cmd_str[:27] + "..."
-            print(f"{name:<20} {status_str:<10} {cmd_str:<30}")
 
     async def test_connection(self) -> None:
         """設定ファイル (mcp.json) に登録された全 MCP サーバーに接続し, ツール一覧取得テストを行います."""
@@ -150,7 +135,7 @@ class McpService:
         # asyncio.run(self._test_servers_async())
         await self._test_servers_async()
 
-    async def start_all_servers(self) -> None:
+    async def _start_all_servers(self) -> None:
         """有効になっている全 MCP サーバーへの接続を登録します."""
         for name, config in self.servers.items():
             if not config.enabled:
@@ -162,7 +147,7 @@ class McpService:
             )
             self._connections[name] = connection
 
-    async def stop_all_servers(self) -> None:
+    async def _stop_all_servers(self) -> None:
         """登録済みの全 MCP サーバーへの接続を破棄・クリーンアップします."""
         self._connections.clear()
 
@@ -236,37 +221,11 @@ class McpService:
                     print(f"   └─ {tool.name}: {desc}")
 
                 success_count += 1
+            # 接続の失敗も結果として集計するため, 1 台の失敗で処理を止めない.
+            # MCP サーバー (外部プロセス) 由来の例外は, MCP SDK・anyio (ExceptionGroup)・OSError など多岐にわたるため, 広く捕捉する.
             except Exception:  # pylint: disable=broad-exception-caught
                 logger.exception("サーバー '%s' への接続テスト失敗", config.name)
 
         print(
             f"\nテスト完了: {success_count}/{len(server_list)} サーバーが正常に応答しました"
         )
-
-    def _format_tools_for_gemini(
-        self, mcp_tools: list[McpToolInfo]
-    ) -> list[dict[str, Any]]:
-        """MCP ツール一覧を Gemini API 用の function_declarations 形式に変換します.
-
-        名前の衝突を防ぐため, "server_name__tool_name" 形式に変換します.
-
-        Args:
-            mcp_tools (list[McpToolInfo]): MCP ツール情報のリスト.
-
-        Returns:
-            list[dict[str, Any]]: Gemini API 用の関数宣言リスト.
-
-        """
-        declarations: list[dict[str, Any]] = []
-
-        for tool in mcp_tools:
-            formatted_name = f"{tool.server_name}__{tool.name}"
-
-            declaration = {
-                "name": formatted_name,
-                "description": tool.description or "",
-                "parameters": tool.input_schema,
-            }
-            declarations.append(declaration)
-
-        return declarations

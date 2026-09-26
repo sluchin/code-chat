@@ -5,6 +5,7 @@ import subprocess
 import sys
 from typing import Any
 
+from code_chat_cli.api import send_message_stream_with_retry
 from code_chat_cli.file_utils import read_path_content
 from code_chat_cli.prompts import Prompts
 
@@ -52,16 +53,11 @@ def handle_code_review(
 
     print("コードレビューを実行中...\n")
 
-    try:
-        response = client.models.generate_content_stream(
-            model=model_name,
-            contents=prompt,
-        )
-        for chunk in response:
-            print(chunk.text, end="", flush=True)
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.exception("コードレビュー実行中にエラーが発生しました")
-        print(f"\nエラーが発生しました: {e}", file=sys.stderr)
+    # 一時的なエラー (503 / 分あたりの上限) はリトライされる. 失敗した場合の APIError は,
+    # 呼び出し元 (chat) が概要とヒントを 1 回だけ出力し, 終了コード 1 で終了する.
+    chat = client.chats.create(model=model_name)
+    for chunk in send_message_stream_with_retry(chat, prompt):
+        print(chunk.text, end="", flush=True)
 
     print()
 

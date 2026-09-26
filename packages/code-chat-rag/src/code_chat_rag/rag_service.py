@@ -83,20 +83,6 @@ class RagService:
         """Vector DB を削除 (初期化) します."""
         self.vector_store.clear()
 
-    def query(self, question: str, k: int = 5) -> str:
-        """インデックスされたコードベースを使用してコードに関する質問に回答します.
-
-        Args:
-            question: ユーザーのクエリ文字列.
-            k: 参照する取得チャンク数.
-
-        Returns:
-            生成された回答テキスト.
-
-        """
-        chain = self._build_chain(k=k)
-        return chain.invoke(question)
-
     def query_stream(self, question: str, k: int = 5) -> Generator[str, None, None]:
         """レスポンシブなCLIインタラクションのために回答トークンをストリーミングします.
 
