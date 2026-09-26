@@ -326,6 +326,18 @@ class TestIsRetryableError:
         """ネットワークの一時的なエラーは, リトライ対象になるか検証."""
         assert _is_retryable_error(httpx.ReadTimeout("timeout")) is True
 
+    @pytest.mark.parametrize(
+        "error",
+        [
+            httpx.ProxyError("proxy"),
+            httpx.UnsupportedProtocol("no scheme"),
+            httpx.LocalProtocolError("bad request"),
+        ],
+    )
+    def test_is_retryable_error_config_transport_error_failure(self, error):
+        """プロキシや URL の設定の誤りなど, 待っても直らないネットワークのエラーは, リトライ対象にならないか検証."""
+        assert _is_retryable_error(error) is False
+
     def test_is_retryable_error_wrapped_transport_error_success(self):
         """ネットワークの一時的なエラーを別の例外で包んだエラーも, リトライ対象になるか検証."""
         wrapped = RuntimeError("wrapped")

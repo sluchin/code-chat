@@ -37,6 +37,14 @@ _BACKOFF = wait_exponential_jitter(
     jitter=RetryPolicy.JITTER,
 )
 
+# リトライの対象にする, ネットワークの一時的なエラー (タイムアウト, 接続・送受信の失敗, 接続の途中切断).
+# プロキシや URL の設定の誤り (ProxyError, UnsupportedProtocol など) は, 待っても直らないため, 対象にしない
+_TRANSIENT_NETWORK_ERRORS = (
+    httpx.TimeoutException,
+    httpx.NetworkError,
+    httpx.RemoteProtocolError,
+)
+
 # ストリームが最初のチャンクを返す前に終了したことを表す目印
 _STREAM_END = object()
 
@@ -169,7 +177,7 @@ def _is_retryable_error(e: BaseException) -> bool:
 
     """
     # LangChain など, ライブラリが例外を別の例外で包んでいる場合も対象にする
-    if find_cause(e, httpx.TransportError) is not None:
+    if any(find_cause(e, error_type) for error_type in _TRANSIENT_NETWORK_ERRORS):
         return True
     api_error = find_api_error(e)
     if api_error is None:
