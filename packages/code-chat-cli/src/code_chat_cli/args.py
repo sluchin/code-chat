@@ -1,105 +1,18 @@
 """Code Chat CLI - 引数パーサーおよびコンテキストコレクター.
 
 このモジュールは, Code Chat CLI アプリケーションのためにコマンドライン引数を解析し,
-ファイルまたは標準入力からコンテキストを収集します.
-"""
+ファイルまたは標準入力からコンテキストを収集します."""
 
 import argparse
 import sys
-from dataclasses import dataclass, field
 
+from code_chat_cli.cli_args import CliArgs
 from code_chat_cli.file_utils import read_path_content
 from code_chat_cli.logger import get_logger
 
 logger = get_logger(__name__)
-
-
-# pylint: disable=too-many-instance-attributes
-@dataclass
-class CliArgs:
-    """解析済み引数とコンテキスト情報を保持するデータクラス."""
-
-    subcommand: str | None = None
-    """実行するサブコマンド ('rag' / 'cache' / 'mcp' / None)."""
-
-    subcommand_action: str | None = None
-    """サブコマンド内のアクション ('create' / 'update' / 'rm' / 'status' / 'list' / 'run' / 'test')."""
-
-    subcommand_target: str | None = None
-    """サブコマンドの対象パスや識別子 (PATH / CACHE_ID / SERVER_NAME)."""
-
-    # メイン対話・共通オプション
-    prompt: str | None = None
-    """ユーザーが指定した初期プロンプト文字列."""
-
-    files: list[str] = field(default_factory=list)
-    """`-f`/`--file` で指定された参照ファイル・ディレクトリパス."""
-
-    rag: bool = False
-    """`--rag` による RAG コンテキスト注入の有効化フラグ."""
-
-    mcp: bool = False
-    """`--mcp` による MCP 連携の有効化フラグ."""
-
-    cache: bool | str = False
-    """`-c`/`--cache` による Context Caching 利用指定 (True または Cache ID 文字列)."""
-
-    model: str = "gemini-3.5-flash"
-    """使用するモデル名."""
-
-    provider: str = "gemini"
-    """使用する LLM プロバイダ名 ('gemini' / 'claude' / 'openai' / 'local')."""
-
-    write_mode: bool = False
-    """`-w`/`--write` によるソースコード直接修正モードの有効化フラグ."""
-
-    auto_save: bool = False
-    """`-a`/`--auto-save` による自動保存の有効化フラグ."""
-
-    context: str | None = None
-    """読み込まれた標準入力およびファイルコンテキストの結合文字列."""
-
-    # cache サブコマンド専用オプション
-    cache_ttl: int = 3600
-    """`cache` コマンド用: キャッシュ保持時間 (秒)."""
-
-    # ログ・デバッグ用
-    debug_mode: bool = False
-    """デバッグモード有効化フラグ."""
-
-    log_level: str = "INFO"
-    """ログレベル文字列."""
-
-    trace_mode: bool = False
-    """サードパーティ製ライブラリのトランスポートログ制御."""
-
-    dry_run: bool = False
-    """ドライラン（実行処理の事前検証・試行）フラグ."""
-
-    list_models: bool = False
-    """モデル一覧表示フラグ."""
-
-    login: bool = False
-    """`--login` による Gemini API への OAuth ログインフラグ."""
-
-    oauth: bool = False
-    """`--oauth` による認証方法の指定 (API キーではなく OAuth を使う)."""
-
-    generate_commit_msg: bool = False
-    """コミットメッセージ生成フラグ."""
-
-    review: bool = False
-    """`--review` によるコードレビュー・静的解析モードフラグ."""
-
-    staged: bool = False
-    """`--staged` によるレビュー対象をステージング済み差分に限定するフラグ."""
-
-    # rag サブコマンド固有フラグ
-    input_dirs: list[str] = field(default_factory=list)
-    """インデックス作成対象のディレクトリパス"""
-
-    output_dir: str | None = "./.chroma_db"
-    """インデックス出力ディレクトリパス"""
+_SUBCOMMANDS = ("rag", "cache", "mcp")
+_VALUE_OPTIONS = {"-f", "--file", "-m", "--model", "-p", "--provider", "--log-level"}
 
 
 # pylint: disable=too-many-locals,too-many-statements
@@ -245,6 +158,19 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
     if raw_args.files and (raw_args.rag or raw_args.mcp):
         main_parser.error("-f/--file は --rag / --mcp と併用できません")
 
+    # Context Caching は, MCP・Write モード (システム指示が異なる) と併用できない
+    if raw_args.cache and raw_args.mcp:
+        main_parser.error("-c/--cache は --mcp と併用できません")
+    if raw_args.cache and raw_args.write_mode:
+        main_parser.error("-c/--cache は -w/--write と併用できません")
+
+    # Context Caching は API キーでのみ利用できる (OAuth のスコープが対応していない)
+    if raw_args.oauth and (raw_args.cache or raw_args.subcommand == "cache"):
+        main_parser.error(
+            "Context Caching (-c/--cache, cache サブコマンド) は API キーのみ対応のため, "
+            "--oauth と併用できません"
+        )
+
     context_parts: list[str] = []
 
     # 標準入力の取得
@@ -306,10 +232,6 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
         input_dirs=input_dirs,
         output_dir=getattr(raw_args, "output_dir", "./.chroma_db"),
     )
-
-
-_SUBCOMMANDS = ("rag", "cache", "mcp")
-_VALUE_OPTIONS = {"-f", "--file", "-m", "--model", "-p", "--provider", "--log-level"}
 
 
 def _split_prompt_tokens(args: list[str]) -> tuple[list[str], list[str]]:
@@ -445,7 +367,7 @@ def _build_main_execution_parser(
         nargs="?",
         const=True,
         default=False,
-        help="Context Caching を利用。指定なしで最新キャッシュ自動選択, Cache ID 指定で特定キャッシュ再利用",
+        help="Context Caching を利用。指定なしで最新キャッシュ自動選択, --cache=<Cache ID> の形式で特定キャッシュを再利用",
     )
     parser.add_argument(
         "-f",

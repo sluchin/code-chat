@@ -8,7 +8,7 @@ import os
 import sys
 from pathlib import Path
 
-from code_chat_cli.constants import EXCLUDE_DIRS, TEXT_EXTENSIONS
+from code_chat_cli.constants import Constants
 from code_chat_cli.logger import get_logger
 
 logger = get_logger(__name__)
@@ -51,11 +51,11 @@ def read_path_content(target_path: str) -> str:
         # os.walk を使うことで除外ディレクトリ配下の走査を即座にスキップ可能
         for root, dirs, files in os.walk(path):
             # EXCLUDE_DIRS に含まれるディレクトリ配下を走査対象から除外
-            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
+            dirs[:] = [d for d in dirs if d not in Constants.EXCLUDE_DIRS]
 
             for file in files:
                 file_path = Path(root) / file
-                if file_path.suffix.lower() in TEXT_EXTENSIONS:
+                if file_path.suffix.lower() in Constants.TEXT_EXTENSIONS:
                     try:
                         text = file_path.read_text(encoding="utf-8", errors="ignore")
                         contents.append(f"=== File: {file_path} ===\n{text}")

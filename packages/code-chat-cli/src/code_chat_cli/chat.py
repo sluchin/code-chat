@@ -18,19 +18,16 @@ from code_chat_rag.rag_service import RagService
 from google.genai import types
 from google.genai.errors import APIError, ClientError, ServerError
 
-from code_chat_cli.api import (
-    send_message_stream_with_retry,
-    send_message_with_retry,
-)
+from code_chat_cli.api import send_message_stream_with_retry, send_message_with_retry
 from code_chat_cli.args import parse_args
-from code_chat_cli.auth import OAuthError, login
+from code_chat_cli.auth import login
+from code_chat_cli.cache_error import CacheError
 from code_chat_cli.client import get_gemini_client
 from code_chat_cli.commands.commit import handle_commit_generation
 from code_chat_cli.commands.models import handle_list_models
 from code_chat_cli.commands.review import handle_code_review
-from code_chat_cli.file_writer import (
-    handle_write_mode_confirmation,
-)
+from code_chat_cli.context_cache import ContextCache
+from code_chat_cli.file_writer import handle_write_mode_confirmation
 from code_chat_cli.history import (
     HAVE_READLINE,
     save_chat_history,
@@ -39,14 +36,9 @@ from code_chat_cli.history import (
     setup_readline_history,
 )
 from code_chat_cli.logger import get_logger, setup_logging, suppress_info_logs
-from code_chat_cli.mcp import (
-    handle_mcp_run,
-    handle_mcp_status,
-    handle_mcp_test,
-)
-from code_chat_cli.prompts import (
-    WRITE_MODE_SYSTEM_INSTRUCTION,
-)
+from code_chat_cli.mcp import handle_mcp_run, handle_mcp_status, handle_mcp_test
+from code_chat_cli.oauth_error import OAuthError
+from code_chat_cli.prompts import Prompts
 from code_chat_cli.rag import (
     handle_rag,
     handle_rag_create,
@@ -262,11 +254,14 @@ def _stream_chat_response(chat: Any, send_text: str) -> str:
     """
     print("Gemini > ", end="", flush=True)
     chunks = []
+    usage = None
     for chunk in send_message_stream_with_retry(chat, send_text):
         if chunk.text:
             print(chunk.text, end="", flush=True)
             chunks.append(chunk.text)
+        usage = getattr(chunk, "usage_metadata", None) or usage
     print("\n")
+    _log_cache_usage(usage)
 
     response_text = "".join(chunks)
     logger.debug("対話レスポンス受信完了 - 文字数: %d", len(response_text))
@@ -353,15 +348,19 @@ def _fetch_response_text(chat: Any, prompt: str, is_write_mode: bool) -> str:
         response = send_message_with_retry(chat, prompt)
         response_text = response.text or ""
         print(response_text)
+        _log_cache_usage(getattr(response, "usage_metadata", None))
         return response_text
 
     print("Gemini > ", end="", flush=True)
     chunks = []
+    usage = None
     for chunk in send_message_stream_with_retry(chat, prompt):
         if chunk.text:
             print(chunk.text, end="", flush=True)
             chunks.append(chunk.text)
+        usage = getattr(chunk, "usage_metadata", None) or usage
     print("\n")
+    _log_cache_usage(usage)
     return "".join(chunks)
 
 
@@ -459,6 +458,102 @@ def _setup_cli_logging(cli_args: Any) -> None:
 
     log_level = "DEBUG" if cli_args.debug_mode else cli_args.log_level
     setup_logging(level_name=log_level, trace=cli_args.trace_mode)
+
+
+def _log_cache_usage(usage: Any) -> None:
+    """応答の使用状況から, コンテキストキャッシュの利用状況をログに出力します.
+
+    キャッシュを指定しなくても, 同じ先頭部分を繰り返し送ると自動 (暗黙) でキャッシュが効きます.
+
+    Args:
+        usage (Any): 応答の usage_metadata. 取得できなかった場合は None.
+
+    """
+    cached = getattr(usage, "cached_content_token_count", None)
+    total = getattr(usage, "prompt_token_count", None)
+    if not isinstance(total, int) or total <= 0:
+        return
+
+    if isinstance(cached, int) and cached > 0:
+        logger.info(
+            "キャッシュヒット: %d / %d トークン (%.0f%%)",
+            cached,
+            total,
+            cached / total * 100,
+        )
+    else:
+        logger.debug("キャッシュヒットなし (プロンプト: %d トークン)", total)
+
+
+def _resolve_cache_settings(
+    client: Any, cli_args: Any
+) -> tuple[str, types.GenerateContentConfig]:
+    """`-c` / `--cache` の指定から, 使用するモデルとキャッシュ付きの生成設定を作成します.
+
+    キャッシュは作成時のモデルに紐づくため, キャッシュのモデルを使用します.
+
+    Args:
+        client (Any): Gemini Client インスタンス.
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+
+    Returns:
+        tuple[str, types.GenerateContentConfig]: (使用するモデル名, キャッシュ付きの生成設定).
+
+    Raises:
+        SystemExit: キャッシュを取得できない場合, 終了コード 1 で終了します.
+
+    """
+    try:
+        cache = ContextCache(client).resolve(cli_args.cache)
+    except CacheError as e:
+        logger.error("%s", e)
+        sys.exit(1)
+
+    logger.info("キャッシュを使用します: %s (モデル: %s)", cache.name, cache.model)
+    if cache.model.removeprefix("models/") != cli_args.model.removeprefix("models/"):
+        logger.info("キャッシュのモデルで実行します (指定: %s)", cli_args.model)
+    return cache.model, _build_chat_config(cli_args.write_mode, cache.name)
+
+
+def _handle_cache_subcommand(client: Any, cli_args: Any) -> None:
+    """cache サブコマンド (create / update / rm / list) の振る舞いを分岐・実行します.
+
+    Args:
+        client (Any): Gemini Client インスタンス.
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+
+    """
+    action = cli_args.subcommand_action
+    target = cli_args.subcommand_target
+
+    context_cache = ContextCache(client)
+
+    try:
+        if action == "create":
+            context_cache.create(cli_args.model, target or ".", cli_args.cache_ttl)
+            sys.exit(0)
+
+        if action == "update":
+            context_cache.update(cli_args.model, target or ".")
+            sys.exit(0)
+
+        if action == "rm":
+            context_cache.remove(target)
+            sys.exit(0)
+
+        if action == "list":
+            context_cache.list_caches()
+            sys.exit(0)
+
+        logger.error("不明なサブコマンドアクションです: %s", action)
+        sys.exit(1)
+
+    except CacheError as e:
+        logger.error("%s", e)
+        sys.exit(1)
+    except Exception:  # pylint: disable=broad-exception-caught
+        logger.exception("cache (%s) コマンドの実行中にエラーが発生しました", action)
+        sys.exit(1)
 
 
 def _require_rag_api_key() -> None:
@@ -590,6 +685,7 @@ def _handle_subcommands(client: Any, cli_args: Any) -> None:
 
     elif subcommand == "cache":
         logger.info("cache サブコマンドを実行します")
+        _handle_cache_subcommand(client, cli_args)
 
     review = cli_args.review
     if review:
@@ -613,7 +709,6 @@ def _handle_rag_subcommand(cli_args: Any) -> None:
         cli_args (Any): コマンドライン引数の名前空間オブジェクト.
 
     """
-    logger.info("rag サブコマンドを実行します")
     input_dirs = cli_args.input_dirs or ["."]
     output_dir = cli_args.output_dir or "./.chroma_db"
     action = cli_args.subcommand_action
@@ -656,7 +751,6 @@ def _handle_mcp_subcommand(cli_args: Any) -> None:
         cli_args (Any): コマンドライン引数の名前空間オブジェクト.
 
     """
-    logger.info("mcp サブコマンドを実行します")
     action = cli_args.subcommand_action
     config_path = getattr(cli_args, "config_path", None)
 
@@ -695,32 +789,39 @@ def _handle_mcp_subcommand(cli_args: Any) -> None:
         sys.exit(1)
 
 
-def _build_chat_config(is_write_mode: bool) -> types.GenerateContentConfig:
-    """Write Mode に応じた GenerateContentConfig を作成します.
+def _build_chat_config(
+    is_write_mode: bool, cached_content: str | None = None
+) -> types.GenerateContentConfig:
+    """Write Mode やキャッシュの有無に応じた GenerateContentConfig を作成します.
 
     Args:
         is_write_mode (bool): 上書きモードが有効かどうか.
+        cached_content (str | None): 使用するキャッシュ名 (`cachedContents/<ID>`).
+            指定時は, システム指示をキャッシュ側に含めるため, リクエストには指定しません.
 
     Returns:
         types.GenerateContentConfig: 設定された生成設定オブジェクト.
 
     """
+    if cached_content:
+        return types.GenerateContentConfig(
+            cached_content=cached_content,
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                disable=True
+            ),
+        )
+
     if is_write_mode:
         return types.GenerateContentConfig(
-            system_instruction=WRITE_MODE_SYSTEM_INSTRUCTION,
+            system_instruction=Prompts.WRITE_MODE_SYSTEM_INSTRUCTION,
             temperature=0.1,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(
                 disable=True
             ),
         )
 
-    system_instruction = (
-        "あなたは優秀なプログラミングアシスタントです."
-        "提供されたソースコードを把握し, "
-        "ユーザーからの指示に従って修正案の提示やコード解説, レビューを行ってください."
-    )
     return types.GenerateContentConfig(
-        system_instruction=system_instruction,
+        system_instruction=Prompts.DEFAULT_SYSTEM_INSTRUCTION,
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
 
@@ -857,7 +958,11 @@ def main() -> None:
             _require_rag_api_key()
             rag_service = RagService(input_dirs=input_dirs, output_dir=output_dir)
 
-        chat = client.chats.create(model=cli_args.model, config=config)
+        model = cli_args.model
+        if cli_args.cache:
+            model, config = _resolve_cache_settings(client, cli_args)
+
+        chat = client.chats.create(model=model, config=config)
 
         if cli_args.context or cli_args.prompt:
             run_single_turn_mode(chat, cli_args, chat_history, rag_service=rag_service)

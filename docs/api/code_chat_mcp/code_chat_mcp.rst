@@ -12,6 +12,14 @@ code\_chat\_mcp.mcp\_config module
    :show-inheritance:
    :undoc-members:
 
+code\_chat\_mcp.mcp\_server\_config module
+------------------------------------------
+
+.. automodule:: code_chat_mcp.mcp_server_config
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 code\_chat\_mcp.mcp\_server\_connection module
 ----------------------------------------------
 
@@ -24,6 +32,14 @@ code\_chat\_mcp.mcp\_service module
 -----------------------------------
 
 .. automodule:: code_chat_mcp.mcp_service
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+code\_chat\_mcp.mcp\_tool\_info module
+--------------------------------------
+
+.. automodule:: code_chat_mcp.mcp_tool_info
    :members:
    :show-inheritance:
    :undoc-members:

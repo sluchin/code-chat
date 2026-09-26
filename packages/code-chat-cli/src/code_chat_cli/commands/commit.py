@@ -9,7 +9,7 @@ from google.genai.errors import APIError, ClientError, ServerError
 from code_chat_cli.api import send_message_stream_with_retry
 from code_chat_cli.git_utils import get_git_diff
 from code_chat_cli.logger import get_logger
-from code_chat_cli.prompts import COMMIT_PROMPT_TEMPLATE_EN, COMMIT_PROMPT_TEMPLATE_JA
+from code_chat_cli.prompts import Prompts
 
 logger = get_logger(__name__)
 
@@ -45,7 +45,9 @@ def handle_commit_generation(client: Any, model_name: str, lang: str = "en") -> 
 
         # 言語に応じたテンプレートの選択（標準を日本語に設定）
         template = (
-            COMMIT_PROMPT_TEMPLATE_JA if lang == "ja" else COMMIT_PROMPT_TEMPLATE_EN
+            Prompts.COMMIT_PROMPT_TEMPLATE_JA
+            if lang == "ja"
+            else Prompts.COMMIT_PROMPT_TEMPLATE_EN
         )
         prompt = template.format(diff=diff_text)
 

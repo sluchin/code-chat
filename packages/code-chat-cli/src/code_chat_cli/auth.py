@@ -18,6 +18,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 
 from code_chat_cli.logger import get_logger
+from code_chat_cli.oauth_error import OAuthError
 
 logger = get_logger(__name__)
 
@@ -38,10 +39,6 @@ SETUP_MESSAGE = f"""OAuth ログインの設定がありません. 次の手順�
        export {CLIENT_SECRET_ENV}='your-client-secret'
   3. code-chat --login を実行する (以降は --oauth を付けて code-chat を実行する)
 API キーを使う場合は, export GEMINI_API_KEY='your-api-key' を設定してください."""
-
-
-class OAuthError(Exception):
-    """OAuth の設定不備・未ログイン・再ログインが必要な状態を表す例外."""
 
 
 def get_token_path() -> Path:

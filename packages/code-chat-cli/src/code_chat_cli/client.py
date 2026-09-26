@@ -6,23 +6,16 @@ import sys
 from google import genai
 from google.genai import types
 
-from code_chat_cli.auth import (
-    OAuthError,
-    build_httpx_clients,
-    get_credentials,
-    is_interactive,
-)
+from code_chat_cli.auth import build_httpx_clients, get_credentials, is_interactive
+from code_chat_cli.client_config_error import ClientConfigError
 from code_chat_cli.logger import get_logger
+from code_chat_cli.oauth_error import OAuthError
 
 logger = get_logger(__name__)
 
 # OAuth 認証時に SDK の API キー必須チェックを通すためのダミー値.
 # 実際の送信時に auth.build_httpx_clients がこのキーのヘッダーを外し, Bearer トークンを付与する.
 _OAUTH_PLACEHOLDER_API_KEY = "oauth-placeholder"
-
-
-class ClientConfigError(Exception):
-    """クライアント設定や環境変数に関する例外."""
 
 
 def get_gemini_client(use_oauth: bool = False) -> genai.Client:

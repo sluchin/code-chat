@@ -4,7 +4,18 @@
 システム指示および各種プロンプトテンプレートを提供します.
 """
 
-COMMIT_PROMPT_TEMPLATE_JA: str = """\
+
+class Prompts:
+    """プロンプトテンプレートおよびシステム指示を保持するクラス."""
+
+    DEFAULT_SYSTEM_INSTRUCTION: str = (
+        "あなたは優秀なプログラミングアシスタントです."
+        "提供されたソースコードを把握し, "
+        "ユーザーからの指示に従って修正案の提示やコード解説, レビューを行ってください."
+    )
+    """通常の対話で使用するシステム指示 (Context Caching 使用時は, キャッシュ作成時にこの指示を含める)."""
+
+    COMMIT_PROMPT_TEMPLATE_JA: str = """\
 以下の git diff の内容を分析し, 適切な Git コミットメッセージを作成してください.
 
 【制約事項】
@@ -17,9 +28,9 @@ COMMIT_PROMPT_TEMPLATE_JA: str = """\
 【git diff】
 {diff}
 """
-"""日本語用のコミットメッセージ生成プロンプトテンプレート."""
+    """日本語用のコミットメッセージ生成プロンプトテンプレート."""
 
-COMMIT_PROMPT_TEMPLATE_EN: str = """\
+    COMMIT_PROMPT_TEMPLATE_EN: str = """\
 Analyze the following git diff and generate a concise, professional Git commit message in English.
 
 [Constraints]
@@ -31,9 +42,9 @@ Analyze the following git diff and generate a concise, professional Git commit m
 [git diff]
 {diff}
 """
-"""英語用のコミットメッセージ生成プロンプトテンプレート."""
+    """英語用のコミットメッセージ生成プロンプトテンプレート."""
 
-WRITE_MODE_SYSTEM_INSTRUCTION: str = """
+    WRITE_MODE_SYSTEM_INSTRUCTION: str = """
 あなたはコード自動生成アシスタントです.
 指定されたファイルを完全に置き換えるための実行可能なコードのみを出力してください.
 
@@ -42,9 +53,9 @@ WRITE_MODE_SYSTEM_INSTRUCTION: str = """
 2. 挨拶, 解説, 説明文, 前置き, 後書きは一切含めないでください.
 3. 出力の1文字目から最後の文字まで, すべてPythonソースコードとして直接実行可能なテキストのみを出力してください.
 """
-"""ファイル直接上書き生成モード（writeモード）用のシステム指示テキスト."""
+    """ファイル直接上書き生成モード（writeモード）用のシステム指示テキスト."""
 
-REVIEW_PROMPT_TEMPLATE: str = """\
+    REVIEW_PROMPT_TEMPLATE: str = """\
 あなたはプロのソフトウェアエンジニアです. 以下のコード差分（diff）またはファイル内容を詳細にレビューしてください.
 
 ### レビュー観点
@@ -56,4 +67,4 @@ REVIEW_PROMPT_TEMPLATE: str = """\
 ### レビュー対象
 {code}
 """
-"""コードレビュー実行用のプロンプトテンプレート."""
+    """コードレビュー実行用のプロンプトテンプレート."""

@@ -36,10 +36,26 @@ code\_chat\_cli.auth module
    :show-inheritance:
    :undoc-members:
 
+code\_chat\_cli.cache\_error module
+-----------------------------------
+
+.. automodule:: code_chat_cli.cache_error
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 code\_chat\_cli.chat module
 ---------------------------
 
 .. automodule:: code_chat_cli.chat
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+code\_chat\_cli.cli\_args module
+--------------------------------
+
+.. automodule:: code_chat_cli.cli_args
    :members:
    :show-inheritance:
    :undoc-members:
@@ -52,10 +68,26 @@ code\_chat\_cli.client module
    :show-inheritance:
    :undoc-members:
 
+code\_chat\_cli.client\_config\_error module
+--------------------------------------------
+
+.. automodule:: code_chat_cli.client_config_error
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 code\_chat\_cli.constants module
 --------------------------------
 
 .. automodule:: code_chat_cli.constants
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+code\_chat\_cli.context\_cache module
+-------------------------------------
+
+.. automodule:: code_chat_cli.context_cache
    :members:
    :show-inheritance:
    :undoc-members:
@@ -104,6 +136,14 @@ code\_chat\_cli.mcp module
 --------------------------
 
 .. automodule:: code_chat_cli.mcp
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+code\_chat\_cli.oauth\_error module
+-----------------------------------
+
+.. automodule:: code_chat_cli.oauth_error
    :members:
    :show-inheritance:
    :undoc-members:
