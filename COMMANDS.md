@@ -121,7 +121,7 @@ Vector DB (既定: `./.chroma_db`) の作成、差分更新、削除、ステー
 | コマンド | オプション | 説明 |
 | --- | --- | --- |
 | `code-chat rag create` | `--input_dirs <PATH>...` `--output_dir <DIR>` | 指定ディレクトリ (複数可、既定: `.`) を走査して Vector DB を新規作成 (既存の内容は初期化) |
-| `code-chat rag update` | `--input_dirs <PATH>...` `--output_dir <DIR>` | 指定ディレクトリの内容を既存の Vector DB に追加 |
+| `code-chat rag update` | `--input_dirs <PATH>...` `--output_dir <DIR>` | 指定ディレクトリの内容を既存の Vector DB に反映 (読み込んだファイルの既存のチャンクは置き換え、他のファイルのデータは残す) |
 | `code-chat rag rm` | なし | 構築済みの Vector DB (`./.chroma_db`) の内容を削除 |
 | `code-chat rag status` | なし | Vector DB のパスと登録済みチャンク数を表示 |
 

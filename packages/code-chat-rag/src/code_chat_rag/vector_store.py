@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 class VectorStore:
     """ベクトルデータベースを使用したコードチャンクの保存および検索を処理します."""
 
+    _DELETE_BATCH_SIZE = 500
+
     def __init__(
         self,
         output_dir: str = "./.chroma_db",
@@ -63,6 +65,24 @@ class VectorStore:
         db = self._get_db()
         ids = db.add_documents(documents, batch_size=32)
         return ids
+
+    def delete_by_sources(self, sources: list[str]) -> None:
+        """指定したソースファイルに由来するチャンクを, すべて削除します.
+
+        差分更新で, 同じファイルのチャンクが重複しないよう, 追加の前に古いチャンクを取り除くために使います.
+
+        Args:
+            sources (list[str]): 削除対象のソースファイルのパス (チャンクのメタデータ `source`).
+
+        """
+        if not sources:
+            return
+
+        db = self._get_db()
+        # 一度に指定できる値の数に上限があるため, 分割して削除する
+        for start in range(0, len(sources), self._DELETE_BATCH_SIZE):
+            batch = sources[start : start + self._DELETE_BATCH_SIZE]
+            db.delete(where={"source": {"$in": batch}})
 
     def as_retriever(
         self, search_type: str = "similarity", k: int = 4
