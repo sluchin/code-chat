@@ -1,6 +1,6 @@
-"""`code_chat_cli.constants` モジュールのテスト."""
+"""`code_chat_lib.constants` モジュールのテスト."""
 
-from code_chat_cli.constants import Constants
+from code_chat_lib.constants import Constants
 
 
 class TestConstants:

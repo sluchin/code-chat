@@ -9,7 +9,7 @@ import pytest
 from google.genai.errors import APIError
 
 from code_chat_cli.commands.models import handle_list_models
-from code_chat_cli.logger import set_trace
+from code_chat_lib.logger import set_trace
 
 
 class TestHandleListModels:

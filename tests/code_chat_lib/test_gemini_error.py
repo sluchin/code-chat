@@ -1,9 +1,9 @@
-"""`code_chat_cli.gemini_error` モジュールのテスト."""
+"""`code_chat_lib.gemini_error` モジュールのテスト."""
 
 import pytest
 from google.genai.errors import APIError, ClientError
 
-from code_chat_cli.gemini_error import (
+from code_chat_lib.gemini_error import (
     _first_line,
     _http_code,
     _quota_detail,

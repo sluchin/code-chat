@@ -6,7 +6,7 @@
 
 from dataclasses import dataclass, field
 
-from code_chat_cli.constants import Constants
+from code_chat_lib.constants import Constants
 
 
 # pylint: disable=too-many-instance-attributes

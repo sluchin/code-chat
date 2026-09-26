@@ -8,8 +8,8 @@ from google.genai import types
 
 from code_chat_cli.auth import build_httpx_clients, get_credentials, is_interactive
 from code_chat_cli.client_config_error import ClientConfigError
-from code_chat_cli.logger import get_logger
 from code_chat_cli.oauth_error import OAuthError
+from code_chat_lib.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 # 実際の送信時に auth.build_httpx_clients がこのキーのヘッダーを外し, Bearer トークンを付与する.
 _OAUTH_PLACEHOLDER_API_KEY = "oauth-placeholder"
 
-# リトライは code_chat_cli.api.call_with_retry に一元化している (retryDelay の優先, 1 日あたりの上限の除外,
+# リトライは code_chat_lib.api.call_with_retry に一元化している (retryDelay の優先, 1 日あたりの上限の除外,
 # 日本語の警告のため). 二重にリトライしないよう, SDK の retry_options は設定しない.
 
 

@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from code_chat_cli.logger import get_logger
+from code_chat_lib.logger import get_logger
 
 # pylint: disable=invalid-name
 HAVE_READLINE = False

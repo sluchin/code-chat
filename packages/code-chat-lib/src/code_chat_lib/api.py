@@ -16,16 +16,16 @@ from tenacity import (
     wait_exponential_jitter,
 )
 
-from code_chat_cli.gemini_error import (
+from code_chat_lib.gemini_error import (
     find_api_error,
     find_cause,
     is_daily_quota_error,
     retry_delay_seconds,
     summarize_error,
 )
-from code_chat_cli.gemini_error_kind import GeminiErrorKind
-from code_chat_cli.logger import get_logger
-from code_chat_cli.retry_policy import RetryPolicy
+from code_chat_lib.gemini_error_kind import GeminiErrorKind
+from code_chat_lib.logger import get_logger
+from code_chat_lib.retry_policy import RetryPolicy
 
 logger = get_logger(__name__)
 

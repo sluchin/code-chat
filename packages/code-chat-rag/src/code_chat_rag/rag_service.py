@@ -9,8 +9,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from code_chat_cli.api import stream_with_retry
-from code_chat_cli.logger import get_logger
+from code_chat_lib.api import stream_with_retry
+from code_chat_lib.logger import get_logger
 from code_chat_rag.indexer import Indexer
 from code_chat_rag.vector_store import VectorStore
 

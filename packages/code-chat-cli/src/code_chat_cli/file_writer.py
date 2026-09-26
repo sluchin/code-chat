@@ -4,7 +4,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
-from code_chat_cli.logger import get_logger
+from code_chat_lib.logger import get_logger
 
 logger = get_logger(__name__)
 

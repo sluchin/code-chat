@@ -1,12 +1,12 @@
 """MCP サーバー設定用モジュール."""
 
 import json
-import logging
 from pathlib import Path
 
+from code_chat_lib.logger import get_logger
 from code_chat_mcp.mcp_server_config import McpServerConfig
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class McpConfig:

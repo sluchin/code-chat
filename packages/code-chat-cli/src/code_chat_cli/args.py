@@ -7,9 +7,9 @@ import argparse
 import sys
 
 from code_chat_cli.cli_args import CliArgs
-from code_chat_cli.constants import Constants
 from code_chat_cli.file_utils import read_path_content
-from code_chat_cli.logger import get_logger
+from code_chat_lib.constants import Constants
+from code_chat_lib.logger import get_logger
 
 logger = get_logger(__name__)
 _SUBCOMMANDS = ("rag", "cache", "mcp")

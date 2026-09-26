@@ -12,6 +12,7 @@ dependencies = [
     "mypy>=2.3.0",
     "pylint>=4.0.6",
     "ruff>=0.16.1",
+    "code-chat-lib",
     "code-chat-rag",
     "code-chat-mcp",
     "google-auth-oauthlib>=1.4.1",
@@ -19,6 +20,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
+code-chat-lib = { workspace = true }
 code-chat-rag = { workspace = true }
 code-chat-mcp = { workspace = true }
 

@@ -1,4 +1,4 @@
-"""Gemini CLI Tool - Constants."""
+"""code-chat の各パッケージで共有する定数."""
 
 from typing import ClassVar
 

@@ -1,8 +1,8 @@
-"""`code_chat_cli.gemini_error_kind` モジュールのテスト."""
+"""`code_chat_lib.gemini_error_kind` モジュールのテスト."""
 
 import pytest
 
-from code_chat_cli.gemini_error_kind import GeminiErrorKind
+from code_chat_lib.gemini_error_kind import GeminiErrorKind
 
 
 class TestGeminiErrorKind:

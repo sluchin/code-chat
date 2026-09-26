@@ -17,8 +17,8 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-from code_chat_cli.logger import get_logger
 from code_chat_cli.oauth_error import OAuthError
+from code_chat_lib.logger import get_logger
 
 logger = get_logger(__name__)
 

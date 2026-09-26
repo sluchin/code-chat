@@ -22,6 +22,7 @@ packages = ["packages/code-chat-cli/src/code_chat_cli"]
 
 [tool.uv.sources]
 code-chat-cli = { workspace = true }
+code-chat-lib = { workspace = true }
 
 [tool.uv.workspace]
 members = ["packages/*"]
@@ -37,12 +38,13 @@ dev = [
 extend-select = ["I"]
 
 [tool.ruff.lint.isort]
-# ワークスペースの 3 パッケージは, どのパッケージから見ても, 自分たちのコード (first-party) として並べる
-known-first-party = ["code_chat_cli", "code_chat_mcp", "code_chat_rag"]
+# ワークスペースの 4 パッケージは, どのパッケージから見ても, 自分たちのコード (first-party) として並べる
+known-first-party = ["code_chat_cli", "code_chat_lib", "code_chat_mcp", "code_chat_rag"]
 
 [tool.pytest.ini_options]
 addopts = [
     "--cov=packages/code-chat-cli/src/code_chat_cli",
+    "--cov=packages/code-chat-lib/src/code_chat_lib",
     "--cov=packages/code-chat-rag/src/code_chat_rag",
     "--cov=packages/code-chat-mcp/src/code_chat_mcp",
     "--cov-report=term-missing",
@@ -50,6 +52,7 @@ addopts = [
 testpaths = ["tests"]
 pythonpath = [
     "packages/code-chat-cli/src",
+    "packages/code-chat-lib/src",
     "packages/code-chat-rag/src",
     "packages/code-chat-mcp/src",
 ]
