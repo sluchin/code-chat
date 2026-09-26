@@ -66,7 +66,7 @@ class CliArgs:
     trace_mode: bool = False
     """サードパーティ製ライブラリのトランスポートログ制御."""
 
-    dry_run: bool = False
+    dryrun: bool = False
     """ドライラン（実行処理の事前検証・試行）フラグ."""
 
     list_models: bool = False

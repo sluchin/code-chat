@@ -22,13 +22,14 @@ def handle_rag_create(
         dryrun (bool): True の場合はインデックス作成を実行せず, 対象ファイル一覧を表示する.
 
     """
-    logger.debug("RagService の初期化を開始します")
-    service = RagService(output_dir=output_dir)
-
+    # dry-run では, Gemini API に接続する RagService を初期化しない
     if dryrun:
         print("[DRY-RUN] インデックスの更新対象ファイルを計算します...")
         _handle_dryrun(input_dirs=input_dirs)
         return
+
+    logger.debug("RagService の初期化を開始します")
+    service = RagService(output_dir=output_dir)
 
     logger.info("新規作成モードでインデックス処理を開始します")
     count = service.index_repository(input_dirs)
@@ -51,13 +52,14 @@ def handle_rag_update(
         dryrun (bool): True の場合はインデックス作成を実行せず, 対象ファイル一覧を表示する.
 
     """
-    logger.debug("RagService の初期化を開始します")
-    service = RagService(output_dir=output_dir)
-
+    # dry-run では, Gemini API に接続する RagService を初期化しない
     if dryrun:
         print("[DRY-RUN] インデックスの更新対象ファイルを計算します...")
         _handle_dryrun(input_dirs=input_dirs)
         return
+
+    logger.debug("RagService の初期化を開始します")
+    service = RagService(output_dir=output_dir)
 
     logger.info("差分更新モードでインデックス処理を開始します")
     count = service.index_repository(input_dirs, update_only=True)

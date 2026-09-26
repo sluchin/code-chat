@@ -49,7 +49,7 @@ class TestHandleRagCreate:
         with patch("builtins.print") as mock_print:
             handle_rag_create(["/path/to/repo"], dryrun=True)
 
-        mock_rag_service_cls.return_value.index_repository.assert_not_called()
+        mock_rag_service_cls.assert_not_called()
         mock_print.assert_any_call("a.py")
         mock_print.assert_any_call("対象ファイル数: 2")
 
@@ -90,7 +90,7 @@ class TestHandleRagUpdate:
         with patch("builtins.print") as mock_print:
             handle_rag_update(["/path/to/repo"], dryrun=True)
 
-        mock_rag_service_cls.return_value.index_repository.assert_not_called()
+        mock_rag_service_cls.assert_not_called()
         mock_print.assert_any_call("対象ファイル数: 1")
 
 
