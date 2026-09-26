@@ -3,25 +3,16 @@
 import asyncio
 import logging
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Self
 
-from code_chat_mcp.mcp_config import McpConfig, McpServerConfig
+from code_chat_mcp.mcp_config import McpConfig
+from code_chat_mcp.mcp_server_config import McpServerConfig
 from code_chat_mcp.mcp_server_connection import McpServerConnection
+from code_chat_mcp.mcp_tool_info import McpToolInfo
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class McpToolInfo:
-    """MCP ツールの情報を保持するデータ構造."""
-
-    server_name: str
-    name: str
-    description: str | None
-    input_schema: dict[str, Any]
 
 
 class McpService:

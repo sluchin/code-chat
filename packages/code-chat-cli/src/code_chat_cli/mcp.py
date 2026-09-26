@@ -4,7 +4,8 @@ import asyncio
 from collections import defaultdict
 from pathlib import Path
 
-from code_chat_mcp.mcp_service import McpService, McpToolInfo
+from code_chat_mcp.mcp_service import McpService
+from code_chat_mcp.mcp_tool_info import McpToolInfo
 
 from code_chat_cli.client import get_gemini_client
 from code_chat_cli.logger import get_logger

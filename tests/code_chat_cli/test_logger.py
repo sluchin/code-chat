@@ -5,11 +5,7 @@ import os
 import socket
 from unittest.mock import patch
 
-from code_chat_cli.logger import (
-    get_logger,
-    setup_logging,
-    syslog_context_filter,
-)
+from code_chat_cli.logger import get_logger, setup_logging, syslog_context_filter
 
 
 class TestSyslogContextFilter:

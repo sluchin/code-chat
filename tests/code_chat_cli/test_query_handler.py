@@ -6,8 +6,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from code_chat_cli.query_handler import QueryHandler, _is_rate_limit_error
-from code_chat_mcp.mcp_service import McpToolInfo
+from code_chat_cli.query_handler import QueryHandler
+from code_chat_mcp.mcp_tool_info import McpToolInfo
 from google.genai.errors import APIError
 
 
@@ -59,14 +59,17 @@ def no_sleep():
 
 
 class TestIsRateLimitError:
-    """`_is_rate_limit_error` のテスト."""
+    """`QueryHandler._is_rate_limit_error` のテスト."""
 
     def test_is_rate_limit_error_success(self):
         """429 エラーの判定を検証."""
-        assert _is_rate_limit_error(APIError(429, {})) is True
-        assert _is_rate_limit_error(APIError("429 RESOURCE_EXHAUSTED", {})) is True
-        assert _is_rate_limit_error(APIError(500, {})) is False
-        assert _is_rate_limit_error(ValueError("429")) is False
+        assert QueryHandler._is_rate_limit_error(APIError(429, {})) is True
+        assert (
+            QueryHandler._is_rate_limit_error(APIError("429 RESOURCE_EXHAUSTED", {}))
+            is True
+        )
+        assert QueryHandler._is_rate_limit_error(APIError(500, {})) is False
+        assert QueryHandler._is_rate_limit_error(ValueError("429")) is False
 
 
 class TestInit:

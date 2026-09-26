@@ -118,7 +118,10 @@ class TestParseArgs:
         monkeypatch.setattr(
             "sys.argv", ["chat.py", "hello", "world", "-m", "gemini-x", "-f", "a.py"]
         )
-        with patch("code_chat_cli.args.read_path_content", return_value="content"):
+        with patch(
+            "code_chat_cli.args.read_path_content",
+            return_value="content",
+        ):
             args = parse_args()
 
         assert args.prompt == "hello world"
@@ -150,6 +153,32 @@ class TestParseArgs:
         assert args.oauth is True
         assert args.login is False
 
+    def test_parse_args_cache_success(self, monkeypatch):
+        """-c が最新キャッシュの自動選択, --cache=<ID> が特定キャッシュの指定として解析され, プロンプトは維持されるか検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py", "-c", "質問です"])
+        latest = parse_args()
+        monkeypatch.setattr(
+            "sys.argv", ["chat.py", "--cache=cachedContents/abc", "質問です"]
+        )
+        specified = parse_args()
+
+        assert latest.cache is True
+        assert latest.prompt == "質問です"
+        assert specified.cache == "cachedContents/abc"
+        assert specified.prompt == "質問です"
+
+    def test_parse_args_cache_subcommand_success(self, monkeypatch):
+        """cache create の対象パスと --ttl が解析されるか検証."""
+        monkeypatch.setattr(
+            "sys.argv", ["chat.py", "cache", "create", "src", "--ttl", "120"]
+        )
+        args = parse_args()
+
+        assert args.subcommand == "cache"
+        assert args.subcommand_action == "create"
+        assert args.subcommand_target == "src"
+        assert args.cache_ttl == 120
+
     @pytest.mark.parametrize("option", ["--rag", "--mcp"])
     def test_parse_args_file_with_rag_or_mcp_failure(
         self, monkeypatch, tmp_path, capsys, option
@@ -164,6 +193,27 @@ class TestParseArgs:
 
         assert exc_info.value.code == 2
         assert "-f/--file は --rag / --mcp と併用できません" in capsys.readouterr().err
+
+    @pytest.mark.parametrize(
+        ("argv", "message"),
+        [
+            (["-c", "--mcp", "q"], "-c/--cache は --mcp と併用できません"),
+            (["-c", "-w", "q"], "-c/--cache は -w/--write と併用できません"),
+            (["-c", "--oauth", "q"], "--oauth と併用できません"),
+            (["cache", "list", "--oauth"], "--oauth と併用できません"),
+        ],
+    )
+    def test_parse_args_cache_conflict_failure(
+        self, monkeypatch, capsys, argv, message
+    ):
+        """Context Caching が --mcp / -w / --oauth と併用された場合に, エラー (終了コード 2) で終了するか検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py", *argv])
+
+        with pytest.raises(SystemExit) as exc_info:
+            parse_args()
+
+        assert exc_info.value.code == 2
+        assert message in capsys.readouterr().err
 
     def test_parse_args_invalid_log_level_failure(self, monkeypatch):
         """無効な --log-level を指定した場合に SystemExit (エラー) になるか検証."""

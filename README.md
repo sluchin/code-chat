@@ -26,10 +26,15 @@ Gemini API を使用してローカルソースコードの参照・対話・自
 - 🔌 **MCP (Model Context Protocol) 統合 (`--mcp`, `mcp` サブコマンド)**
   - 外部の MCP サーバーのツールを Gemini の Function Calling 経由で呼び出します。
 
+- 🗃️ **Context Caching (`-c`, `--cache`, `cache` サブコマンド)**
+  - 大きなコンテキスト (ソースコード一式など) を Gemini サーバー上にキャッシュし、繰り返しの質問で再利用します (明示的キャッシュ)。
+  - 明示的キャッシュは **有料枠 (課金が有効なプロジェクト) の API キーでのみ**利用できます。無料枠と `--oauth` では利用できません。
+  - キャッシュを指定しなくても、同じ内容を先頭に送り続けると Gemini が自動でキャッシュします (暗黙のキャッシュ)。ヒットしたトークン数は、応答後に `キャッシュヒット: 12264 / 16718 トークン (73%)` のようにログへ出力されます。
+
 - 🛡️ **開発基盤**
   - `ruff` / `pylint` / `mypy` / `pytest` / `pre-commit` によるチェック。
 
-> **未実装**: `cache` サブコマンドと `-c/--cache`（Context Caching）は引数定義のみで、まだ動作しません。`-p/--provider` も現時点では `gemini` のみ対応です。
+> **未実装**: `-p/--provider` は現時点では `gemini` のみ対応です。
 
 コマンドとオプションの一覧は [COMMANDS.md](COMMANDS.md) も参照してください。
 
@@ -172,6 +177,12 @@ code-chat --generate-commit-msg
 # 利用可能なモデル一覧
 code-chat --list-models
 
+# Context Caching: コンテキストをキャッシュして再利用 (有料枠の API キーが必要)
+code-chat cache create ./src
+code-chat -c "認証まわりの実装を説明して"
+code-chat cache list
+code-chat cache rm
+
 # Google アカウントで OAuth ログイン (初回のみ)
 code-chat --login
 
@@ -195,6 +206,7 @@ code-chat "テスト" -f ./src/main.py --dry-run
 | `-l, --list-models` | モデル一覧を表示 |
 | `--login` | ブラウザで OAuth ログインし、トークンを保存して終了 |
 | `--oauth` | `GEMINI_API_KEY` ではなく OAuth (`--login` で保存したトークン) で認証 |
+| `-c, --cache` | キャッシュを使用 (`-c` で最新、`--cache=<ID>` で指定)。`--mcp` / `-w` / `--oauth` とは併用不可 |
 | `--rag` | RAG 検索によるコンテキスト注入 (`--mcp` と併用可) |
 | `--mcp` | MCP ツール連携 (`--rag` と併用可) |
 | `-a, --auto-save` | 対話ログを `<日時>_chat.md` に自動保存 |
@@ -305,7 +317,7 @@ uv run pytest
 uv run pytest --no-cov tests/code_chat_cli/test_args.py -vv --tb=short
 
 # 特定のテスト関数を実行
-uv run pytest --no-cov tests/code_chat_cli/test_args.py::test_parse_args_default -vv --tb=short
+uv run pytest --no-cov tests/code_chat_cli/test_args.py::TestParseArgs::test_parse_args_default_success -vv --tb=short
 
 # テスト名のキーワード指定 (名前に "retry" を含むテストのみ)
 uv run pytest --no-cov -k "retry" -vv --tb=short

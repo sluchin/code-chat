@@ -9,13 +9,13 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from code_chat_cli.args import CliArgs
-from code_chat_cli.auth import OAuthError
+from code_chat_cli.cache_error import CacheError
 from code_chat_cli.chat import (
     _append_rag_context,
     _build_chat_config,
     _build_context_prompt,
     _build_send_text,
+    _handle_cache_subcommand,
     _handle_dry_run,
     _handle_login,
     _handle_mcp_interactive,
@@ -25,13 +25,17 @@ from code_chat_cli.chat import (
     _handle_rag_subcommand,
     _handle_subcommands,
     _load_files_context,
+    _log_cache_usage,
     _require_rag_api_key,
+    _resolve_cache_settings,
     _retrieve_rag_context,
     _setup_cli_logging,
     main,
     run_interactive_loop,
     run_single_turn_mode,
 )
+from code_chat_cli.cli_args import CliArgs
+from code_chat_cli.oauth_error import OAuthError
 from google.genai.errors import APIError
 
 
@@ -193,7 +197,10 @@ class TestRunInteractiveLoop:
         with (
             patch("code_chat_cli.chat.parse_args", return_value=mock_args),
             patch("code_chat_cli.chat._setup_cli_logging"),
-            patch("code_chat_cli.chat.get_gemini_client", return_value=mock_client),
+            patch(
+                "code_chat_cli.chat.get_gemini_client",
+                return_value=mock_client,
+            ),
             patch("code_chat_cli.chat._handle_subcommands"),
             patch("builtins.input", side_effect=exception_type),
             pytest.raises(SystemExit) as exc_info,
@@ -503,6 +510,184 @@ class TestSetupCliLogging:
         setup.assert_called_once_with(level_name="DEBUG", trace=True)
 
 
+class TestLogCacheUsage:
+    """`_log_cache_usage` のテスト."""
+
+    def test_log_cache_usage_hit_success(self, caplog):
+        """キャッシュが効いた場合は, ヒットしたトークン数と割合が INFO で出力されるか検証."""
+        usage = SimpleNamespace(
+            prompt_token_count=16718, cached_content_token_count=12264
+        )
+
+        with caplog.at_level(logging.INFO):
+            _log_cache_usage(usage)
+
+        assert "キャッシュヒット: 12264 / 16718 トークン (73%)" in caplog.text
+
+    def test_log_cache_usage_no_hit(self, caplog):
+        """キャッシュが効いていない場合は, INFO には出さず DEBUG にだけ出力されるか検証."""
+        usage = SimpleNamespace(prompt_token_count=100, cached_content_token_count=None)
+
+        with caplog.at_level(logging.INFO):
+            _log_cache_usage(usage)
+        assert "キャッシュヒット" not in caplog.text
+
+        with caplog.at_level(logging.DEBUG, logger="code_chat_cli.chat"):
+            _log_cache_usage(usage)
+        assert "キャッシュヒットなし (プロンプト: 100 トークン)" in caplog.text
+
+    @pytest.mark.parametrize(
+        "usage", [None, MagicMock(), SimpleNamespace(prompt_token_count=0)]
+    )
+    def test_log_cache_usage_unavailable(self, caplog, usage):
+        """使用状況が無い・数値でない・0 の場合は, 何も出力せずに戻るか検証."""
+        with caplog.at_level(logging.DEBUG):
+            _log_cache_usage(usage)
+
+        assert "キャッシュ" not in caplog.text
+
+
+class TestResolveCacheSettings:
+    """`_resolve_cache_settings` のテスト."""
+
+    def test_resolve_cache_settings_success(self):
+        """キャッシュのモデルと, キャッシュ名を指定した生成設定 (システム指示なし) が返るか検証."""
+        cache = SimpleNamespace(name="cachedContents/abc", model="models/gemini-cache")
+
+        with patch(
+            "code_chat_cli.context_cache.ContextCache.resolve", return_value=cache
+        ) as resolve:
+            model, config = _resolve_cache_settings(
+                MagicMock(), _cli_args(cache="abc", model="models/gemini-cache")
+            )
+
+        resolve.assert_called_once()
+        assert model == "models/gemini-cache"
+        assert config.cached_content == "cachedContents/abc"
+        assert config.system_instruction is None
+
+    def test_resolve_cache_settings_model_mismatch_success(self, caplog):
+        """指定のモデルとキャッシュのモデルが異なる場合は, キャッシュのモデルが使われ, その旨がログに出るか検証."""
+        cache = SimpleNamespace(name="cachedContents/abc", model="models/gemini-cache")
+
+        with (
+            caplog.at_level(logging.INFO),
+            patch(
+                "code_chat_cli.context_cache.ContextCache.resolve", return_value=cache
+            ),
+        ):
+            model, _ = _resolve_cache_settings(
+                MagicMock(), _cli_args(cache=True, model="gemini-other")
+            )
+
+        assert model == "models/gemini-cache"
+        assert "キャッシュのモデルで実行します (指定: gemini-other)" in caplog.text
+
+    def test_resolve_cache_settings_failure(self, caplog):
+        """キャッシュを取得できない場合は, エラーを出力して終了コード 1 で終了するか検証."""
+        with (
+            patch(
+                "code_chat_cli.context_cache.ContextCache.resolve",
+                side_effect=CacheError("使用できるキャッシュがありません"),
+            ),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            _resolve_cache_settings(MagicMock(), _cli_args(cache=True))
+
+        assert exc_info.value.code == 1
+        assert "使用できるキャッシュがありません" in caplog.text
+
+
+class TestHandleCacheSubcommand:
+    """`_handle_cache_subcommand` のテスト."""
+
+    @pytest.mark.parametrize(
+        ("action", "handler", "expected_args"),
+        [
+            ("create", "create", ("gemini-flash-latest", "src", 120)),
+            ("update", "update", ("gemini-flash-latest", "src")),
+            ("rm", "remove", ("src",)),
+            ("list", "list_caches", ()),
+        ],
+    )
+    def test_handle_cache_subcommand_actions_success(
+        self, action, handler, expected_args
+    ):
+        """cache の各アクションが対応するハンドラを呼び, 終了コード 0 で終了するか検証."""
+        args = _cli_args(
+            subcommand="cache",
+            subcommand_action=action,
+            subcommand_target="src",
+            cache_ttl=120,
+        )
+        client = MagicMock()
+
+        with (
+            patch(
+                f"code_chat_cli.context_cache.ContextCache.{handler}"
+            ) as mock_handler,
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            _handle_cache_subcommand(client, args)
+
+        mock_handler.assert_called_once_with(*expected_args)
+        assert exc_info.value.code == 0
+
+    def test_handle_cache_subcommand_default_target_success(self):
+        """create の対象パスを省略した場合は, カレントディレクトリが対象になるか検証."""
+        args = _cli_args(subcommand="cache", subcommand_action="create", cache_ttl=3600)
+
+        with (
+            patch("code_chat_cli.context_cache.ContextCache.create") as handler,
+            pytest.raises(SystemExit),
+        ):
+            _handle_cache_subcommand(MagicMock(), args)
+
+        assert handler.call_args.args[1] == "."
+
+    def test_handle_cache_subcommand_unknown_action_failure(self, caplog):
+        """不明なアクションは, 終了コード 1 で終了するか検証."""
+        args = _cli_args(subcommand="cache", subcommand_action="unknown")
+
+        with pytest.raises(SystemExit) as exc_info:
+            _handle_cache_subcommand(MagicMock(), args)
+
+        assert exc_info.value.code == 1
+        assert "不明なサブコマンドアクション" in caplog.text
+
+    def test_handle_cache_subcommand_cache_error_failure(self, caplog):
+        """キャッシュの作成などに失敗した場合は, 原因を出力して終了コード 1 で終了するか検証."""
+        args = _cli_args(subcommand="cache", subcommand_action="create")
+
+        with (
+            patch(
+                "code_chat_cli.context_cache.ContextCache.create",
+                side_effect=CacheError("無料枠では利用できません"),
+            ),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            _handle_cache_subcommand(MagicMock(), args)
+
+        assert exc_info.value.code == 1
+        assert "無料枠では利用できません" in caplog.text
+
+    def test_handle_cache_subcommand_unexpected_error_failure(self, caplog):
+        """予期しない例外が発生した場合は, ログを出力して終了コード 1 で終了するか検証."""
+        args = _cli_args(subcommand="cache", subcommand_action="list")
+
+        with (
+            patch(
+                "code_chat_cli.context_cache.ContextCache.list_caches",
+                side_effect=RuntimeError("boom"),
+            ),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            _handle_cache_subcommand(MagicMock(), args)
+
+        assert exc_info.value.code == 1
+        assert "cache (list) コマンドの実行中にエラーが発生しました" in caplog.text
+
+
 class TestRequireRagApiKey:
     """`_require_rag_api_key` のテスト."""
 
@@ -684,8 +869,10 @@ class TestHandleSubcommands:
             _handle_subcommands(MagicMock(), _cli_args(subcommand="mcp"))
         mcp.assert_called_once()
 
-        # cache は未実装のため, 何も行わず例外なく戻ること
-        _handle_subcommands(MagicMock(), _cli_args(subcommand="cache"))
+        # cache は cache サブコマンドの処理へ振り分けられる
+        with patch("code_chat_cli.chat._handle_cache_subcommand") as cache:
+            _handle_subcommands(MagicMock(), _cli_args(subcommand="cache"))
+        cache.assert_called_once()
 
     def test_handle_subcommands_review_success(self):
         """--review が引数を渡して実行され, 終了コード 0 で終了するか検証."""
@@ -710,7 +897,10 @@ class TestHandleSubcommands:
         """--list-models の実行中に例外が発生した場合, 終了コード 1 で終了するか検証."""
         # モデル一覧の取得で例外を発生させる
         with (
-            patch("code_chat_cli.chat.handle_list_models", side_effect=RuntimeError),
+            patch(
+                "code_chat_cli.chat.handle_list_models",
+                side_effect=RuntimeError,
+            ),
             pytest.raises(SystemExit) as exc_info,
         ):
             _handle_subcommands(MagicMock(), _cli_args(list_models=True))
@@ -742,7 +932,8 @@ class TestHandleSubcommands:
         # 検索ハンドラが例外を送出する設定
         with (
             patch(
-                "code_chat_cli.chat.handle_rag", side_effect=RuntimeError("Ask failure")
+                "code_chat_cli.chat.handle_rag",
+                side_effect=RuntimeError("Ask failure"),
             ),
             pytest.raises(SystemExit) as exc_info,
         ):
@@ -755,7 +946,10 @@ class TestHandleSubcommands:
         """--review の実行中に例外が発生した場合, 終了コード 1 で終了するか検証."""
         # レビュー処理で例外を発生させる
         with (
-            patch("code_chat_cli.chat.handle_code_review", side_effect=RuntimeError),
+            patch(
+                "code_chat_cli.chat.handle_code_review",
+                side_effect=RuntimeError,
+            ),
             pytest.raises(SystemExit) as exc_info,
         ):
             _handle_subcommands(MagicMock(), _cli_args(review=True))
@@ -877,6 +1071,31 @@ class TestHandleMcpSubcommand:
 
         # 例外は握りつぶされ, 終了コード 1 で終了すること
         assert exc_info.value.code == 1
+
+
+class TestBuildChatConfig:
+    """`_build_chat_config` のテスト."""
+
+    def test_build_chat_config_success(self):
+        """通常時は, システム指示が設定され, キャッシュは指定されないか検証."""
+        config = _build_chat_config(False)
+
+        assert config.system_instruction
+        assert config.cached_content is None
+
+    def test_build_chat_config_write_mode_success(self):
+        """Write モード時は, Write モード用のシステム指示と低い temperature が設定されるか検証."""
+        config = _build_chat_config(True)
+
+        assert config.temperature == 0.1
+        assert "コード" in config.system_instruction
+
+    def test_build_chat_config_cached_content_success(self):
+        """キャッシュ指定時は, キャッシュ名が設定され, システム指示は指定されない (キャッシュ側に含める) か検証."""
+        config = _build_chat_config(False, cached_content="cachedContents/abc")
+
+        assert config.cached_content == "cachedContents/abc"
+        assert config.system_instruction is None
 
 
 class TestHandleMcpSingleTurn:
@@ -1111,6 +1330,22 @@ class TestMain:
 
         mock_gemini_client["get_client"].assert_called_once_with(use_oauth=True)
 
+    def test_main_cache_success(self, mock_args, mock_gemini_client):
+        """-c 指定時は, キャッシュのモデルとキャッシュ名を指定してチャットが作成されるか検証."""
+        mock_args.return_value.cache = True
+        mock_args.return_value.prompt = "q"
+        cache = SimpleNamespace(name="cachedContents/abc", model="models/gemini-cache")
+        mock_gemini_client["chat"].send_message_stream.return_value = [_chunk("reply")]
+
+        with patch(
+            "code_chat_cli.context_cache.ContextCache.resolve", return_value=cache
+        ):
+            main()
+
+        kwargs = mock_gemini_client["client"].chats.create.call_args.kwargs
+        assert kwargs["model"] == "models/gemini-cache"
+        assert kwargs["config"].cached_content == "cachedContents/abc"
+
     def test_main_rag_success(self, monkeypatch, mock_args, mock_gemini_client):
         """--rag 指定時に RagService が初期化され, 応答に反映されるか検証."""
         monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
@@ -1221,7 +1456,10 @@ class TestMain:
 
         with (
             patch("code_chat_cli.chat.parse_args", return_value=mock_args),
-            patch("code_chat_cli.chat.get_gemini_client", return_value=mock_client),
+            patch(
+                "code_chat_cli.chat.get_gemini_client",
+                return_value=mock_client,
+            ),
             # コミットメッセージ生成の呼び出しをモック化 (chat.py が参照する名前を差し替える)
             patch("code_chat_cli.chat.handle_commit_generation") as mock_handle,
             pytest.raises(SystemExit) as exc_info,
@@ -1353,7 +1591,10 @@ class TestMain:
         # parse_args で予期せぬ例外を発生させる
         with (
             patch.object(sys, "argv", test_args),
-            patch("code_chat_cli.chat.parse_args", side_effect=Exception("Fatal Boom")),
+            patch(
+                "code_chat_cli.chat.parse_args",
+                side_effect=Exception("Fatal Boom"),
+            ),
         ):
             with pytest.raises(SystemExit) as exc_info:
                 main()
@@ -1377,7 +1618,10 @@ class TestMain:
         # parse_args で予期せぬ例外を発生させる
         with (
             patch.object(sys, "argv", ["code_chat_cli"]),
-            patch("code_chat_cli.chat.parse_args", side_effect=Exception("Fatal Boom")),
+            patch(
+                "code_chat_cli.chat.parse_args",
+                side_effect=Exception("Fatal Boom"),
+            ),
             pytest.raises(SystemExit) as exc_info,
         ):
             main()
@@ -1426,7 +1670,7 @@ class TestMain:
                 "code_chat_cli.chat.run_interactive_loop",
                 side_effect=exception_type,
             ),
-            patch("code_chat_cli.history.save_history_if_needed"),
+            patch("code_chat_cli.chat.save_history_if_needed"),
             pytest.raises(SystemExit) as exc_info,
         ):
             main()

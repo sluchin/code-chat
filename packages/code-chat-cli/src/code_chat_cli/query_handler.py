@@ -4,31 +4,14 @@ import json
 import logging
 from typing import Any
 
-from code_chat_mcp.mcp_service import McpService, McpToolInfo
+from code_chat_mcp.mcp_service import McpService
+from code_chat_mcp.mcp_tool_info import McpToolInfo
 from google import genai
 from google.genai import types
 from google.genai.errors import APIError
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
-
-
-def _is_rate_limit_error(exception: BaseException) -> bool:
-    """429 RESOURCE_EXHAUSTED エラーかどうかを判定します.
-
-    Args:
-        exception (BaseException): 判定対象の例外オブジェクト.
-
-    Returns:
-        bool: 429 エラーである場合は True, それ以外は False.
-
-    """
-    if isinstance(exception, APIError):
-        if exception.code == 429:
-            return True
-        if "429" in str(exception):
-            return True
-    return False
 
 
 class QueryHandler:
@@ -51,6 +34,24 @@ class QueryHandler:
         self.client = gemini_client
         self.mcp_service = mcp_service
         self.model_name = model_name
+
+    @staticmethod
+    def _is_rate_limit_error(exception: BaseException) -> bool:
+        """429 RESOURCE_EXHAUSTED エラーかどうかを判定します.
+
+        Args:
+            exception (BaseException): 判定対象の例外オブジェクト.
+
+        Returns:
+            bool: 429 エラーである場合は True, それ以外は False.
+
+        """
+        if isinstance(exception, APIError):
+            if exception.code == 429:
+                return True
+            if "429" in str(exception):
+                return True
+        return False
 
     @retry(
         retry=retry_if_exception(_is_rate_limit_error),

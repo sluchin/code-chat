@@ -14,7 +14,6 @@ from code_chat_cli.auth import (
     CLIENT_ID_ENV,
     CLIENT_SECRET_ENV,
     SCOPES,
-    OAuthError,
     build_httpx_clients,
     get_credentials,
     get_token_path,
@@ -23,6 +22,7 @@ from code_chat_cli.auth import (
     login,
     save_credentials,
 )
+from code_chat_cli.oauth_error import OAuthError
 from google.auth.exceptions import RefreshError
 from google.oauth2.credentials import Credentials
 
