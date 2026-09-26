@@ -473,7 +473,7 @@ class TestHandlePromptMode:
         monkeypatch.setattr("sys.stdin", io.StringIO(""))
         monkeypatch.setattr("sys.argv", ["chat.py", "-p", "パイプからの入力メッセージ"])
 
-        with patch("code_chat_cli.chat.time.sleep"):
+        with patch("time.sleep"):
             main()
 
         # send_message_stream が正しく呼ばれたか検証
@@ -1747,7 +1747,7 @@ class TestMain:
 
         # 実行 (待機が発生しないよう, スリープをスキップする)
         with (
-            patch("code_chat_cli.chat.time.sleep"),
+            patch("time.sleep"),
             pytest.raises(SystemExit) as exc_info,
         ):
             main()
