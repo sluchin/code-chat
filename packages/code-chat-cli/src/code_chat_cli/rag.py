@@ -97,14 +97,15 @@ def handle_rag_status(input_dirs: list[str], output_dir: str) -> None:
     print(f"--- [RAG Index Status] ---\n{status_info}")
 
 
-def handle_rag(question: str) -> None:
+def handle_rag(question: str, output_dir: str = "./.chroma_db") -> None:
     """質問に対して RagService を呼び出し, 回答をリアルタイムでストリーミング出力する.
 
     Args:
         question (str): ユーザーから入力された質問文.
+        output_dir (str): ベクトルストアの永続化先ディレクトリ.
 
     """
-    service = RagService(output_dir="./.chroma_db")
+    service = RagService(output_dir=output_dir)
 
     # CLI向けにストリーミング出力
     for token in service.query_stream(question):
