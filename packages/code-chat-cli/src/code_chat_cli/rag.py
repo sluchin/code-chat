@@ -2,7 +2,7 @@
 
 from pathlib import Path  # pylint: disable=unused-import
 
-from code_chat_cli.logger import get_logger, log_exception
+from code_chat_cli.logger import get_logger
 from code_chat_rag.indexer import Indexer
 from code_chat_rag.rag_service import RagService
 
@@ -22,25 +22,20 @@ def handle_rag_create(
         dryrun (bool): True の場合はインデックス作成を実行せず, 対象ファイル一覧を表示する.
 
     """
-    try:
-        logger.debug("RagService の初期化を開始します")
-        service = RagService(output_dir=output_dir)
+    logger.debug("RagService の初期化を開始します")
+    service = RagService(output_dir=output_dir)
 
-        if dryrun:
-            print("[DRY-RUN] インデックスの更新対象ファイルを計算します...")
-            _handle_dryrun(input_dirs=input_dirs)
-            return
+    if dryrun:
+        print("[DRY-RUN] インデックスの更新対象ファイルを計算します...")
+        _handle_dryrun(input_dirs=input_dirs)
+        return
 
-        logger.info("新規作成モードでインデックス処理を開始します")
-        count = service.index_repository(input_dirs)
+    logger.info("新規作成モードでインデックス処理を開始します")
+    count = service.index_repository(input_dirs)
 
-        # フルパス（絶対パス）を取得
-        full_db_path = Path(output_dir).resolve()
-        print(f"インデックス作成完了: {count} チャンク追加 (Database: {full_db_path})")
-    # langchain / chroma / Embedding API が送出する例外は種類が多く, 特定できないため広く捕捉する
-    # ログに記録するだけで, 呼び出し元には伝えない.
-    except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
-        log_exception(logger, "handle_index 実行中にエラーが発生しました")
+    # フルパス（絶対パス）を取得
+    full_db_path = Path(output_dir).resolve()
+    print(f"インデックス作成完了: {count} チャンク追加 (Database: {full_db_path})")
 
 
 def handle_rag_update(
@@ -56,25 +51,20 @@ def handle_rag_update(
         dryrun (bool): True の場合はインデックス作成を実行せず, 対象ファイル一覧を表示する.
 
     """
-    try:
-        logger.debug("RagService の初期化を開始します")
-        service = RagService(output_dir=output_dir)
+    logger.debug("RagService の初期化を開始します")
+    service = RagService(output_dir=output_dir)
 
-        if dryrun:
-            print("[DRY-RUN] インデックスの更新対象ファイルを計算します...")
-            _handle_dryrun(input_dirs=input_dirs)
-            return
+    if dryrun:
+        print("[DRY-RUN] インデックスの更新対象ファイルを計算します...")
+        _handle_dryrun(input_dirs=input_dirs)
+        return
 
-        logger.info("差分更新モードでインデックス処理を開始します")
-        count = service.index_repository(input_dirs, update_only=True)
+    logger.info("差分更新モードでインデックス処理を開始します")
+    count = service.index_repository(input_dirs, update_only=True)
 
-        # フルパス（絶対パス）を取得
-        full_db_path = Path(output_dir).resolve()
-        print(f"インデックス作成完了: {count} チャンク追加 (Database: {full_db_path})")
-    # langchain / chroma / Embedding API が送出する例外は種類が多く, 特定できないため広く捕捉する
-    # ログに記録するだけで, 呼び出し元には伝えない.
-    except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
-        log_exception(logger, "handle_index 実行中にエラーが発生しました")
+    # フルパス（絶対パス）を取得
+    full_db_path = Path(output_dir).resolve()
+    print(f"インデックス作成完了: {count} チャンク追加 (Database: {full_db_path})")
 
 
 def handle_rag_rm(
@@ -86,14 +76,9 @@ def handle_rag_rm(
         output_dir (str): ベクトルストアの永続化先ディレクトリ.
 
     """
-    try:
-        logger.info("インデックス初期化を開始します")
-        service = RagService(output_dir=output_dir)
-        service.clear()
-    # langchain / chroma / Embedding API が送出する例外は種類が多く, 特定できないため広く捕捉する
-    # ログに記録するだけで, 呼び出し元には伝えない.
-    except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
-        log_exception(logger, "handle_index 実行中にエラーが発生しました")
+    logger.info("インデックス初期化を開始します")
+    service = RagService(output_dir=output_dir)
+    service.clear()
 
 
 def handle_rag_status(input_dirs: list[str], output_dir: str) -> None:

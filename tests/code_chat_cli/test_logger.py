@@ -249,6 +249,44 @@ class TestLogException:
         assert caplog.records[0].exc_info is not None
 
     @pytest.mark.usefixtures("trace_off")
+    def test_log_exception_file_not_found_success(self, caplog):
+        """FileNotFoundError は, --trace なしではトレースバックを省き, -D でだけ出力されるか検証."""
+        logger = get_logger("test_log_exception")
+
+        with caplog.at_level(logging.INFO, logger="test_log_exception"):
+            try:
+                raise FileNotFoundError("ディレクトリが存在しません: /no/such")
+            except FileNotFoundError:
+                log_exception(logger, "処理に失敗しました")
+
+        record = caplog.records[0]
+        assert record.exc_info is None
+        assert "処理に失敗しました: ディレクトリが存在しません" in record.getMessage()
+        assert "Traceback" not in caplog.text
+
+        caplog.clear()
+        with caplog.at_level(logging.DEBUG, logger="test_log_exception"):
+            try:
+                raise FileNotFoundError("x")
+            except FileNotFoundError:
+                log_exception(logger, "処理に失敗しました")
+        assert "Traceback" in caplog.text
+
+    @pytest.mark.usefixtures("trace_off")
+    def test_log_exception_file_not_found_trace_success(self, caplog):
+        """--trace 指定時は, FileNotFoundError でもトレースバックが出力されるか検証."""
+        logger = get_logger("test_log_exception")
+        set_trace(True)
+
+        with caplog.at_level(logging.ERROR, logger="test_log_exception"):
+            try:
+                raise FileNotFoundError("x")
+            except FileNotFoundError:
+                log_exception(logger, "処理に失敗しました")
+
+        assert caplog.records[0].exc_info is not None
+
+    @pytest.mark.usefixtures("trace_off")
     def test_log_exception_wrapped_gemini_error_success(self, caplog):
         """Gemini API のエラーを別の例外で包んでいる場合も, トレースバックが省かれるか検証."""
         logger = get_logger("test_log_exception")

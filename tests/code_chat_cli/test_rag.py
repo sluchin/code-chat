@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from code_chat_cli.rag import (
     handle_rag,
     handle_rag_create,
@@ -29,17 +31,14 @@ class TestHandleRagCreate:
         assert "42 チャンク追加" in mock_print.call_args[0][0]
 
     @patch("code_chat_cli.rag.RagService")
-    def test_handle_rag_create_logs_errors_exception(
-        self, mock_rag_service_cls, caplog
-    ):
-        """インデックス作成で例外が発生してもログ出力のみで終了するか検証する."""
+    def test_handle_rag_create_error_failure(self, mock_rag_service_cls):
+        """インデックス作成で例外が発生した場合は, 握りつぶさずに, 呼び出し元へ送出されるか検証する."""
         mock_rag_service_cls.return_value.index_repository.side_effect = RuntimeError(
             "x"
         )
 
-        handle_rag_create(["/path/to/repo"])
-
-        assert "handle_index 実行中にエラーが発生しました" in caplog.text
+        with pytest.raises(RuntimeError, match="x"):
+            handle_rag_create(["/path/to/repo"])
 
     @patch("code_chat_cli.rag.Indexer")
     @patch("code_chat_cli.rag.RagService")
@@ -73,17 +72,14 @@ class TestHandleRagUpdate:
         )
 
     @patch("code_chat_cli.rag.RagService")
-    def test_handle_rag_update_logs_errors_exception(
-        self, mock_rag_service_cls, caplog
-    ):
-        """差分更新で例外が発生してもログ出力のみで終了するか検証する."""
+    def test_handle_rag_update_error_failure(self, mock_rag_service_cls):
+        """差分更新で例外が発生した場合は, 握りつぶさずに, 呼び出し元へ送出されるか検証する."""
         mock_rag_service_cls.return_value.index_repository.side_effect = RuntimeError(
             "x"
         )
 
-        handle_rag_update(["/path/to/repo"])
-
-        assert "handle_index 実行中にエラーが発生しました" in caplog.text
+        with pytest.raises(RuntimeError, match="x"):
+            handle_rag_update(["/path/to/repo"])
 
     @patch("code_chat_cli.rag.Indexer")
     @patch("code_chat_cli.rag.RagService")
@@ -110,13 +106,12 @@ class TestHandleRagRm:
         mock_rag_service_cls.return_value.clear.assert_called_once_with()
 
     @patch("code_chat_cli.rag.RagService")
-    def test_handle_rag_rm_logs_errors_exception(self, mock_rag_service_cls, caplog):
-        """削除で例外が発生してもログ出力のみで終了するか検証する."""
+    def test_handle_rag_rm_error_failure(self, mock_rag_service_cls):
+        """削除で例外が発生した場合は, 握りつぶさずに, 呼び出し元へ送出されるか検証する."""
         mock_rag_service_cls.return_value.clear.side_effect = RuntimeError("x")
 
-        handle_rag_rm()
-
-        assert "handle_index 実行中にエラーが発生しました" in caplog.text
+        with pytest.raises(RuntimeError, match="x"):
+            handle_rag_rm()
 
 
 class TestHandleRagStatus:

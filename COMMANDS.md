@@ -49,7 +49,7 @@ code-chat [PROMPT] [OPTIONS]
 | `--oauth` | フラグ | `False` | `GEMINI_API_KEY` ではなく OAuth (`--login` で保存したトークン) で認証する。`GEMINI_API_KEY` が設定されていても OAuth を使う。トークンがなく対話端末の場合は、ブラウザ認証を開始する。RAG (`--rag`, `rag`) の検索は OAuth に対応せず、API キー (`GEMINI_API_KEY`) を使う |
 | `-D, --debug` | フラグ | `False` | デバッグログを出力 (`--log-level DEBUG` と同等) |
 | `--log-level` | 文字列 | `INFO` | ログレベル (`DEBUG` / `INFO` / `WARNING` / `ERROR` / `CRITICAL`) |
-| `--trace` | フラグ | `False` | SDK や HTTP クライアント等のライブラリ内部通信ログを出力。あわせて、Gemini API のエラー時にもトレースバックを出力する (指定しない場合、Gemini API のエラーは、エラー内容だけを出力する。それ以外の例外は、常にトレースバック付き) |
+| `--trace` | フラグ | `False` | SDK や HTTP クライアント等のライブラリ内部通信ログを出力。あわせて、Gemini API のエラー時にもトレースバックを出力する (指定しない場合、Gemini API のエラーは、エラー内容だけを出力する。それ以外の例外は、トレースバック付き。ただし、ファイルやディレクトリが見つからないエラーは、概要の 1 行のみ) |
 | `--dry-run` | フラグ | `False` | API 呼び出しを行わず、読み込まれるファイル群や指定引数の確認のみ実行 |
 
 標準入力 (パイプ) にテキストがある場合は、`-f` の内容とあわせてコンテキストとして読み込まれます。

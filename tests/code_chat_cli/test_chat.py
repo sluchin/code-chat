@@ -1705,16 +1705,37 @@ class TestMain:
         assert "ヒント: " in messages[0]
         assert caplog.records[-1].exc_info is None
 
+    def test_main_file_not_found_summary_failure(self, monkeypatch, mock_args, caplog):
+        """FileNotFoundError は, トレースバックなしの概要 1 行を出力し, sys.exit(1) で終了するか検証."""
+        mock_args.side_effect = FileNotFoundError("指定されたファイルが見つかりません")
+        monkeypatch.setattr("sys.argv", ["chat.py"])
+
+        with (
+            patch("code_chat_cli.chat._setup_cli_logging"),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            main()
+
+        assert exc_info.value.code == 1
+        messages = [
+            r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR
+        ]
+        assert messages == [
+            "ファイルまたはディレクトリが見つかりません: 指定されたファイルが見つかりません"
+        ]
+        assert all(
+            r.exc_info is None for r in caplog.records if r.levelno >= logging.ERROR
+        )
+
     @pytest.mark.parametrize(
         "file_exception",
         [
-            FileNotFoundError("指定されたファイルが見つかりません"),
             ValueError("無効なファイルパスです"),
             PermissionError("ファイルの読み込み権限がありません"),
         ],
     )
     def test_main_file_operation_failure(self, monkeypatch, mock_args, file_exception):
-        """ファイル操作関連の例外 (FileNotFoundError, ValueError, PermissionError) 発生時に sys.exit(1) で終了するか検証."""
+        """ファイル操作関連の例外 (ValueError, PermissionError) 発生時に sys.exit(1) で終了するか検証."""
         # parse_args 呼び出し時（またはファイル操作処理時）に指定の例外を発生させる
         mock_args.side_effect = file_exception
 
