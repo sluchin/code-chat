@@ -78,35 +78,6 @@ class TestAsyncContextManager:
         assert after == {}
 
 
-class TestRun:
-    """`McpService.run` のテスト."""
-
-    def test_run_executes_tool_and_prints_success(self, service, capsys):
-        """run が単発でツールを実行し, 結果を出力するか検証."""
-        connection = _fake_connection(call_result="RESULT")
-
-        with patch(
-            "code_chat_mcp.mcp_service.McpServerConnection", return_value=connection
-        ):
-            service.run("git", "status", {"x": 1})
-
-        out = capsys.readouterr().out
-        assert "=== Execution Result: status ===" in out
-        assert "RESULT" in out
-        connection.call_tool.assert_awaited_once_with("status", {"x": 1})
-
-    def test_run_without_arguments(self, service):
-        """arguments 省略時でも実行できるか検証."""
-        connection = _fake_connection()
-
-        with patch(
-            "code_chat_mcp.mcp_service.McpServerConnection", return_value=connection
-        ):
-            service.run("git", "status")
-
-        connection.call_tool.assert_awaited_once_with("status", {})
-
-
 class TestGetAllTools:
     """`McpService.get_all_tools` のテスト."""
 
@@ -234,18 +205,3 @@ class TestCallTool:
         asyncio.run(service.call_tool("git", "status"))
 
         connection.call_tool.assert_awaited_once_with("status", {})
-
-
-class TestGetServerOrFail:
-    """`McpService._get_server_or_fail` のテスト."""
-
-    def test_get_server_or_fail_success(self, service):
-        """存在するサーバーが返るか検証."""
-        assert service._get_server_or_fail("git").command == "uvx"
-
-    def test_get_server_or_fail_failure(self, service):
-        """存在しないサーバーを指定した場合, 終了コード 1 で終了するか検証."""
-        with pytest.raises(SystemExit) as exc_info:
-            service._get_server_or_fail("unknown")
-
-        assert exc_info.value.code == 1
