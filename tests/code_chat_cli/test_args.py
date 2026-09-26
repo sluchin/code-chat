@@ -69,6 +69,30 @@ class TestParseArgs:
         assert "--- [標準入力] ---" in args.context
         assert "パイプからのテストデータ" in args.context
 
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["rag", "status"],
+            ["cache", "list"],
+            ["mcp", "status"],
+            ["--list-models"],
+            ["--login"],
+            ["--generate-commit-msg"],
+            ["--review"],
+        ],
+    )
+    def test_parse_args_does_not_read_stdin_for_commands_without_context(
+        self, monkeypatch, argv
+    ):
+        """コンテキストを使わないコマンドでは, 標準入力を読み込まない (入力の終了を待って固まらない) か検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py", *argv])
+        monkeypatch.setattr("sys.stdin", io.StringIO("パイプからのテストデータ"))
+        monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+
+        args = parse_args()
+
+        assert not args.context
+
     def test_parse_args_with_file_context_success(self, monkeypatch, tmp_path):
         """-f / --file オプション指定時, context にファイル内容が格納されるか検証."""
         test_file = tmp_path / "test.txt"
