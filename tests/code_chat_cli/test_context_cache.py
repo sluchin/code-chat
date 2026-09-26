@@ -67,35 +67,6 @@ class TestNormalizeCacheName:
         assert ContextCache._normalize_cache_name(cache_id) == expected
 
 
-class TestExplainApiError:
-    """`ContextCache._explain_api_error` のテスト."""
-
-    def test_explain_api_error_free_tier_success(self):
-        """無料枠の上限エラーの場合, 有料枠が必要な旨を返すか検証."""
-        error = ClientError(
-            429,
-            {
-                "error": {
-                    "message": "TotalCachedContentStorageTokensPerModelFreeTier limit exceeded"
-                }
-            },
-        )
-
-        assert "無料枠" in ContextCache._explain_api_error(error)
-
-    def test_explain_api_error_too_small_success(self):
-        """コンテキストが小さすぎる場合, 最小トークン数の必要性を返すか検証."""
-        error = ClientError(400, {"error": {"message": "Cached content is too small"}})
-
-        assert "小さすぎます" in ContextCache._explain_api_error(error)
-
-    def test_explain_api_error_other_success(self):
-        """その他のエラーの場合, 元のメッセージを含めて返すか検証."""
-        error = APIError(401, {"error": {"message": "boom"}})
-
-        assert "boom" in ContextCache._explain_api_error(error)
-
-
 class TestListCodeChatCaches:
     """`ContextCache._list_code_chat_caches` のテスト."""
 
