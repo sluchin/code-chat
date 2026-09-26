@@ -7,6 +7,7 @@
 `system_instruction` を別途指定できないため, 使用するモデルもキャッシュ作成時のものに固定されます.
 """
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -154,8 +155,10 @@ class ContextCache:
             raise CacheError(
                 "使用できるキャッシュがありません. code-chat cache create で作成してください"
             )
-        # 最も新しく作成されたキャッシュを選ぶ
-        return max(caches, key=lambda c: c.create_time)
+        # 最も新しく作成されたキャッシュを選ぶ (作成日時を取得できないものは, 最も古いものとして扱う)
+        return max(
+            caches, key=lambda c: c.create_time or datetime.min.replace(tzinfo=UTC)
+        )
 
     @staticmethod
     def _display_name(target: str) -> str:
