@@ -194,7 +194,6 @@ class QueryHandler:
             declaration = {
                 "name": formatted_name,
                 "description": tool.description or "",
-                # "parameters": tool.input_schema,
                 "parameters": self._sanitize_schema(raw_parameters),
             }
             declarations.append(declaration)

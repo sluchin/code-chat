@@ -104,8 +104,6 @@ class McpService:
 
         print("=== Testing MCP Server Connections via Stdio ===")
 
-        # 非同期テスト処理を同期で実行
-        # asyncio.run(self._test_servers_async())
         await self._test_servers_async()
 
     async def _start_all_servers(self) -> None:

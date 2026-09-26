@@ -128,11 +128,6 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
     )
     mcp_subparsers = mcp_parser.add_subparsers(dest="subcommand_action")
 
-    #    mcp_run = mcp_subparsers.add_parser(
-    #        "run", parents=[global_parser], help="指定した MCP サーバーを個別起動"
-    #    )
-    #    mcp_run.add_argument("target", help="サーバー名")
-
     mcp_subparsers.add_parser(
         "status", parents=[global_parser], help="MCP サーバーの接続状態を表示"
     )
