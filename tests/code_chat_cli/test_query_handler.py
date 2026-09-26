@@ -3,7 +3,7 @@
 
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from code_chat_cli.query_handler import QueryHandler
@@ -49,33 +49,6 @@ def client():
 def handler(client, mcp_service):
     """QueryHandler インスタンス."""
     return QueryHandler(gemini_client=client, mcp_service=mcp_service)
-
-
-@pytest.fixture(autouse=True)
-def no_sleep():
-    """tenacity のリトライ待機をスキップする."""
-    with patch("tenacity.nap.time.sleep"):
-        yield
-
-
-class TestIsRateLimitError:
-    """`QueryHandler._is_rate_limit_error` のテスト."""
-
-    def test_is_rate_limit_error_success(self):
-        """429 エラーの判定を検証."""
-        assert QueryHandler._is_rate_limit_error(APIError(429, {})) is True
-        assert (
-            QueryHandler._is_rate_limit_error(APIError("429 RESOURCE_EXHAUSTED", {}))
-            is True
-        )
-        assert QueryHandler._is_rate_limit_error(APIError(500, {})) is False
-        assert QueryHandler._is_rate_limit_error(ValueError("429")) is False
-
-    def test_is_rate_limit_error_daily_quota(self):
-        """1 日あたりの上限 (RPD) の 429 は, 待っても回復しないためリトライ対象にならないか検証."""
-        error = APIError(429, {"error": {"message": "GenerateRequestsPerDay exceeded"}})
-
-        assert QueryHandler._is_rate_limit_error(error) is False
 
 
 class TestInit:
@@ -154,7 +127,7 @@ class TestGenerateContentWithRetry:
 
         handler._generate_content_with_retry(contents=["x"], config=MagicMock())
 
-        assert "レート制限のため" in caplog.text
+        assert "一時的なエラーが発生しました" in caplog.text
         assert "(1/5)" in caplog.text
         assert "1 分あたりのリクエスト上限" in caplog.text
 

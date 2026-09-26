@@ -312,7 +312,6 @@ class TestHandleCodeReview:
                 "code_chat_cli.commands.review._get_git_diff",
                 return_value="def foo(): pass",
             ),
-            patch("code_chat_cli.api.time.sleep"),
         ):
             handle_code_review(client=mock_client, model_name="gemini-2.5-flash")
 

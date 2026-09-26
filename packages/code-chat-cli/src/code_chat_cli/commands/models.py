@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from code_chat_cli.api import call_with_retry
 from code_chat_cli.logger import get_logger, log_exception
 
 # logger を定義
@@ -19,8 +20,10 @@ def handle_list_models(client: Any) -> None:
 
     """
     try:
+        # 一時的なエラーをリトライするため, 一覧の取得は, 出力の前にまとめて行う
+        models = call_with_retry(lambda: list(client.models.list()))
         print("利用可能なモデル一覧:")
-        for model in client.models.list():
+        for model in models:
             if "generateContent" in model.supported_actions:
                 model_id = model.name.replace("models/", "")
                 print(f"- {model_id} ({model.display_name})")

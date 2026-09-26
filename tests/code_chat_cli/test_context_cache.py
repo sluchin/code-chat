@@ -112,6 +112,18 @@ class TestListCodeChatCaches:
 
         assert ContextCache(client)._list_code_chat_caches() == [mine]
 
+    def test_list_code_chat_caches_retry_exception(self):
+        """一覧の取得で一時的なエラー (503) が発生した場合は, リトライされるか検証."""
+        mine = _cache("mine")
+        client = _client()
+        client.caches.list.side_effect = [
+            APIError(503, {"error": {"message": "high demand"}}),
+            [mine],
+        ]
+
+        assert ContextCache(client)._list_code_chat_caches() == [mine]
+        assert client.caches.list.call_count == 2
+
 
 class TestPrintCache:
     """`ContextCache._print_cache` のテスト."""
@@ -177,6 +189,18 @@ class TestCreateCache:
 
         with pytest.raises(CacheError, match="無料枠"):
             ContextCache(client)._create_cache("m", str(target_dir), 60)
+
+    def test_create_cache_retry_exception(self, target_dir):
+        """作成で一時的なエラー (503) が発生した場合は, リトライされて作成されるか検証."""
+        client = _client()
+        created = _cache("created")
+        client.caches.create.side_effect = [
+            APIError(503, {"error": {"message": "high demand"}}),
+            created,
+        ]
+
+        assert ContextCache(client)._create_cache("m", str(target_dir), 60) is created
+        assert client.caches.create.call_count == 2
 
 
 class TestCreate:
@@ -272,6 +296,18 @@ class TestRemove:
         assert "キャッシュを削除しました: cachedContents/a" in out
         assert "キャッシュを削除しました: cachedContents/b" in out
 
+    def test_remove_retry_exception(self):
+        """削除で一時的なエラー (503) が発生した場合は, リトライされるか検証."""
+        client = _client()
+        client.caches.delete.side_effect = [
+            APIError(503, {"error": {"message": "high demand"}}),
+            None,
+        ]
+
+        ContextCache(client).remove("abc")
+
+        assert client.caches.delete.call_count == 2
+
     def test_remove_no_caches(self, capsys):
         """削除対象が無い場合は, 何も削除せずに通知するか検証."""
         client = _client()
@@ -344,3 +380,14 @@ class TestResolve:
 
         with pytest.raises(CacheError, match="取得できませんでした"):
             ContextCache(client).resolve("missing")
+
+    def test_resolve_retry_exception(self):
+        """取得で一時的なエラー (503) が発生した場合は, リトライされるか検証."""
+        client = _client()
+        client.caches.get.side_effect = [
+            APIError(503, {"error": {"message": "high demand"}}),
+            "cache",
+        ]
+
+        assert ContextCache(client).resolve("abc") == "cache"
+        assert client.caches.get.call_count == 2

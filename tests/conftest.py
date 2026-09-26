@@ -78,3 +78,14 @@ def fail_read_text():
         return patch.object(Path, "read_text", side_effect=read_text, autospec=True)
 
     return factory
+
+
+@pytest.fixture(autouse=True)
+def no_retry_sleep():
+    """Gemini API のリトライの待機 (tenacity) を, テストで実際には待たないようにするフィクスチャ.
+
+    Yields:
+        MagicMock: 待機に使われる `time.sleep` のモック. 待機時間の検証に使える.
+    """
+    with patch("tenacity.nap.time.sleep") as sleep:
+        yield sleep
