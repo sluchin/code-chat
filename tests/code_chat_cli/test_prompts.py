@@ -11,8 +11,7 @@ class TestPrompts:
     @pytest.mark.parametrize(
         ("template", "placeholder"),
         [
-            (Prompts.COMMIT_PROMPT_TEMPLATE_JA, "diff"),
-            (Prompts.COMMIT_PROMPT_TEMPLATE_EN, "diff"),
+            (Prompts.COMMIT_PROMPT_TEMPLATE, "diff"),
             (Prompts.REVIEW_PROMPT_TEMPLATE, "code"),
         ],
     )

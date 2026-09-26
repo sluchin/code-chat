@@ -15,22 +15,7 @@ class Prompts:
     )
     """通常の対話で使用するシステム指示 (Context Caching 使用時は, キャッシュ作成時にこの指示を含める)."""
 
-    COMMIT_PROMPT_TEMPLATE_JA: str = """\
-以下の git diff の内容を分析し, 適切な Git コミットメッセージを作成してください.
-
-【制約事項】
-- 1行目は変更内容を簡潔に要約したタイトル（50文字程度）にしてください.
-- 必要に応じて空行を挟み, 箇条書きで変更理由や詳細を記述してください.
-- プレフィックス（feat:, fix:, docs:, refactor:, test: など）を使用してください.
-- 記述は日本語で行ってください.
-- 余計な解説やコードブロックの枠（``` など）は含めず, コミットメッセージ本文のみを出力してください.
-
-【git diff】
-{diff}
-"""
-    """日本語用のコミットメッセージ生成プロンプトテンプレート."""
-
-    COMMIT_PROMPT_TEMPLATE_EN: str = """\
+    COMMIT_PROMPT_TEMPLATE: str = """\
 Analyze the following git diff and generate a concise, professional Git commit message in English.
 
 [Constraints]
@@ -42,7 +27,7 @@ Analyze the following git diff and generate a concise, professional Git commit m
 [git diff]
 {diff}
 """
-    """英語用のコミットメッセージ生成プロンプトテンプレート."""
+    """コミットメッセージ生成プロンプトテンプレート (英語で出力させる)."""
 
     WRITE_MODE_SYSTEM_INSTRUCTION: str = """
 あなたはコード自動生成アシスタントです.
