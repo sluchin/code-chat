@@ -186,19 +186,6 @@ class ContextCache:
         return f"{ContextCache._NAME_PREFIX}{cache_id}"
 
     @staticmethod
-    def _explain_api_error(error: APIError) -> str:
-        """キャッシュ API のエラーから, 原因と対処を示すメッセージを作成します.
-
-        Args:
-            error (APIError): キャッシュ API が返したエラー.
-
-        Returns:
-            str: 概要とヒントを含むメッセージ.
-
-        """
-        return format_error(error)
-
-    @staticmethod
     def _print_cache(cache: Any) -> None:
         """キャッシュ 1 件の情報を標準出力に表示します.
 
@@ -261,4 +248,4 @@ class ContextCache:
                 ),
             )
         except APIError as e:
-            raise CacheError(self._explain_api_error(e)) from e
+            raise CacheError(format_error(e)) from e
