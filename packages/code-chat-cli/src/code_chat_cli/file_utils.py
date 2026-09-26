@@ -40,7 +40,8 @@ def read_path_content(target_path: str) -> str:
     if path.is_file():
         try:
             return f"=== File: {path} ===\n" + path.read_text(encoding="utf-8")
-        except OSError:
+        # 明示的に指定されたファイルは, UTF-8 として読めない場合も, 読み込みの失敗として扱う
+        except (OSError, UnicodeDecodeError):
             logger.exception("ファイル '%s' の読み込みに失敗しました", path)
             sys.exit(1)
 

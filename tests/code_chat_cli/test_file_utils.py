@@ -67,6 +67,16 @@ class TestReadPathContent:
 
         assert exc_info.value.code == 1
 
+    def test_read_path_content_file_not_utf8_failure(self, tmp_path):
+        """単一ファイルが UTF-8 として読めない場合, 例外を送出せずに sys.exit(1) で終了するか検証."""
+        file_path = tmp_path / "latin1.txt"
+        file_path.write_bytes(b"caf\xe9")
+
+        with pytest.raises(SystemExit) as exc_info:
+            read_path_content(str(file_path))
+
+        assert exc_info.value.code == 1
+
     def test_read_path_content_directory_file_read_error_exception(
         self, valid_and_error_files, fail_read_text
     ):
