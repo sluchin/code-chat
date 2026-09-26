@@ -30,6 +30,7 @@ from code_chat_cli.chat import (
     _handle_subcommands,
     _load_files_context,
     _log_cache_usage,
+    _query_mcp,
     _require_rag_api_key,
     _resolve_cache_settings,
     _retrieve_rag_context,
@@ -1170,6 +1171,34 @@ class TestBuildChatConfig:
         assert config.system_instruction is None
 
 
+class TestQueryMcp:
+    """`_query_mcp` のテスト."""
+
+    def test_query_mcp_success(self, capsys):
+        """成功した場合は True を返し, 結果を出力して履歴に記録するか検証."""
+        history: list[str] = []
+
+        with patch(
+            "code_chat_cli.chat.handle_mcp_run", new=AsyncMock(return_value="answer")
+        ):
+            result = _query_mcp("q", _cli_args(mcp=True), history)
+
+        assert result is True
+        assert "answer" in capsys.readouterr().out
+        assert history == ["### User (MCP)\n\nq", "### Gemini (MCP)\n\nanswer"]
+
+    def test_query_mcp_exception(self, caplog):
+        """失敗した場合は, エラーを記録して False を返し, 例外を送出しないか検証."""
+        with patch(
+            "code_chat_cli.chat.handle_mcp_run",
+            new=AsyncMock(side_effect=RuntimeError("boom")),
+        ):
+            result = _query_mcp("q", _cli_args(mcp=True), [])
+
+        assert result is False
+        assert "MCP クエリの実行中にエラーが発生しました: boom" in caplog.text
+
+
 class TestHandleMcpSingleTurn:
     """`_handle_mcp_single_turn` のテスト."""
 
@@ -1246,36 +1275,45 @@ class TestHandleMcpSingleTurn:
         )
         assert not history
 
-    def test_handle_mcp_single_turn_api_error_exception(self, caplog):
-        """MCP 実行中の Gemini API のエラーは, 概要とヒントに整理されて記録されるか検証."""
+    def test_handle_mcp_single_turn_api_error_failure(self, caplog):
+        """MCP 実行中の Gemini API のエラーは, 概要とヒントに整理されて記録され, 終了コード 1 で終了するか検証."""
         args = _cli_args(mcp=True, prompt="q")
 
-        with patch(
-            "code_chat_cli.chat.handle_mcp_run",
-            new=AsyncMock(
-                side_effect=APIError(
-                    503, {"error": {"message": "high demand", "status": "UNAVAILABLE"}}
-                )
+        with (
+            patch(
+                "code_chat_cli.chat.handle_mcp_run",
+                new=AsyncMock(
+                    side_effect=APIError(
+                        503,
+                        {"error": {"message": "high demand", "status": "UNAVAILABLE"}},
+                    )
+                ),
             ),
+            pytest.raises(SystemExit) as exc_info,
         ):
             _handle_mcp_single_turn(args, [])
 
+        assert exc_info.value.code == 1
         assert "[HTTP 503 UNAVAILABLE]" in caplog.text
         assert "ヒント: " in caplog.text
         assert "'error'" not in caplog.text
 
-    def test_handle_mcp_single_turn_exception(self, caplog):
-        """MCP 実行が失敗した場合はエラーを記録し, 履歴に応答を残さないか検証."""
+    def test_handle_mcp_single_turn_failure(self, caplog):
+        """MCP 実行が失敗した場合はエラーを記録し, 履歴に応答を残さず, 終了コード 1 で終了するか検証."""
         history: list[str] = []
 
         # MCP の実行で例外を発生させる
-        with patch(
-            "code_chat_cli.chat.handle_mcp_run",
-            new=AsyncMock(side_effect=RuntimeError("boom")),
+        with (
+            patch(
+                "code_chat_cli.chat.handle_mcp_run",
+                new=AsyncMock(side_effect=RuntimeError("boom")),
+            ),
+            pytest.raises(SystemExit) as exc_info,
         ):
             _handle_mcp_single_turn(_cli_args(mcp=True, prompt="q"), history)
 
-        # エラーがログに残り, 履歴には User 側だけが記録されること
+        # エラーがログに残り, 履歴には User 側だけが記録され, 終了コード 1 で終了すること
+        assert exc_info.value.code == 1
         assert "MCP クエリの実行中にエラーが発生しました: boom" in caplog.text
         assert history == ["### User (MCP)\n\nq"]
 
