@@ -1,9 +1,10 @@
 """Git コマンドの実行, リポジトリ状態の検証, および差分（diff）情報の取得を行うユーティリティモジュール."""
 
 import subprocess
-from logging import getLogger
 
-logger = getLogger(__name__)
+from code_chat_cli.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def get_git_diff() -> str:
