@@ -15,7 +15,6 @@ import time  # pylint: disable=unused-import # noqa: F401
 from pathlib import Path  # pylint: disable=unused-import
 from typing import Any
 
-from code_chat_rag.rag_service import RagService
 from google.genai import types
 from google.genai.errors import APIError, ClientError, ServerError
 
@@ -54,6 +53,7 @@ from code_chat_cli.rag import (
     handle_rag_status,
     handle_rag_update,
 )
+from code_chat_rag.rag_service import RagService
 
 logger = get_logger(__name__)
 

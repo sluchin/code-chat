@@ -1,6 +1,7 @@
 """`code_chat_cli.client_config_error` モジュールのテスト."""
 
 import pytest
+
 from code_chat_cli.client_config_error import ClientConfigError
 
 

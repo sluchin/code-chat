@@ -1,7 +1,8 @@
 """埋め込みの呼び出しに, Gemini API のリトライを加えるモジュール."""
 
-from code_chat_cli.api import call_with_retry
 from langchain_core.embeddings import Embeddings
+
+from code_chat_cli.api import call_with_retry
 
 
 class RetryEmbeddings(Embeddings):

@@ -1,6 +1,7 @@
 """`code_chat_cli.prompts` モジュールのテスト."""
 
 import pytest
+
 from code_chat_cli.prompts import Prompts
 
 

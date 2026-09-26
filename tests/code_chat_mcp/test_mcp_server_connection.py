@@ -9,6 +9,7 @@ from typing import ClassVar
 from unittest.mock import patch
 
 import pytest
+
 from code_chat_mcp.mcp_server_connection import McpServerConnection
 
 

@@ -10,6 +10,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from google.genai.errors import APIError
+
 from code_chat_cli.cache_error import CacheError
 from code_chat_cli.chat import (
     _append_rag_context,
@@ -37,7 +39,6 @@ from code_chat_cli.chat import (
 )
 from code_chat_cli.cli_args import CliArgs
 from code_chat_cli.oauth_error import OAuthError
-from google.genai.errors import APIError
 
 
 def _cli_args(**overrides) -> SimpleNamespace:

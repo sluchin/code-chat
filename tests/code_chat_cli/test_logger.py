@@ -6,6 +6,8 @@ import socket
 from unittest.mock import patch
 
 import pytest
+from google.genai.errors import APIError
+
 from code_chat_cli.logger import (
     THIRD_PARTY_LOGGERS,
     _is_trace_enabled,
@@ -15,7 +17,6 @@ from code_chat_cli.logger import (
     set_trace,
     setup_logging,
 )
-from google.genai.errors import APIError
 
 
 @pytest.fixture

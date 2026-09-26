@@ -7,10 +7,11 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from google.genai.errors import APIError, ClientError
+
 from code_chat_cli.cache_error import CacheError
 from code_chat_cli.context_cache import ContextCache
 from code_chat_cli.prompts import Prompts
-from google.genai.errors import APIError, ClientError
 
 
 def _cache(name="abc", display_name=None, **overrides):

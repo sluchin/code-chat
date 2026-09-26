@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
+
 from code_chat_cli.client import get_gemini_client
 from code_chat_cli.client_config_error import ClientConfigError
 from code_chat_cli.oauth_error import OAuthError

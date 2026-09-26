@@ -5,6 +5,7 @@ from unittest import mock
 from unittest.mock import patch
 
 import pytest
+
 from code_chat_cli.file_utils import read_path_content
 
 

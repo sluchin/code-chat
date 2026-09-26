@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from code_chat_mcp.mcp_server_config import McpServerConfig
 from code_chat_mcp.mcp_service import McpService
 from code_chat_mcp.mcp_tool_info import McpToolInfo

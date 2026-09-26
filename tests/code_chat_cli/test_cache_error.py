@@ -1,6 +1,7 @@
 """`code_chat_cli.cache_error` モジュールのテスト."""
 
 import pytest
+
 from code_chat_cli.cache_error import CacheError
 
 

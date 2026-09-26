@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
 from code_chat_cli.file_writer import (
     _apply_file_modification,
     _cleanup_old_backups,
