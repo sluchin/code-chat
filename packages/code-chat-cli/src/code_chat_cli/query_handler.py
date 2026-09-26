@@ -104,7 +104,9 @@ class QueryHandler:
                 # ツール呼び出しが必要ない場合, テキスト回答を抽出して終了
                 return response.text or ""
 
-            # 要求されたツールを実行
+            # 要求されたツールを実行し, 結果は, 呼び出しの数と同じ数の Part にまとめて 1 回で返す
+            # (並列の呼び出しの結果を別々に返すと, Gemini API が 400 を返す)
+            response_parts: list[types.Part] = []
             for call in response.function_calls:
                 tool_args = dict(call.args) if call.args else {}
 
@@ -147,13 +149,14 @@ class QueryHandler:
 
                 # Gemini に返答する際は, Gemini が認識している
                 # call.name (プレフィックス付き) を設定
-                function_response_part = types.Part.from_function_response(
-                    name=call.name,
-                    response={"result": result_text},
+                response_parts.append(
+                    types.Part.from_function_response(
+                        name=call.name,
+                        response={"result": result_text},
+                    )
                 )
-                contents.append(
-                    types.Content(role="user", parts=[function_response_part])
-                )
+
+            contents.append(types.Content(role="user", parts=response_parts))
 
     def _format_tools_for_gemini(
         self, mcp_tools: list[McpToolInfo]

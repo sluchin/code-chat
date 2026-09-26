@@ -197,6 +197,25 @@ class TestRun:
         assert '[MCP Tool Executing] git__status({"path": "."})' in out
         assert "[MCP Tool Result] line1\nline2" in out
 
+    def test_run_returns_parallel_tool_results_in_one_content_success(
+        self, handler, client, mcp_service
+    ):
+        """並列のツール呼び出しの結果は, 1 つの Content に, 呼び出しと同じ数の Part としてまとめて返すか検証."""
+        client.models.generate_content.side_effect = [
+            _response(function_calls=[_call("a__x"), _call("b__y")]),
+            _response(text="done"),
+        ]
+
+        asyncio.run(handler.run("q"))
+
+        contents = client.models.generate_content.call_args_list[1].kwargs["contents"]
+        # [プロンプト, モデルの応答, ツール結果 (1 つの Content), ...]
+        assert [p.function_response.name for p in contents[2].parts] == [
+            "a__x",
+            "b__y",
+        ]
+        assert mcp_service.call_tool.await_count == 2
+
     def test_run_handles_empty_response(self, handler, client):
         """テキストもコンテンツも無いレスポンスでも空文字を返すか検証."""
         client.models.generate_content.return_value = _response(
