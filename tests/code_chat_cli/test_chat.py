@@ -20,7 +20,7 @@ from code_chat_cli.chat import (
     _build_send_text,
     _cached_content_name,
     _handle_cache_subcommand,
-    _handle_dry_run,
+    _handle_dryrun,
     _handle_login,
     _handle_mcp_interactive,
     _handle_mcp_single_turn,
@@ -793,9 +793,9 @@ class TestHandleLogin:
 
 
 class TestHandleDryRun:
-    """`_handle_dry_run` のテスト."""
+    """`_handle_dryrun` のテスト."""
 
-    def test_handle_dry_run_success(self, capsys):
+    def test_handle_dryrun_success(self, capsys):
         """dry-run の出力に引数・生成設定・コンテキストのプレビューが含まれるか検証."""
         # ファイル・入力ディレクトリ・長いコンテキスト (400 文字) を指定
         args = _cli_args(
@@ -807,7 +807,7 @@ class TestHandleDryRun:
         )
 
         # 実行
-        _handle_dry_run(args, _build_chat_config(False))
+        _handle_dryrun(args, _build_chat_config(False))
 
         # 各セクションが出力され, コンテキストは 300 文字で切り詰めて表示されること
         out = capsys.readouterr().out
@@ -819,13 +819,13 @@ class TestHandleDryRun:
         assert "コンテキスト長: 400 文字" in out
         assert "x" * 300 + "..." in out
 
-    def test_handle_dry_run_minimal_args(self, capsys):
+    def test_handle_dryrun_minimal_args(self, capsys):
         """パスもコンテキストも無い場合の出力を検証."""
         # パス・入力ディレクトリ・コンテキストがすべて空の状態
         args = _cli_args(input_dirs=[], model="", provider="")
 
         # 実行 (Write モードの設定で出力)
-        _handle_dry_run(args, _build_chat_config(True))
+        _handle_dryrun(args, _build_chat_config(True))
 
         out = capsys.readouterr().out
         # 未指定の項目は None と表示され, コンテキストのプレビューは出力されないこと
@@ -1393,10 +1393,10 @@ class TestMain:
             in system_instruction
         )
 
-    def test_main_dry_run_success(self, mock_args):
+    def test_main_dryrun_success(self, mock_args):
         """--dry-run では API クライアントを作らずに終了コード 0 で終了するか検証."""
         # --dry-run を指定
-        mock_args.return_value.dry_run = True
+        mock_args.return_value.dryrun = True
 
         # API クライアントの生成をモック化し, 呼ばれないことを確認する
         with (
@@ -1407,6 +1407,44 @@ class TestMain:
 
         # クライアントを作らず, 終了コード 0 で終了すること
         get_client.assert_not_called()
+        assert exc_info.value.code == 0
+
+    @pytest.mark.parametrize(
+        ("action", "handler"),
+        [("create", "handle_rag_create"), ("update", "handle_rag_update")],
+    )
+    def test_main_dryrun_rag_index_success(self, mock_args, action, handler):
+        """`rag create` / `rag update` の --dry-run では, dryrun=True で対象ファイル一覧を表示し, クライアントを作らないか検証."""
+        mock_args.return_value.dryrun = True
+        mock_args.return_value.subcommand = "rag"
+        mock_args.return_value.subcommand_action = action
+
+        with (
+            patch("code_chat_cli.chat.get_gemini_client") as get_client,
+            patch(f"code_chat_cli.chat.{handler}") as mock_handler,
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            main()
+
+        get_client.assert_not_called()
+        mock_handler.assert_called_once_with(["."], "./.chroma_db", dryrun=True)
+        assert exc_info.value.code == 0
+
+    def test_main_dryrun_rag_other_action_success(self, mock_args):
+        """`rag status` の --dry-run では, インデックスの一覧表示を行わないか検証."""
+        mock_args.return_value.dryrun = True
+        mock_args.return_value.subcommand = "rag"
+        mock_args.return_value.subcommand_action = "status"
+
+        with (
+            patch("code_chat_cli.chat.handle_rag_create") as mock_create,
+            patch("code_chat_cli.chat.handle_rag_update") as mock_update,
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            main()
+
+        mock_create.assert_not_called()
+        mock_update.assert_not_called()
         assert exc_info.value.code == 0
 
     def test_main_login_success(self, mock_args, mock_gemini_client):

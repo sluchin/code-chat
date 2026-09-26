@@ -628,7 +628,7 @@ def _handle_login() -> None:
     sys.exit(0)
 
 
-def _handle_dry_run(cli_args: Any, config: types.GenerateContentConfig) -> None:
+def _handle_dryrun(cli_args: Any, config: types.GenerateContentConfig) -> None:
     """ドライランモード指定時の情報出力と終了処理を実行します.
 
     API 送信を行わずに解析結果を表示します.
@@ -675,6 +675,25 @@ def _handle_dry_run(cli_args: Any, config: types.GenerateContentConfig) -> None:
         )
         print(preview)
         print("---------------------------------------")
+
+
+def _handle_rag_dryrun(cli_args: Any, input_dirs: list[str], output_dir: str) -> None:
+    """`rag create` / `rag update` の dry-run 指定時に, インデックス対象のファイル一覧を表示します.
+
+    ファイルの走査だけを行い, Gemini API には接続しません. それ以外のコマンドでは何もしません.
+
+    Args:
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+        input_dirs (list[str]): インデックス作成対象のディレクトリ.
+        output_dir (str): ベクトルストアの永続化先ディレクトリ.
+
+    """
+    if cli_args.subcommand != "rag":
+        return
+    if cli_args.subcommand_action == "create":
+        handle_rag_create(input_dirs, output_dir, dryrun=True)
+    elif cli_args.subcommand_action == "update":
+        handle_rag_update(input_dirs, output_dir, dryrun=True)
 
 
 def _handle_subcommands(client: Any, cli_args: Any) -> None:
@@ -999,8 +1018,9 @@ def main() -> None:
         write_mode = cli_args.write_mode
         config = _build_chat_config(write_mode)
 
-        if cli_args.dry_run:
-            _handle_dry_run(cli_args, config)
+        if cli_args.dryrun:
+            _handle_dryrun(cli_args, config)
+            _handle_rag_dryrun(cli_args, input_dirs, output_dir)
             sys.exit(0)
 
         # ログインは, 実行後に終了する

@@ -222,7 +222,7 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
         debug_mode=debug_mode,
         log_level=log_level,
         trace_mode=trace_mode,
-        dry_run=raw_args.dry_run,
+        dryrun=raw_args.dryrun,
         list_models=raw_args.list_models,
         login=raw_args.login,
         oauth=raw_args.oauth,
@@ -275,6 +275,7 @@ def _build_global_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument(
         "--dry-run",
+        dest="dryrun",
         action="store_true",
         help="API 呼び出しを行わず, 読み込まれるファイル群や指定引数の確認のみ実行します",
     )
