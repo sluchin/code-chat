@@ -4,37 +4,21 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from google.genai.errors import APIError
 from langchain_core.documents import Document
-from langchain_core.messages import AIMessage
-from langchain_core.runnables import RunnableLambda
 
 from code_chat_rag.rag_service import RagService
 
 
 @pytest.fixture
 def mock_dependencies():
-    """VectorStore と ChatGoogleGenerativeAI をモック化する fixture."""
-    # RunnableLambda を使い, StrOutputParser が処理できる AIMessage を返すモック LLM を定義
-    fake_llm = RunnableLambda(
-        lambda prompt: AIMessage(content="hello関数とworld関数が定義されています。")
-    )
-
-    with (
-        patch("code_chat_rag.rag_service.VectorStore") as mock_vector_store_cls,
-        patch(
-            "code_chat_rag.rag_service.ChatGoogleGenerativeAI",
-            return_value=fake_llm,
-        ) as mock_llm_cls,
-    ):
+    """VectorStore をモック化する fixture."""
+    with patch("code_chat_rag.rag_service.VectorStore") as mock_vector_store_cls:
         mock_vs_instance = MagicMock()
         mock_vector_store_cls.return_value = mock_vs_instance
 
         yield {
             "vs_cls": mock_vector_store_cls,
             "vs_inst": mock_vs_instance,
-            "llm_cls": mock_llm_cls,
-            "fake_llm": fake_llm,
         }
 
 
@@ -43,18 +27,10 @@ class TestInit:
 
     def test_init_success(self, mock_dependencies):
         """RagService の初期化処理を検証する."""
-        service = RagService(
-            output_dir="/dummy/chroma",
-            model_name="gemini-3.5-flash",
-        )
+        service = RagService(output_dir="/dummy/chroma")
 
         assert service.output_dir == "/dummy/chroma"
         mock_dependencies["vs_cls"].assert_called_once_with(output_dir="/dummy/chroma")
-        mock_dependencies["llm_cls"].assert_called_once_with(
-            model="gemini-3.5-flash",
-            temperature=0.0,
-            max_retries=1,
-        )
 
 
 class TestIndexRepository:
@@ -165,52 +141,6 @@ class TestClear:
         mock_dependencies["vs_inst"].clear.assert_called_once_with()
 
 
-class TestQueryStream:
-    """`RagService.query_stream` のテスト."""
-
-    @patch("code_chat_rag.rag_service.stream_with_retry")
-    @patch.object(RagService, "_build_chain")
-    def test_query_stream_success(
-        self, mock_build_chain, mock_stream_with_retry, mock_dependencies
-    ):
-        """検索した文脈と質問がチェーンに渡され, トークンが逐次生成されるか検証する."""
-        retriever = mock_dependencies["vs_inst"].as_retriever.return_value
-        retriever.invoke.return_value = [
-            Document(page_content="code1", metadata={"source": "a.py"})
-        ]
-        mock_stream_with_retry.return_value = iter(["Hello", " ", "World"])
-
-        service = RagService()
-        stream_result = list(service.query_stream("How to run this?", k=3))
-
-        assert stream_result == ["Hello", " ", "World"]
-        mock_dependencies["vs_inst"].as_retriever.assert_called_once_with(k=3)
-        mock_stream_with_retry.assert_called_once_with(
-            mock_build_chain.return_value.stream,
-            {
-                "context": "--- File: a.py ---\ncode1",
-                "question": "How to run this?",
-            },
-        )
-
-    def test_query_stream_retry_exception(self, mock_dependencies):
-        """回答の生成が一時的なエラーで失敗しても, リトライされて回答が得られるか検証する."""
-        mock_dependencies["vs_inst"].as_retriever.return_value.invoke.return_value = []
-        calls = []
-
-        def flaky_llm(_prompt):
-            calls.append(1)
-            if len(calls) == 1:
-                raise APIError(503, {"error": {"status": "UNAVAILABLE"}})
-            return AIMessage(content="ok")
-
-        service = RagService()
-        service.llm = RunnableLambda(flaky_llm)
-
-        assert "".join(service.query_stream("q")) == "ok"
-        assert len(calls) == 2
-
-
 class TestGetStatus:
     """`RagService.get_status` のテスト."""
 
@@ -222,17 +152,3 @@ class TestGetStatus:
 
         assert str(tmp_path.resolve()) in status
         assert "総インデックスチャンク数: 7" in status
-
-
-class TestBuildChain:
-    """`RagService._build_chain` のテスト."""
-
-    @pytest.mark.usefixtures("mock_dependencies")
-    def test_build_chain_execution_success(self):
-        """_build_chain で構築された LCEL チェーンが, 文脈と質問から回答を生成するか検証する."""
-        service = RagService()
-        chain = service._build_chain()
-
-        result = chain.invoke({"context": "def hello(): pass", "question": "何ですか?"})
-
-        assert result == "hello関数とworld関数が定義されています。"
