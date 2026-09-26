@@ -10,7 +10,9 @@ class Constants:
         {
             ".git",
             ".venv",
+            ".env",
             "venv",
+            "node_modules",
             "__pycache__",
             ".pytest_cache",
             ".mypy_cache",
