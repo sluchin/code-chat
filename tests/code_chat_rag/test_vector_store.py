@@ -84,6 +84,42 @@ class TestAddChunks:
         assert store.add_chunks([]) == []
 
 
+class TestDeleteBySources:
+    """`VectorStore.delete_by_sources` のテスト."""
+
+    @patch("code_chat_rag.vector_store.Chroma")
+    def test_delete_by_sources_success(self, mock_chroma_cls, mock_embedding, tmp_path):
+        """指定したソースのチャンクだけを, source のメタデータで削除するか検証する."""
+        store = VectorStore(output_dir=str(tmp_path), embedding_function=mock_embedding)
+
+        store.delete_by_sources(["a.py", "b.py"])
+
+        mock_chroma_cls.return_value.delete.assert_called_once_with(
+            where={"source": {"$in": ["a.py", "b.py"]}}
+        )
+
+    @patch("code_chat_rag.vector_store.Chroma")
+    def test_delete_by_sources_splits_batches(
+        self, mock_chroma_cls, mock_embedding, tmp_path
+    ):
+        """ソースが多い場合は, 上限ごとに分割して削除するか検証する."""
+        store = VectorStore(output_dir=str(tmp_path), embedding_function=mock_embedding)
+        sources = [f"{i}.py" for i in range(501)]
+
+        store.delete_by_sources(sources)
+
+        calls = mock_chroma_cls.return_value.delete.call_args_list
+        assert [len(c.kwargs["where"]["source"]["$in"]) for c in calls] == [500, 1]
+
+    def test_delete_by_sources_empty(self, mock_embedding):
+        """ソースが空の場合は, DB を操作しないか検証する."""
+        store = VectorStore(output_dir="/dummy/path", embedding_function=mock_embedding)
+
+        store.delete_by_sources([])
+
+        assert store._db is None
+
+
 class TestAsRetriever:
     """`VectorStore.as_retriever` のテスト."""
 

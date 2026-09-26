@@ -89,6 +89,41 @@ class TestIndexRepository:
         )
 
     @patch("code_chat_rag.rag_service.Indexer")
+    def test_index_repository_update_only_replaces_existing_chunks_success(
+        self, mock_indexer_cls, mock_dependencies
+    ):
+        """差分更新では, 更新対象のファイルの既存チャンクを削除してから追加し, 全件のクリアはしないか検証する."""
+        mock_indexer_cls.return_value.load_and_chunk.return_value = [
+            {"page_content": "a1", "metadata": {"source": "b.py"}},
+            {"page_content": "a2", "metadata": {"source": "a.py"}},
+            {"page_content": "a3", "metadata": {"source": "a.py"}},
+            {"page_content": "x", "metadata": {}},
+        ]
+        mock_dependencies["vs_inst"].add_chunks.return_value = ["1", "2", "3", "4"]
+
+        count = RagService().index_repository(["/repo"], update_only=True)
+
+        assert count == 4
+        vs = mock_dependencies["vs_inst"]
+        vs.delete_by_sources.assert_called_once_with(["a.py", "b.py"])
+        vs.clear.assert_not_called()
+
+    @patch("code_chat_rag.rag_service.Indexer")
+    def test_index_repository_full_rebuild_clears_store_success(
+        self, mock_indexer_cls, mock_dependencies
+    ):
+        """新規作成では, 既存のデータを全件クリアし, ソース単位の削除はしないか検証する."""
+        mock_indexer_cls.return_value.load_and_chunk.return_value = [
+            {"page_content": "a", "metadata": {"source": "a.py"}}
+        ]
+        mock_dependencies["vs_inst"].add_chunks.return_value = ["1"]
+
+        RagService().index_repository(["/repo"])
+
+        mock_dependencies["vs_inst"].clear.assert_called_once()
+        mock_dependencies["vs_inst"].delete_by_sources.assert_not_called()
+
+    @patch("code_chat_rag.rag_service.Indexer")
     def test_index_repository_empty(self, mock_indexer_cls, mock_dependencies):
         """チャンクが空の場合は 0 を返し, add_chunks が呼ばれないことを検証する."""
         mock_indexer_instance = MagicMock()

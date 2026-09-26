@@ -52,7 +52,7 @@ class RagService:
 
         Args:
             input_dirs: コードリポジトリディレクトリへのパス.
-            update_only: True の場合は既存データを消さずに差分追加/更新し, False の場合は初期化して全件再作成します.
+            update_only: True の場合は, 読み込んだファイルの既存のチャンクを置き換えて追加し (他のファイルのデータは残す), False の場合は初期化して全件再作成します.
 
         Returns:
             インデックスされたチャンク数.
@@ -64,7 +64,17 @@ class RagService:
         if not chunks:
             return 0
 
-        if not update_only:
+        if update_only:
+            # 差分更新のときは, 更新対象のファイルの古いチャンクを取り除き, 重複を避ける
+            sources = sorted(
+                {
+                    str(chunk["metadata"]["source"])
+                    for chunk in chunks
+                    if chunk["metadata"].get("source")
+                }
+            )
+            self.vector_store.delete_by_sources(sources)
+        else:
             # 新規作成 (新規インデックス化) のときは既存のベクトルストア内容をクリア
             self.vector_store.clear()
 
