@@ -18,6 +18,8 @@ async def handle_mcp_run(
     user_prompt: str,
     config_path: Path | str | None = None,
     use_oauth: bool = False,
+    model_name: str | None = None,
+    cached_content: str | None = None,
 ) -> str:
     """McpService のライフサイクルを管理し, Gemini へのクエリとツール実行を行います.
 
@@ -26,6 +28,9 @@ async def handle_mcp_run(
     Args:
         user_prompt (str): ユーザーから入力されたプロンプト文字列.
         config_path (Path | str | None): MCP 設定ファイルのパス. 省略時はデフォルトパスを使用.
+        use_oauth (bool): OAuth で認証するかどうか. Defaults to False.
+        model_name (str | None): 使用する Gemini モデル名. 省略時は QueryHandler の既定モデル.
+        cached_content (str | None): 使用するキャッシュ名. 省略時はキャッシュを使わない.
 
     Returns:
         str: Gemini からの最終回答テキスト.
@@ -39,7 +44,12 @@ async def handle_mcp_run(
         async with McpService(config_path=config) as mcp_service:
             # クライアントの初期化（API キーまたは OAuth 認証）
             client = get_gemini_client(use_oauth=use_oauth)
-            handler = QueryHandler(gemini_client=client, mcp_service=mcp_service)
+            handler = QueryHandler(
+                gemini_client=client,
+                mcp_service=mcp_service,
+                model_name=model_name,
+                cached_content=cached_content,
+            )
 
             logger.info("ユーザープロンプトの処理を開始します: %s", user_prompt)
             result_text = await handler.run(user_prompt)

@@ -43,6 +43,30 @@ class TestHandleMcpRun:
         assert handler_cls.call_args.kwargs["gemini_client"] is client_cls.return_value
         handler.run.assert_awaited_once_with("hello")
 
+    def test_handle_mcp_run_model_and_cache_success(self):
+        """モデルとキャッシュ名が, QueryHandler に渡されるか検証."""
+        service_cls = _service_cm(MagicMock())
+        handler = MagicMock()
+        handler.run = AsyncMock(return_value="answer")
+
+        with (
+            patch("code_chat_cli.mcp.McpService", service_cls),
+            patch("code_chat_cli.mcp.get_gemini_client"),
+            patch(
+                "code_chat_cli.mcp.QueryHandler", return_value=handler
+            ) as handler_cls,
+        ):
+            asyncio.run(
+                handle_mcp_run(
+                    "hello",
+                    model_name="models/gemini-cache",
+                    cached_content="cachedContents/abc",
+                )
+            )
+
+        assert handler_cls.call_args.kwargs["model_name"] == "models/gemini-cache"
+        assert handler_cls.call_args.kwargs["cached_content"] == "cachedContents/abc"
+
     def test_handle_mcp_run_use_oauth_success(self):
         """use_oauth が Gemini クライアントの作成に渡されるか検証."""
         service_cls = _service_cm(MagicMock())

@@ -533,6 +533,19 @@ def _resolve_cache_settings(
     return cache.model, _build_chat_config(cli_args.write_mode, cache.name)
 
 
+def _cached_content_name(cli_args: Any) -> str | None:
+    """`-c` / `--cache` で解決したキャッシュ名を返します.
+
+    Args:
+        cli_args (Any): コマンドライン引数の名前空間オブジェクト.
+
+    Returns:
+        str | None: キャッシュ名 (`cachedContents/<ID>`). キャッシュを使わない場合は None.
+
+    """
+    return cli_args.cache if isinstance(cli_args.cache, str) else None
+
+
 def _handle_cache_subcommand(client: Any, cli_args: Any) -> None:
     """cache サブコマンド (create / update / rm / list) の振る舞いを分岐・実行します.
 
@@ -895,6 +908,8 @@ def _handle_mcp_single_turn(
                 user_prompt=send_prompt,
                 config_path=config_path,
                 use_oauth=cli_args.oauth,
+                model_name=cli_args.model,
+                cached_content=_cached_content_name(cli_args),
             )
         )
         print(result_text)
@@ -947,6 +962,8 @@ def _handle_mcp_interactive(
                 user_prompt=send_prompt,
                 config_path=config_path,
                 use_oauth=cli_args.oauth,
+                model_name=cli_args.model,
+                cached_content=_cached_content_name(cli_args),
             )
         )
         print(result_text)
@@ -1003,6 +1020,9 @@ def main() -> None:
         # キャッシュはモデルに紐づくため, モデルと生成設定を, キャッシュのものに置き換える
         if cli_args.cache:
             model, config = _resolve_cache_settings(client, cli_args)
+            # --mcp など, チャット以外の経路にも渡せるよう, 解決したモデルとキャッシュ名を引数に反映する
+            cli_args.model = model
+            cli_args.cache = config.cached_content
 
         chat = client.chats.create(model=model, config=config)
 

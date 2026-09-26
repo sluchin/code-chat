@@ -21,19 +21,24 @@ class QueryHandler:
         self,
         gemini_client: genai.Client,
         mcp_service: McpService,
-        model_name: str = "gemini-3.5-flash",
+        model_name: str | None = None,
+        cached_content: str | None = None,
     ) -> None:
         """QueryHandler インスタンスを初期化します.
 
         Args:
             gemini_client (genai.Client): google-genai の Client インスタンス.
             mcp_service (McpService): 複数の MCP サーバーを管理する McpService インスタンス.
-            model_name (str): 使用する Gemini モデル名.
+            model_name (str | None): 使用する Gemini モデル名. 省略時は `gemini-3.5-flash`.
+            キャッシュを使う場合は, キャッシュのモデルを指定する.
+            cached_content (str | None): 使用するキャッシュ名 (`cachedContents/<ID>`). 省略時はキャッシュを使わない.
+                ツール定義はキャッシュに含まれないため, Gemini API がエラーを返す場合がある.
 
         """
         self.client = gemini_client
         self.mcp_service = mcp_service
-        self.model_name = model_name
+        self.model_name = model_name or "gemini-3.5-flash"
+        self.cached_content = cached_content
 
     def _generate_content_with_retry(
         self, contents: list[Any], config: types.GenerateContentConfig
@@ -76,6 +81,7 @@ class QueryHandler:
         config = types.GenerateContentConfig(
             tools=[{"function_declarations": declarations}] if declarations else None,
             temperature=0.2,
+            cached_content=self.cached_content,
         )
 
         # 会話履歴メッセージの初期化

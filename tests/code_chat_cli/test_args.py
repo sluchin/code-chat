@@ -168,6 +168,15 @@ class TestParseArgs:
         assert specified.cache == "cachedContents/abc"
         assert specified.prompt == "質問です"
 
+    def test_parse_args_cache_with_mcp_success(self, monkeypatch):
+        """-c と --mcp の併用は, 引数のエラーにならないか検証 (併用の可否は, Gemini API が判断する)."""
+        monkeypatch.setattr("sys.argv", ["chat.py", "-c", "--mcp", "質問です"])
+
+        args = parse_args()
+
+        assert args.cache is True
+        assert args.mcp is True
+
     def test_parse_args_cache_subcommand_success(self, monkeypatch):
         """cache create の対象パスと --ttl が解析されるか検証."""
         monkeypatch.setattr(
@@ -198,7 +207,6 @@ class TestParseArgs:
     @pytest.mark.parametrize(
         ("argv", "message"),
         [
-            (["-c", "--mcp", "q"], "-c/--cache は --mcp と併用できません"),
             (["-c", "-w", "q"], "-c/--cache は -w/--write と併用できません"),
             (["-c", "--oauth", "q"], "--oauth と併用できません"),
             (["cache", "list", "--oauth"], "--oauth と併用できません"),

@@ -63,6 +63,18 @@ class TestInit:
         assert handler.mcp_service is mcp_service
         assert handler.model_name == "gemini-3.5-flash"
 
+    def test_init_model_and_cache_success(self, client, mcp_service):
+        """モデルとキャッシュ名の指定が, 属性に反映されるか検証."""
+        handler = QueryHandler(
+            client,
+            mcp_service,
+            model_name="models/gemini-cache",
+            cached_content="cachedContents/abc",
+        )
+
+        assert handler.model_name == "models/gemini-cache"
+        assert handler.cached_content == "cachedContents/abc"
+
 
 class TestGenerateContentWithRetry:
     """`QueryHandler._generate_content_with_retry` のテスト."""
@@ -217,6 +229,16 @@ class TestRun:
         asyncio.run(handler.run("q"))
 
         assert f"[MCP Tool Result] {'x' * 100}..." in capsys.readouterr().out
+
+    def test_run_passes_cached_content_success(self, client, mcp_service):
+        """キャッシュ名の指定が, 生成設定に渡されるか検証 (ツール定義との併用の可否は, Gemini API が判断する)."""
+        handler = QueryHandler(client, mcp_service, cached_content="cachedContents/abc")
+        client.models.generate_content.return_value = _response(text="answer")
+
+        asyncio.run(handler.run("question"))
+
+        config = client.models.generate_content.call_args.kwargs["config"]
+        assert config.cached_content == "cachedContents/abc"
 
 
 class TestFormatToolsForGemini:
