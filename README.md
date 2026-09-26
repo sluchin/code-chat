@@ -38,6 +38,24 @@ Gemini API を使用してローカルソースコードの参照・対話・自
 
 コマンドとオプションの一覧は [COMMANDS.md](COMMANDS.md) も参照してください。
 
+## Gemini CLI との違い (code-chat を使うメリット)
+
+Google 公式の [Gemini CLI](https://github.com/google-gemini/gemini-cli) は、ファイル編集・シェル実行・Web 検索などを自律的に行うエージェントです。汎用の用途や、無料枠の広さでは Gemini CLI が有利です。
+
+- 無料枠: Gemini CLI は「Google アカウントでログイン」すると、1 日 1,000 リクエスト (無料の API キーは 1 日 250 リクエスト、Flash 系のモデルのみ)。数字は公式のドキュメントによるもので、変更される場合があります。
+- code-chat の `--oauth` は Gemini API に直接アクセスするため、**無料枠は API キーと同じ**です (Gemini CLI のログインの枠は使えません)。
+
+code-chat を使うメリットは、次のとおりです。
+
+- **RAG (ChromaDB)**: リポジトリを自前でインデックス化し、検索結果を質問に付加します。`--rag` と `--mcp` は併用できます。
+- **明示的な Context Caching**: `cache create` で作成し、`-c` で再利用します (有料枠が必要)。
+- **エラー表示とリトライの制御**: 429 / 503 を、原因とヒントを付けた 1 行で表示します。`retryDelay` に従って自動でリトライし、1 日の上限は対象から除きます (RAG を含む全ての Gemini 呼び出しで統一)。詳しくは [ERRORS.md](ERRORS.md) を参照してください。
+- **非対話での利用**: パイプ入力、`--review`、`-g` (コミットメッセージ生成) を、ワンショットで実行できます。
+- **Write モードの安全性**: 上書き前に確認し、省略コードを検知して警告し、世代付きのバックアップを残します。
+- **変更しやすい**: プロンプト、リトライの方針、MCP の扱いを、自分で決められます。
+
+使い分けの目安: 無料で広く使いたい場合や、エージェントとして自律的に作業させたい場合は Gemini CLI、RAG・Context Caching・エラーとリトライの細かい制御・独自のワークフローが必要な場合は code-chat を使います。
+
 ## プロジェクト構成
 
 uv workspace による 3 パッケージ構成です。
@@ -145,6 +163,7 @@ export GEMINI_API_KEY=your_api_key_here
 - 毎回 `--oauth` を付けたくない場合は、`alias code-chat='code-chat --oauth'` のようにエイリアスを設定してください。
 - ダウンロードした OAuth クライアントの JSON (`client_secret_*.json`) は `.gitignore` の対象です。リポジトリに含めないでください。
 - OAuth 同意画面が「テスト中」のままだと、リフレッシュトークンは 7 日で失効し、再ログインが必要になります。
+- **`--oauth` にしても、無料枠は API キーと同じで、増えません。** 上限は、OAuth クライアントを作成したプロジェクトの Gemini API の無料枠です (確認: `gemini-3.5-flash` は、どちらも 1 分あたり 5 リクエスト)。詳しくは [OAUTH.md](OAUTH.md#9-制限事項) を参照してください。
 - RAG (`--rag`, `rag` サブコマンド) は Embedding API を langchain 経由で呼び出すため、OAuth に対応していません。`--rag` と `--oauth` を併用する場合、RAG の検索には `GEMINI_API_KEY` の API キーが使われます (Gemini への問い合わせ自体は OAuth です)。
 
 > **Note:** `.env` ファイルは自動では読み込まれません。`.env` を使う場合は `uv run --env-file .env code-chat ...` のように明示するか、シェルで読み込んでください。
