@@ -137,7 +137,7 @@ class McpServerConnection:
         """
         if not args:
             return []
-        # 実行時のカレントディレクトリの絶対パス（/home/higashi/src/code-chat 等）を取得
+        # 実行時のカレントディレクトリの絶対パスを取得
         current_dir = str(Path.cwd().resolve())
 
         # "${CWD}" をカレントディレクトリの絶対パスに置換
