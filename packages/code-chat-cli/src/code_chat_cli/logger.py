@@ -110,6 +110,8 @@ def log_exception(logger: logging.Logger, message: str, *args: object) -> None:
     Gemini API のエラー (認証エラー, モデル未提供, 上限超過など) は, トレースバックを見ても
     原因が分からないため, 概要 (HTTP ステータス, 原因) と対処のヒントだけを出力します.
     レスポンスの詳細は -D (DEBUG), トレースバックは --trace 指定時に出力します.
+    ファイルやディレクトリが見つからないエラー (`FileNotFoundError`) は, パスの指定ミスなど,
+    原因が明らかなため, --trace 指定時を除いて, トレースバックを省きます (詳細は -D で出力します).
     それ以外の例外は, 常にトレースバック付きです.
     `except` ブロックの中から呼び出してください.
 
@@ -119,8 +121,13 @@ def log_exception(logger: logging.Logger, message: str, *args: object) -> None:
         *args (object): メッセージに埋め込む値.
 
     """
-    api_error = find_api_error(sys.exc_info()[1])
+    error = sys.exc_info()[1]
+    api_error = find_api_error(error)
     if api_error is None:
+        if isinstance(error, FileNotFoundError) and not _is_trace_enabled():
+            logger.error(message + ": %s", *args, error)
+            logger.debug("エラーの詳細", exc_info=error)
+            return
         logger.exception(message, *args)
         return
 

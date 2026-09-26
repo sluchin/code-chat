@@ -1037,7 +1037,11 @@ def main() -> None:
     except (APIError, ServerError, ClientError):
         log_exception(logger, "Gemini API エラーにより処理を中断しました")
         sys.exit(1)
-    except (FileNotFoundError, ValueError, PermissionError):
+    except FileNotFoundError:
+        # パスの指定ミスなど原因が明らかなため, 概要 1 行だけを出力する (--trace 時を除く).
+        log_exception(logger, "ファイルまたはディレクトリが見つかりません")
+        sys.exit(1)
+    except (ValueError, PermissionError):
         logger.exception("ファイル操作でエラーが発生しました")
         sys.exit(1)
     # 最後の安全網: 想定外の例外も握りつぶさず, ログに記録して終了コード 1 で終了する.
