@@ -7,6 +7,7 @@ from code_chat_cli.gemini_error import (
     _quota_detail,
     _retry_suffix,
     find_api_error,
+    find_cause,
     format_error,
     hint_for_error,
     is_daily_quota_error,
@@ -59,6 +60,24 @@ CACHE_FREE = _error(
     "TotalCachedContentStorageTokensPerModelFreeTier limit exceeded for model gemini-3.8-flash: limit=0",
     ["TotalCachedContentStorageTokensPerModelFreeTier"],
 )
+
+
+class TestFindCause:
+    """`find_cause` のテスト."""
+
+    def test_find_cause_success(self):
+        """指定した種類の例外と, それを原因に持つ例外から, 指定した種類の例外が見つかるか検証."""
+        error = ValueError("x")
+        wrapped = RuntimeError("wrapped")
+        wrapped.__cause__ = error
+
+        assert find_cause(error, ValueError) is error
+        assert find_cause(wrapped, ValueError) is error
+
+    def test_find_cause_other(self):
+        """指定した種類の例外を含まない例外・None では, None が返るか検証."""
+        assert find_cause(RuntimeError("x"), ValueError) is None
+        assert find_cause(None, ValueError) is None
 
 
 class TestFindApiError:

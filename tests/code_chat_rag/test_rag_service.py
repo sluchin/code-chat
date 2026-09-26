@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from code_chat_rag.rag_service import RagService
+from google.genai.errors import APIError
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
@@ -51,6 +52,7 @@ class TestInit:
         mock_dependencies["llm_cls"].assert_called_once_with(
             model="gemini-3.5-flash",
             temperature=0.0,
+            max_retries=1,
         )
 
 
@@ -130,19 +132,47 @@ class TestClear:
 class TestQueryStream:
     """`RagService.query_stream` のテスト."""
 
+    @patch("code_chat_rag.rag_service.stream_with_retry")
     @patch.object(RagService, "_build_chain")
-    def test_query_stream_success(self, mock_build_chain):
-        """ask_stream メソッドがトークンを逐次生成（ジェネレータ化）するか検証する."""
-        mock_chain = MagicMock()
-        mock_chain.stream.return_value = iter(["Hello", " ", "World"])
-        mock_build_chain.return_value = mock_chain
+    def test_query_stream_success(
+        self, mock_build_chain, mock_stream_with_retry, mock_dependencies
+    ):
+        """検索した文脈と質問がチェーンに渡され, トークンが逐次生成されるか検証する."""
+        retriever = mock_dependencies["vs_inst"].as_retriever.return_value
+        retriever.invoke.return_value = [
+            Document(page_content="code1", metadata={"source": "a.py"})
+        ]
+        mock_stream_with_retry.return_value = iter(["Hello", " ", "World"])
 
         service = RagService()
         stream_result = list(service.query_stream("How to run this?", k=3))
 
         assert stream_result == ["Hello", " ", "World"]
-        mock_build_chain.assert_called_once_with(k=3)
-        mock_chain.stream.assert_called_once_with("How to run this?")
+        mock_dependencies["vs_inst"].as_retriever.assert_called_once_with(k=3)
+        mock_stream_with_retry.assert_called_once_with(
+            mock_build_chain.return_value.stream,
+            {
+                "context": "--- File: a.py ---\ncode1",
+                "question": "How to run this?",
+            },
+        )
+
+    def test_query_stream_retry_exception(self, mock_dependencies):
+        """回答の生成が一時的なエラーで失敗しても, リトライされて回答が得られるか検証する."""
+        mock_dependencies["vs_inst"].as_retriever.return_value.invoke.return_value = []
+        calls = []
+
+        def flaky_llm(_prompt):
+            calls.append(1)
+            if len(calls) == 1:
+                raise APIError(503, {"error": {"status": "UNAVAILABLE"}})
+            return AIMessage(content="ok")
+
+        service = RagService()
+        service.llm = RunnableLambda(flaky_llm)
+
+        assert "".join(service.query_stream("q")) == "ok"
+        assert len(calls) == 2
 
 
 class TestGetStatus:
@@ -161,46 +191,12 @@ class TestGetStatus:
 class TestBuildChain:
     """`RagService._build_chain` のテスト."""
 
-    def test_build_chain_execution_success(self, mock_dependencies):
-        """_build_chain で構築された LCEL チェーンの動作と format_docs の実行を検証する."""
-        mock_vs = mock_dependencies["vs_inst"]
-
-        # 検索結果として返される Document リストを設定
-        retrieved_docs = [
-            Document(
-                page_content="def hello():\n    print('Hello')",
-                metadata={"source": "src/hello.py"},
-            ),
-            Document(
-                page_content="def world():\n    print('World')",
-                metadata={"source": "src/world.py"},
-            ),
-        ]
-
-        # Retriever を RunnableLambda にすることで, 後続の format_docs へ確実に Document リストが渡るようにする
-        retriever_calls = []
-
-        def fake_retriever_func(query):
-            retriever_calls.append(query)
-            return retrieved_docs
-
-        fake_retriever = RunnableLambda(fake_retriever_func)
-        mock_vs.as_retriever.return_value = fake_retriever
-
-        # テスト対象の実行
+    @pytest.mark.usefixtures("mock_dependencies")
+    def test_build_chain_execution_success(self):
+        """_build_chain で構築された LCEL チェーンが, 文脈と質問から回答を生成するか検証する."""
         service = RagService()
-        chain = service._build_chain(k=3)
+        chain = service._build_chain()
 
-        query = "どのような関数が定義されていますか？"
-        result = chain.invoke(query)
+        result = chain.invoke({"context": "def hello(): pass", "question": "何ですか?"})
 
-        # 検証
-        expected_answer = "hello関数とworld関数が定義されています。"
-        assert result == expected_answer
-
-        # as_retriever の引数検証
-        mock_vs.as_retriever.assert_called_once_with(k=3)
-
-        # Retriever にクエリが渡ったか検証
-        assert len(retriever_calls) == 1
-        assert retriever_calls[0] == query
+        assert result == "hello関数とworld関数が定義されています。"

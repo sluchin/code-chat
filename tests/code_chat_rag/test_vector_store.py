@@ -4,6 +4,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from code_chat_rag.retry_embeddings import RetryEmbeddings
 from code_chat_rag.vector_store import VectorStore
 from langchain_core.documents import Document
 
@@ -24,7 +25,8 @@ class TestInit:
             embedding_function=mock_embedding,
         )
         assert store.output_dir == "/dummy/path"
-        assert store.embeddings == mock_embedding
+        assert isinstance(store.embeddings, RetryEmbeddings)
+        assert store.embeddings.embeddings == mock_embedding
         assert store._db is None
 
 
@@ -60,7 +62,7 @@ class TestAddChunks:
         assert ids == ["id1", "id2"]
         mock_chroma_cls.assert_called_once_with(
             persist_directory=str(persist_dir),
-            embedding_function=mock_embedding,
+            embedding_function=store.embeddings,
         )
 
         # Document オブジェクトとして正しく変換されて渡されたか確認
@@ -107,6 +109,23 @@ class TestAsRetriever:
             search_type="similarity",
             search_kwargs={"k": 5},
         )
+
+
+class TestCount:
+    """`VectorStore.count` のテスト."""
+
+    @patch("code_chat_rag.vector_store.Chroma")
+    def test_count_success(self, mock_chroma_cls, mock_embedding, tmp_path):
+        """登録されているドキュメントの件数が返るか検証する."""
+        persist_dir = tmp_path / ".chroma_db"
+        persist_dir.mkdir()
+        mock_chroma_cls.return_value._collection.count.return_value = 7
+
+        store = VectorStore(
+            output_dir=str(persist_dir), embedding_function=mock_embedding
+        )
+
+        assert store.count() == 7
 
 
 class TestSearchDebug:

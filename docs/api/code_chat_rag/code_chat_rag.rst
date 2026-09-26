@@ -20,6 +20,14 @@ code\_chat\_rag.rag\_service module
    :show-inheritance:
    :undoc-members:
 
+code\_chat\_rag.retry\_embeddings module
+----------------------------------------
+
+.. automodule:: code_chat_rag.retry_embeddings
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 code\_chat\_rag.vector\_store module
 ------------------------------------
 

@@ -17,10 +17,33 @@ _MAX_CAUSE_DEPTH = 10
 _MAX_MESSAGE_LENGTH = 200
 
 
+def find_cause[E: BaseException](
+    error: BaseException | None, error_type: type[E]
+) -> E | None:
+    """例外 (または, その原因の例外) から, 指定した種類の例外を探します.
+
+    ライブラリが例外を別の例外で包んでいる場合も対象にします.
+
+    Args:
+        error (BaseException | None): 調べる例外. `except` ブロックの外では None.
+        error_type (type[E]): 探す例外の種類.
+
+    Returns:
+        E | None: 見つかった例外. 含まれていない場合は None.
+
+    """
+    # 循環参照に備えて, 辿る深さを制限する
+    for _ in range(_MAX_CAUSE_DEPTH):
+        if error is None:
+            return None
+        if isinstance(error, error_type):
+            return error
+        error = error.__cause__ or error.__context__
+    return None
+
+
 def find_api_error(error: BaseException | None) -> APIError | None:
     """例外 (または, その原因の例外) から, Gemini API のエラーを探します.
-
-    ライブラリが `APIError` を別の例外で包んでいる場合も対象にします.
 
     Args:
         error (BaseException | None): 調べる例外. `except` ブロックの外では None.
@@ -29,14 +52,7 @@ def find_api_error(error: BaseException | None) -> APIError | None:
         APIError | None: 見つかった `APIError`. 含まれていない場合は None.
 
     """
-    # 循環参照に備えて, 辿る深さを制限する
-    for _ in range(_MAX_CAUSE_DEPTH):
-        if error is None:
-            return None
-        if isinstance(error, APIError):
-            return error
-        error = error.__cause__ or error.__context__
-    return None
+    return find_cause(error, APIError)
 
 
 def retry_delay_seconds(error: BaseException) -> float | None:
