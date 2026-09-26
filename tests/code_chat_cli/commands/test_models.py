@@ -6,9 +6,10 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from google.genai.errors import APIError
+
 from code_chat_cli.commands.models import handle_list_models
 from code_chat_cli.logger import set_trace
-from google.genai.errors import APIError
 
 
 class TestHandleListModels:

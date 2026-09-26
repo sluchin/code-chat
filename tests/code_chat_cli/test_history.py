@@ -5,8 +5,9 @@ import re
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import code_chat_cli.chat
 import pytest
+
+import code_chat_cli.chat
 from code_chat_cli.history import (
     save_chat_history,
     save_history_if_needed,

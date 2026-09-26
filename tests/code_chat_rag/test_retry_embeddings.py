@@ -3,8 +3,9 @@
 from unittest.mock import MagicMock
 
 import pytest
-from code_chat_rag.retry_embeddings import RetryEmbeddings
 from google.genai.errors import APIError
+
+from code_chat_rag.retry_embeddings import RetryEmbeddings
 
 
 def _unavailable():

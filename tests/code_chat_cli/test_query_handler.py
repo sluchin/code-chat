@@ -6,9 +6,10 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from google.genai.errors import APIError
+
 from code_chat_cli.query_handler import QueryHandler
 from code_chat_mcp.mcp_tool_info import McpToolInfo
-from google.genai.errors import APIError
 
 
 def _response(text="", function_calls=None, content="CONTENT", candidates=True):

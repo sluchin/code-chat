@@ -4,9 +4,10 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from langchain_core.documents import Document
+
 from code_chat_rag.retry_embeddings import RetryEmbeddings
 from code_chat_rag.vector_store import VectorStore
-from langchain_core.documents import Document
 
 
 @pytest.fixture

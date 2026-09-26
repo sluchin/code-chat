@@ -32,6 +32,14 @@ dev = [
     "pytest-cov>=7.1.0",
 ]
 
+[tool.ruff.lint]
+# import の並び順 (isort) も検査する
+extend-select = ["I"]
+
+[tool.ruff.lint.isort]
+# ワークスペースの 3 パッケージは, どのパッケージから見ても, 自分たちのコード (first-party) として並べる
+known-first-party = ["code_chat_cli", "code_chat_mcp", "code_chat_rag"]
+
 [tool.pytest.ini_options]
 addopts = [
     "--cov=packages/code-chat-cli/src/code_chat_cli",

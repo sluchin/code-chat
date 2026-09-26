@@ -2,10 +2,9 @@
 
 from pathlib import Path  # pylint: disable=unused-import
 
+from code_chat_cli.logger import get_logger, log_exception
 from code_chat_rag.indexer import Indexer
 from code_chat_rag.rag_service import RagService
-
-from code_chat_cli.logger import get_logger, log_exception
 
 logger = get_logger(__name__)
 

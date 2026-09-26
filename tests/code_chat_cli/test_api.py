@@ -5,6 +5,10 @@ from unittest.mock import MagicMock
 
 import httpx
 import pytest
+from google.genai.errors import APIError
+from tenacity import RetryCallState
+from tenacity.wait import wait_base
+
 from code_chat_cli.api import (
     _STREAM_END,
     _is_retryable_error,
@@ -17,9 +21,6 @@ from code_chat_cli.api import (
     stream_with_retry,
 )
 from code_chat_cli.retry_policy import RetryPolicy
-from google.genai.errors import APIError
-from tenacity import RetryCallState
-from tenacity.wait import wait_base
 
 
 def _api_error(code, status="UNAVAILABLE", message="high demand", extra=None):

@@ -7,11 +7,12 @@
 from pathlib import Path
 from typing import Any
 
-from code_chat_cli.logger import get_logger
 from langchain_community.document_loaders import TextLoader
 from langchain_community.document_loaders.generic import GenericLoader
 from langchain_community.document_loaders.parsers import LanguageParser
 from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
+
+from code_chat_cli.logger import get_logger
 
 # プロジェクト共通の定数や拡張子定義
 EXCLUDE_DIRS = {".git", ".venv", ".env", "__pycache__", "node_modules", "build", "dist"}

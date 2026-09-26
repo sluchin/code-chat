@@ -1,6 +1,8 @@
 """`code_chat_cli.gemini_error` モジュールのテスト."""
 
 import pytest
+from google.genai.errors import APIError, ClientError
+
 from code_chat_cli.gemini_error import (
     _first_line,
     _http_code,
@@ -14,7 +16,6 @@ from code_chat_cli.gemini_error import (
     retry_delay_seconds,
     summarize_error,
 )
-from google.genai.errors import APIError, ClientError
 
 
 def _error(code, status, message, violations=None, retry_delay=None):

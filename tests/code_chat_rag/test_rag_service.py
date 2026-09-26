@@ -4,11 +4,12 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from code_chat_rag.rag_service import RagService
 from google.genai.errors import APIError
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
+
+from code_chat_rag.rag_service import RagService
 
 
 @pytest.fixture

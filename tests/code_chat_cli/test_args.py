@@ -4,6 +4,7 @@ import io
 from unittest.mock import patch
 
 import pytest
+
 from code_chat_cli.args import _read_stdin_content, parse_args
 
 

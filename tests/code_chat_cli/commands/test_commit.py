@@ -4,8 +4,9 @@ import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
-from code_chat_cli.commands.commit import handle_commit_generation
 from google.genai.errors import APIError
+
+from code_chat_cli.commands.commit import handle_commit_generation
 
 
 class TestHandleCommitGeneration:

@@ -3,8 +3,9 @@
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
-from code_chat_rag.indexer import Indexer
 from langchain_core.documents import Document
+
+from code_chat_rag.indexer import Indexer
 
 
 class TestInit:

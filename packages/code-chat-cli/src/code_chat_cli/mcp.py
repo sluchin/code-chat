@@ -4,13 +4,12 @@ import asyncio
 from collections import defaultdict
 from pathlib import Path
 
-from code_chat_mcp.mcp_service import McpService
-from code_chat_mcp.mcp_tool_info import McpToolInfo
-
 from code_chat_cli.client import get_gemini_client
 from code_chat_cli.gemini_error import find_api_error
 from code_chat_cli.logger import get_logger, log_exception
 from code_chat_cli.query_handler import QueryHandler
+from code_chat_mcp.mcp_service import McpService
+from code_chat_mcp.mcp_tool_info import McpToolInfo
 
 logger = get_logger(__name__)
 

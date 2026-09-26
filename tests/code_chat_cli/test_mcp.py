@@ -5,9 +5,10 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from google.genai.errors import APIError
+
 from code_chat_cli.mcp import handle_mcp_run, handle_mcp_status, handle_mcp_test
 from code_chat_mcp.mcp_tool_info import McpToolInfo
-from google.genai.errors import APIError
 
 
 def _service_cm(service: MagicMock) -> MagicMock:

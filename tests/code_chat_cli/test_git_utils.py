@@ -5,6 +5,7 @@ from subprocess import CalledProcessError
 from unittest.mock import patch
 
 import pytest
+
 from code_chat_cli.git_utils import get_git_diff
 
 

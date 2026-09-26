@@ -5,8 +5,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from code_chat_cli.commands.review import handle_code_review
 from google.genai.errors import APIError
+
+from code_chat_cli.commands.review import handle_code_review
 
 
 @pytest.fixture

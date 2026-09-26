@@ -10,6 +10,9 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
+from google.auth.exceptions import RefreshError
+from google.oauth2.credentials import Credentials
+
 from code_chat_cli.auth import (
     CLIENT_ID_ENV,
     CLIENT_SECRET_ENV,
@@ -23,8 +26,6 @@ from code_chat_cli.auth import (
     login,
 )
 from code_chat_cli.oauth_error import OAuthError
-from google.auth.exceptions import RefreshError
-from google.oauth2.credentials import Credentials
 
 
 def _utcnow() -> datetime.datetime:
