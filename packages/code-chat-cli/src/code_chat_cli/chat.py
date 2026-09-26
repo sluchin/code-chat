@@ -38,7 +38,6 @@ from code_chat_cli.mcp import handle_mcp_run, handle_mcp_status, handle_mcp_test
 from code_chat_cli.oauth_error import OAuthError
 from code_chat_cli.prompts import Prompts
 from code_chat_cli.rag import (
-    handle_rag,
     handle_rag_create,
     handle_rag_rm,
     handle_rag_status,
@@ -749,7 +748,7 @@ def _handle_subcommands(client: Any, cli_args: Any) -> None:
 
 
 def _handle_rag_subcommand(cli_args: Any) -> None:
-    """RAGサブコマンド（create / update / rm / status / prompt）の振る舞いを分岐・実行します.
+    """RAGサブコマンド（create / update / rm / status）の振る舞いを分岐・実行します.
 
     Args:
         cli_args (Any): コマンドライン引数の名前空間オブジェクト.
@@ -776,21 +775,13 @@ def _handle_rag_subcommand(cli_args: Any) -> None:
             handle_rag_status(input_dirs, output_dir)
             sys.exit(0)
 
-        # アクション未指定かつプロンプトが渡された場合（ワンショット検索）
-        prompt = cli_args.prompt
-        if prompt:
-            prompt_str = " ".join(prompt) if isinstance(prompt, list) else str(prompt)
-            logger.info("RAG 検索クエリを実行します: %s", prompt_str)
-            handle_rag(prompt_str, output_dir)
-            sys.exit(0)
+        logger.error("不明なサブコマンドアクションです: %s", action)
+        sys.exit(1)
 
     # ハンドラの中で送出される langchain / chroma / Embedding API の例外は種類が多く, 特定できないため
     # 広く捕捉し, ログに記録して終了コード 1 で終了する.
     except Exception:  # noqa: BLE001 # pylint: disable=broad-exception-caught
-        action_name = action or "prompt"
-        log_exception(
-            logger, "RAG (%s) コマンドの実行中にエラーが発生しました", action_name
-        )
+        log_exception(logger, "RAG (%s) コマンドの実行中にエラーが発生しました", action)
         sys.exit(1)
 
 

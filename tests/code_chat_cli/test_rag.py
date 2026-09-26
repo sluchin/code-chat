@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from code_chat_cli.rag import (
-    handle_rag,
     handle_rag_create,
     handle_rag_rm,
     handle_rag_status,
@@ -129,27 +128,3 @@ class TestHandleRagStatus:
             input_dirs=["."], output_dir="./.chroma_db"
         )
         mock_print.assert_called_once_with("--- [RAG Index Status] ---\nSTATUS")
-
-
-class TestHandleRag:
-    """`handle_rag` のテスト."""
-
-    @patch("code_chat_cli.rag.RagService")
-    def test_handle_rag_success(self, mock_rag_service_cls):
-        """handle_rag が query_stream の結果をストリーミング出力するか検証する."""
-        mock_service = MagicMock()
-        mock_service.query_stream.return_value = iter(["Hello", ", ", "world!"])
-        mock_rag_service_cls.return_value = mock_service
-
-        with patch("builtins.print") as mock_print:
-            handle_rag("テストの質問", "/path/to/db")
-
-        mock_rag_service_cls.assert_called_once_with(output_dir="/path/to/db")
-        mock_service.query_stream.assert_called_once_with("テストの質問")
-
-        # ストリーミング出力（flush=True）と最後の改行の検証
-        assert mock_print.call_count == 4
-        mock_print.assert_any_call("Hello", end="", flush=True)
-        mock_print.assert_any_call(", ", end="", flush=True)
-        mock_print.assert_any_call("world!", end="", flush=True)
-        mock_print.assert_called_with()  # 引数なしの print() （改行）

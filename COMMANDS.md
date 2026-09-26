@@ -34,7 +34,7 @@ code-chat [PROMPT] [OPTIONS]
 | --- | --- | --- | --- |
 | `PROMPT` | 位置引数 (文字列) | なし | 実行するプロンプト。省略時は対話モード (REPL) を起動 (複数語はスペースで結合) |
 | `--rag` | フラグ | `False` | RAG (ChromaDB Vector Store) 検索によるコンテキスト注入を有効化。`--mcp` と併用すると、検索したコンテキストを MCP に渡すプロンプトに付加する。RAG の検索には API キー (`GEMINI_API_KEY`) が必要 (`--oauth` 指定時も) |
-| `--mcp` | フラグ | `False` | MCP サーバーとの連携 (Function Calling によるツール実行) を有効化。`--rag` と併用可 |
+| `--mcp` | フラグ | `False` | MCP サーバーとの連携 (Function Calling によるツール実行) を有効化。`--rag` と併用可。ワンショット実行 (プロンプトを指定) で失敗した場合は、終了コード 1 で終了する |
 | `--max-tool-rounds` | 整数 | `20` | `--mcp` 指定時に、Gemini のツール呼び出しを繰り返す回数の上限 (1 以上)。上限を超えると、エラー終了する。モデルがツールを呼び続けて、終わらなくなることを防ぐ |
 | `-c, --cache` | フラグ / 文字列 | `False` | Context Caching を利用。`-c` で最新のキャッシュを自動選択、`--cache=<CACHE_ID>` で特定のキャッシュを指定 (`-c <ID>` のようにスペース区切りにすると、直後の語はプロンプトとして扱われる)。キャッシュのモデルで実行され、システム指示はキャッシュに含まれたものが使われる。`-w` / `--oauth` とは併用できない (エラー終了)。`--mcp` とは引数のエラーにしない。キャッシュを使うリクエストでは、ツール定義を別に指定できないため、Gemini API が 400 (`CachedContent can not be used with GenerateContent request setting system_instruction, tools or tool_config`) を返す想定 (実機では未確認) |
 | `-f, --file <PATH>` | 文字列 (複数指定可) | なし | 追加コンテキストとしてロードする (または `-w` の書き込み対象とする) ファイル・ディレクトリパス。`-f a.py -f b.py` のように繰り返して指定。ファイル内容をそのまま送信する用途のため、`--rag` / `--mcp` とは併用できない (指定するとエラー終了) |
@@ -43,7 +43,7 @@ code-chat [PROMPT] [OPTIONS]
 | `-w, --write` | フラグ | `False` | 生成・修正結果を対象ファイル (`-f`) に書き込み・適用 (実行前に確認あり) |
 | `-a, --auto-save` | フラグ | `False` | 終了時に対話ログを `<日時>_chat.md` として自動保存 |
 | `-g, --generate-commit-msg` | フラグ | `False` | Git 差分 (ステージ済みを優先、なければ作業ツリー) からコミットメッセージを生成 |
-| `-r, --review` | フラグ | `False` | `-f` 指定ファイル、または Git 差分のコードレビューを実行。Gemini API の一時的なエラー (503 など) はリトライし、失敗した場合は終了コード 1 で終了する |
+| `-r, --review` | フラグ | `False` | `-f` 指定ファイル、または Git 差分のコードレビューを実行。Gemini API の一時的なエラー (503 など) はリトライする。Gemini API のエラーや、`git diff` の実行の失敗 (Git リポジトリ外など) は、終了コード 1 で終了する (差分がない場合は、メッセージを表示して終了コード 0) |
 | `--staged` | フラグ | `False` | `--review` 時に、ステージ済み (`--cached`) の差分を対象にする |
 | `-l, --list-models` | フラグ | `False` | 利用可能な LLM モデルの一覧を表示 |
 | `--login` | フラグ | `False` | ブラウザで Google アカウントに OAuth ログインし、トークンを `~/.config/code-chat/oauth_token.json` に保存して終了。事前に環境変数 `GEMINI_OAUTH_CLIENT_ID` / `GEMINI_OAUTH_CLIENT_SECRET` の設定が必要 |
@@ -51,9 +51,9 @@ code-chat [PROMPT] [OPTIONS]
 | `-D, --debug` | フラグ | `False` | デバッグログを出力 (`--log-level DEBUG` と同等) |
 | `--log-level` | 文字列 | `INFO` | ログレベル (`DEBUG` / `INFO` / `WARNING` / `ERROR` / `CRITICAL`) |
 | `--trace` | フラグ | `False` | SDK や HTTP クライアント等のライブラリ内部通信ログを出力。あわせて、Gemini API のエラー時にもトレースバックを出力する (指定しない場合、Gemini API のエラーは、エラー内容だけを出力する。それ以外の例外は、トレースバック付き。ただし、ファイルやディレクトリが見つからないエラーは、概要の 1 行のみ) |
-| `--dry-run` | フラグ | `False` | API 呼び出しを行わず、読み込まれるファイル群や指定引数の確認のみ実行 |
+| `--dry-run` | フラグ | `False` | API 呼び出しを行わず、読み込まれるファイル群や指定引数の確認のみ実行。`rag create` / `rag update` では、インデックス対象ファイルの一覧も表示する |
 
-標準入力 (パイプ) にテキストがある場合は、`-f` の内容とあわせてコンテキストとして読み込まれます。
+標準入力 (パイプ) にテキストがある場合は、`-f` の内容とあわせてコンテキストとして読み込まれます。コンテキストを使わないコマンド (サブコマンド、`--list-models`、`--login`、`--generate-commit-msg`、`--review`) では、標準入力を読み込みません (入力の終了を待って固まることはありません)。
 
 ### 実行例
 
@@ -139,7 +139,7 @@ code-chat rag create
 # 複数ディレクトリを指定して作成
 code-chat rag create --input_dirs ./packages ./tests --output_dir ./.chroma_db
 
-# 特定ディレクトリの内容を追加
+# 特定ディレクトリの内容を反映 (読み込んだファイルの既存のチャンクは置き換え)
 code-chat rag update --input_dirs ./packages
 
 # DB ステータスの確認
@@ -196,7 +196,7 @@ Model Context Protocol (MCP) サーバーのステータス確認と動作テス
 | コマンド | 引数 | 説明 |
 | --- | --- | --- |
 | `code-chat mcp status` | なし | 有効な MCP サーバーごとに、利用可能なツール一覧を表示 |
-| `code-chat mcp test` | `[SERVER_NAME]` | MCP サーバーへの接続とツール一覧取得を試行 (現状は `SERVER_NAME` を指定しても、有効な全サーバーが対象) |
+| `code-chat mcp test` | `[SERVER_NAME]` | MCP サーバーへの接続とツール一覧取得を試行。サーバーごとに、成功は `[OK]`、失敗は `[NG]` と表示し、最後に成功数を表示する (現状は `SERVER_NAME` を指定しても、有効な全サーバーが対象) |
 
 #### 実行例
 

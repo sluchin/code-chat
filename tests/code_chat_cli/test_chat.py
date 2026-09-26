@@ -892,24 +892,6 @@ class TestHandleSubcommands:
         mock_handle.assert_called_once_with(["/path/to/repo"], "/path/to/db")
         assert exc_info.value.code == 0
 
-    def test_handle_subcommands_rag_prompt_success(self) -> None:
-        """rag のアクション未指定でプロンプトがある場合, handle_rag が呼ばれ sys.exit(0) されること."""
-        # アクションなし + プロンプトを指定 (ワンショット検索)
-        cli_args = _cli_args(
-            subcommand="rag", prompt="how to use this?", output_dir="/path/to/db"
-        )
-
-        # RAG 検索のハンドラをモック化
-        with (
-            patch("code_chat_cli.chat.handle_rag") as mock_handle,
-            pytest.raises(SystemExit) as exc_info,
-        ):
-            _handle_subcommands(MagicMock(), cli_args)
-
-        # プロンプトが検索に渡され, 正常終了すること
-        mock_handle.assert_called_once_with("how to use this?", "/path/to/db")
-        assert exc_info.value.code == 0
-
     def test_handle_subcommands_dispatch_success(self):
         """rag / mcp / cache サブコマンドが振り分けられるか検証."""
         # rag は RAG サブコマンドの処理へ振り分けられる
@@ -997,25 +979,6 @@ class TestHandleSubcommands:
         # 例外時は終了コード 1 で終了すること
         assert exc_info.value.code == 1
 
-    def test_handle_subcommands_rag_prompt_failure(self) -> None:
-        """rag のプロンプト検索で例外が発生した場合, sys.exit(1) されること."""
-        cli_args = _cli_args(
-            subcommand="rag", prompt="how to use this?", output_dir="/path/to/db"
-        )
-
-        # 検索ハンドラが例外を送出する設定
-        with (
-            patch(
-                "code_chat_cli.chat.handle_rag",
-                side_effect=RuntimeError("Ask failure"),
-            ),
-            pytest.raises(SystemExit) as exc_info,
-        ):
-            _handle_subcommands(MagicMock(), cli_args)
-
-        # 例外時は終了コード 1 で終了すること
-        assert exc_info.value.code == 1
-
     def test_handle_subcommands_review_failure(self):
         """--review の実行中に例外が発生した場合, 終了コード 1 で終了するか検証."""
         # レビュー処理で例外を発生させる
@@ -1075,26 +1038,13 @@ class TestHandleRagSubcommand:
         mock_handler.assert_called_once_with(*expected_args)
         assert exc_info.value.code == 0
 
-    def test_handle_rag_subcommand_prompt_list_success(self):
-        """プロンプトがリストの場合は結合されて検索されるか検証."""
-        args = _cli_args(subcommand="rag")
-        # プロンプトが単語のリストで渡された場合を再現
-        args.prompt = ["how", "to"]
+    def test_handle_rag_subcommand_unknown_action_failure(self, caplog):
+        """アクションの指定がない (または不明な) 場合は, エラーを記録し, 終了コード 1 で終了するか検証."""
+        with pytest.raises(SystemExit) as exc_info:
+            _handle_rag_subcommand(_cli_args(subcommand="rag"))
 
-        with (
-            patch("code_chat_cli.chat.handle_rag") as handler,
-            pytest.raises(SystemExit) as exc_info,
-        ):
-            _handle_rag_subcommand(args)
-
-        # 空白区切りで結合した文字列で検索されること
-        handler.assert_called_once_with("how to", "./.chroma_db")
-        assert exc_info.value.code == 0
-
-    def test_handle_rag_subcommand_no_action_no_prompt(self):
-        """アクションもプロンプトも無い場合は何もせずに戻るか検証."""
-        # アクションもプロンプトも無い場合は, sys.exit せず例外なく戻ること
-        _handle_rag_subcommand(_cli_args(subcommand="rag", prompt=""))
+        assert exc_info.value.code == 1
+        assert "不明なサブコマンドアクションです" in caplog.text
 
 
 class TestHandleMcpSubcommand:
