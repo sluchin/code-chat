@@ -240,9 +240,6 @@ def _sanitize_code_output(raw_output: str) -> str:
                         "from ",
                         "def ",
                         "class ",
-                        "p",
-                        "u",
-                        "v",
                     )
                 )
                 or not stripped
@@ -291,6 +288,7 @@ def _cleanup_old_backups(path: Path, max_keep: int) -> None:
             try:
                 old_bak.unlink()
                 logger.debug("古いバックアップを削除しました: %s", old_bak)
+            # 削除に失敗しても, 次回のバックアップ作成時に再び整理されるため, 無視する
             except OSError:
                 pass
 
@@ -308,6 +306,7 @@ def _extract_file_changes(
         dict[str, str]: ファイルパスをキー, 抽出されたコードブロックを値とする辞書.
 
     """
+    # 相対パスと絶対パスの表記の違いを吸収するため, 絶対パスで照合する
     valid_str_paths = {str(p.resolve()): str(p) for p in valid_targets}
     changes: dict[str, str] = {}
 
