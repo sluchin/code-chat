@@ -1,11 +1,28 @@
 """`code_chat_rag.indexer` モジュールのテスト."""
 
+import subprocess
+import sys
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 from langchain_core.documents import Document
 
 from code_chat_rag.indexer import Indexer
+
+
+class TestIndexer:
+    """`Indexer` のテスト."""
+
+    def test_indexer_import_without_cli_success(self):
+        """code_chat_cli を先に import しなくても, code_chat_rag を単独で import できるか検証する (循環 import の回帰テスト)."""
+        result = subprocess.run(
+            [sys.executable, "-c", "import code_chat_rag.indexer"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert result.returncode == 0, result.stderr
 
 
 class TestInit:
@@ -191,6 +208,16 @@ class TestGetTargetFiles:
         assert indexer.get_target_files() == [
             str(repo / "a.py"),
             str(repo / "sub" / "c.TS"),
+        ]
+
+    def test_get_target_files_ignores_hidden_and_excluded_parents(self, tmp_path):
+        """走査対象のパス自体が, 隠しディレクトリや除外ディレクトリ配下にあっても, 対象にするか検証する."""
+        repo = tmp_path / ".work" / "build" / "repo"
+        repo.mkdir(parents=True)
+        (repo / "a.py").write_text("a", encoding="utf-8")
+
+        assert Indexer(input_dirs=[str(repo)]).get_target_files() == [
+            str(repo / "a.py")
         ]
 
     def test_get_target_files_without_input_dirs(self):

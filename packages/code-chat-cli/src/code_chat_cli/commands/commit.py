@@ -54,7 +54,9 @@ def handle_commit_generation(client: Any, model_name: str, lang: str = "en") -> 
         )
 
         for chunk in response_stream:
-            print(chunk.text, end="", flush=True)
+            # 使用状況だけを含む最後のチャンクなど, テキストが空のものは出力しない
+            if chunk.text:
+                print(chunk.text, end="", flush=True)
         print()
 
     except subprocess.CalledProcessError as e:

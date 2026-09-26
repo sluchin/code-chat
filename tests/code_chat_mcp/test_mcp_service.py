@@ -180,6 +180,7 @@ class TestTestConnection:
         assert "t1: No description" in out
         assert "t2: described" in out
         assert "[off] ... [SKIP] (Disabled)" in out
+        assert "[NG] Failed to connect." in out
         assert "1/3 サーバーが正常に応答しました" in out
         assert "接続テスト失敗" in caplog.text
 

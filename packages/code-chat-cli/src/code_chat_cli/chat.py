@@ -23,6 +23,7 @@ from code_chat_cli.args import parse_args
 from code_chat_cli.auth import login
 from code_chat_cli.cache_error import CacheError
 from code_chat_cli.client import get_gemini_client
+from code_chat_cli.client_config_error import ClientConfigError
 from code_chat_cli.commands.commit import handle_commit_generation
 from code_chat_cli.commands.models import handle_list_models
 from code_chat_cli.commands.review import handle_code_review
@@ -1056,6 +1057,9 @@ def main() -> None:
         sys.exit(0)
     except (APIError, ServerError, ClientError):
         log_exception(logger, "Gemini API エラーにより処理を中断しました")
+        sys.exit(1)
+    # 認証情報の不足は, 対処の案内を get_gemini_client が出力済みのため, ここでは何も出力しない.
+    except ClientConfigError:
         sys.exit(1)
     except FileNotFoundError:
         # パスの指定ミスなど原因が明らかなため, 概要 1 行だけを出力する (--trace 時を除く).

@@ -39,6 +39,7 @@ from code_chat_cli.chat import (
     main,
 )
 from code_chat_cli.cli_args import CliArgs
+from code_chat_cli.client_config_error import ClientConfigError
 from code_chat_cli.oauth_error import OAuthError
 
 
@@ -1742,6 +1743,20 @@ class TestMain:
         assert "API キーが無効です" in messages[0]
         assert "ヒント: " in messages[0]
         assert caplog.records[-1].exc_info is None
+
+    def test_main_client_config_error_failure(self, monkeypatch, mock_args, caplog):
+        """認証情報の不足 (ClientConfigError) は, 追加のエラーを出力せずに sys.exit(1) で終了するか検証."""
+        mock_args.side_effect = ClientConfigError("GEMINI_API_KEY is missing")
+        monkeypatch.setattr("sys.argv", ["chat.py"])
+
+        with (
+            patch("code_chat_cli.chat._setup_cli_logging"),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            main()
+
+        assert exc_info.value.code == 1
+        assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
 
     def test_main_file_not_found_summary_failure(self, monkeypatch, mock_args, caplog):
         """FileNotFoundError は, トレースバックなしの概要 1 行を出力し, sys.exit(1) で終了するか検証."""

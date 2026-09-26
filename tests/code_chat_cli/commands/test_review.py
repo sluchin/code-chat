@@ -199,6 +199,21 @@ class TestHandleCodeReview:
         assert exc_info.value.code == 1
         assert "読み込みに失敗しました" in caplog.text
 
+    def test_handle_code_review_skips_empty_text_chunk(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """テキストが空 (None) のチャンクは, "None" と出力されずに読み飛ばされることを検証する."""
+        mock_client = MagicMock()
+        mock_client.chats.create.return_value.send_message_stream.return_value = [
+            MagicMock(text="OK"),
+            MagicMock(text=None),
+        ]
+
+        with patch("code_chat_cli.commands.review._get_git_diff", return_value="diff"):
+            handle_code_review(mock_client, "gemini-flash-latest")
+
+        assert "None" not in capsys.readouterr().out
+
     @patch("subprocess.run")
     def test_handle_code_review_git_diff_error_failure(
         self,
@@ -211,8 +226,10 @@ class TestHandleCodeReview:
             returncode=128, stderr="fatal: not a git repository"
         )
 
-        handle_code_review(mock_client, "gemini-flash-latest")
+        with pytest.raises(SystemExit) as exc_info:
+            handle_code_review(mock_client, "gemini-flash-latest")
 
+        assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "エラー: git diff の実行に失敗しました:" in captured.err
         assert "fatal: not a git repository" in captured.err
@@ -262,19 +279,21 @@ class TestHandleCodeReview:
         assert "一部の応答" in capsys.readouterr().out
 
     @patch("subprocess.run", side_effect=FileNotFoundError)
-    def test_handle_code_review_git_not_found_exception(
+    def test_handle_code_review_git_not_found_failure(
         self,
         mock_client: MagicMock,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """git コマンドが存在しない環境で例外がキャッチされ標準エラー出力にエラーが表示されることを検証する.
+        """git コマンドが存在しない環境で, 標準エラー出力にエラーが表示され, 終了コード 1 で終了することを検証する.
 
         Args:
             mock_client (MagicMock): Gemini API クライアントのモック.
             capsys (pytest.CaptureFixture[str]): 標準出力・標準エラー出力をキャプチャするフィクスチャ.
         """
-        handle_code_review(mock_client, "gemini-flash-latest")
+        with pytest.raises(SystemExit) as exc_info:
+            handle_code_review(mock_client, "gemini-flash-latest")
 
+        assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "エラー: git コマンドが見つかりません." in captured.err
         mock_client.chats.create.return_value.send_message_stream.assert_not_called()

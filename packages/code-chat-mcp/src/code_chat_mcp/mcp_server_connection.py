@@ -93,19 +93,16 @@ class McpServerConnection:
         """MCP サーバーから公開されているツールの生データ (mcp.Tool オブジェクトのリスト) を取得します.
 
         Returns:
-            list[Tool]: 取得したツールのリスト. 取得失敗時は空リストを返します.
+            list[Tool]: 取得したツールのリスト.
+
+        Raises:
+            Exception: サーバーの起動・通信に失敗した場合 (`connect` がログに記録して再送出したもの).
 
         """
-        try:
-            async with self.connect() as session:
-                response = await session.list_tools()
-                logger.info("%d 個の MCP ツールを取得しました", len(response.tools))
-                return response.tools
-        # MCP サーバー (外部プロセス) 由来の例外は, MCP SDK・anyio (ExceptionGroup)・OSError など多岐にわたる.
-        # 広く捕捉し, 取得できない場合は空リストを返す.
-        except Exception:  # noqa: BLE001  # fmt: skip # pylint: disable=broad-exception-caught
-            # トレースバックを抑止
-            return []
+        async with self.connect() as session:
+            response = await session.list_tools()
+            logger.info("%d 個の MCP ツールを取得しました", len(response.tools))
+            return response.tools
 
     async def call_tool(
         self, tool_name: str, arguments: dict[str, Any] | None = None
