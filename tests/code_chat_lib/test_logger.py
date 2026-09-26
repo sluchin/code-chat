@@ -94,14 +94,23 @@ class TestSyslogContextFilter:
 class TestSetupLogging:
     """`setup_logging` のテスト."""
 
-    def test_setup_logging_app_logger_level_success(self):
-        """setup_logging が app_logger と handler のレベルを正しく更新するか検証."""
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "code_chat_cli.chat",
+            "code_chat_lib.api",
+            "code_chat_mcp.mcp_service",
+            "code_chat_rag.indexer",
+        ],
+    )
+    def test_setup_logging_root_level_applies_to_all_packages_success(self, name):
+        """setup_logging が, ルートロガーと handler のレベルを更新し, 全パッケージのロガーがそれを継承するか検証."""
         setup_logging("DEBUG")
 
-        app_logger = logging.getLogger("code_chat_cli")
         root_logger = logging.getLogger()
 
-        assert app_logger.level == logging.DEBUG
+        assert root_logger.level == logging.DEBUG
+        assert logging.getLogger(name).getEffectiveLevel() == logging.DEBUG
         assert len(root_logger.handlers) > 0
         assert root_logger.handlers[0].level == logging.DEBUG
 

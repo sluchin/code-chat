@@ -69,10 +69,6 @@ def setup_logging(level_name: str = "INFO", trace: bool = False) -> None:
 
     root_logger.addHandler(handler)
 
-    # アプリケーション固有のロガー（code_chat_cli）のレベルも明示的に変更する
-    app_logger = logging.getLogger("code_chat_cli")
-    app_logger.setLevel(numeric_level)
-
     set_trace(trace)
 
 
@@ -156,5 +152,4 @@ def get_logger(name: str) -> logging.Logger:
 def suppress_info_logs() -> None:
     """コミットメッセージ生成時など, 標準出力のノイズを減らすため INFO ログを抑制します."""
     logging.getLogger().setLevel(logging.WARNING)
-    logging.getLogger("code_chat_cli").setLevel(logging.WARNING)
     logging.getLogger("google_genai").setLevel(logging.WARNING)
