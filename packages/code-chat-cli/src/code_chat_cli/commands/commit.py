@@ -11,17 +11,16 @@ from code_chat_cli.prompts import Prompts
 logger = get_logger(__name__)
 
 
-def handle_commit_generation(client: Any, model_name: str, lang: str = "en") -> None:
+def handle_commit_generation(client: Any, model_name: str) -> None:
     """Git の diff（差分）を取得し, Gemini API を用いてコミットメッセージを自動生成します.
 
     ステージング済み差分 (`git diff --staged`) および未ステージング差分 (`git diff`) を
-    読み取り, 変更内容が存在する場合に指定された言語で Conventional Commits 形式に沿った
-    適切なコミットメッセージを生成して標準出力に表示します.
+    読み取り, 変更内容が存在する場合に Conventional Commits 形式に沿った
+    英語のコミットメッセージを生成して標準出力に表示します.
 
     Args:
         client (Any): Gemini API クライアントインスタンス.
         model_name (str): 使用する Gemini モデル名.
-        lang (str, optional): コミットメッセージの出力言語（例: "ja", "en"）. デフォルトは "en".
 
     Raises:
         subprocess.CalledProcessError: Git コマンドの実行に失敗した場合.
@@ -40,13 +39,7 @@ def handle_commit_generation(client: Any, model_name: str, lang: str = "en") -> 
             )
             return
 
-        # 言語に応じたテンプレートの選択（標準を日本語に設定）
-        template = (
-            Prompts.COMMIT_PROMPT_TEMPLATE_JA
-            if lang == "ja"
-            else Prompts.COMMIT_PROMPT_TEMPLATE_EN
-        )
-        prompt = template.format(diff=diff_text)
+        prompt = Prompts.COMMIT_PROMPT_TEMPLATE.format(diff=diff_text)
 
         # 失敗した場合の APIError は, 呼び出し元 (chat) が概要とヒントを 1 回だけ出力する
         response_stream = send_message_stream_with_retry(
