@@ -17,6 +17,9 @@ logger = get_logger(__name__)
 # 実際の送信時に auth.build_httpx_clients がこのキーのヘッダーを外し, Bearer トークンを付与する.
 _OAUTH_PLACEHOLDER_API_KEY = "oauth-placeholder"
 
+# リトライは code_chat_cli.api.call_with_retry に一元化している (retryDelay の優先, 1 日あたりの上限の除外,
+# 日本語の警告のため). 二重にリトライしないよう, SDK の retry_options は設定しない.
+
 
 def get_gemini_client(use_oauth: bool = False) -> genai.Client:
     """認証情報から Gemini クライアントを作成する.

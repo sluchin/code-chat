@@ -1,263 +1,294 @@
 """Gemini API 通信およびリトライ処理モジュールの単体テスト."""
 
-from unittest.mock import MagicMock, patch
+import logging
+from unittest.mock import MagicMock
 
+import httpx
 import pytest
 from code_chat_cli.api import (
+    _STREAM_END,
     _is_retryable_error,
+    _log_retry,
+    _open_stream,
+    _wait_seconds,
+    call_with_retry,
     send_message_stream_with_retry,
     send_message_with_retry,
 )
+from code_chat_cli.retry_policy import RetryPolicy
 from google.genai.errors import APIError
+from tenacity import RetryCallState
+from tenacity.wait import wait_base
+
+
+def _api_error(code, status="UNAVAILABLE", message="high demand", extra=None):
+    """Gemini API の実際のレスポンス形式に近い APIError を作成する."""
+    body = {"error": {"code": code, "status": status, "message": message}}
+    if extra:
+        body["error"]["details"] = extra
+    return APIError(code, body)
+
+
+def _retry_state(error=None, sleep=None):
+    """tenacity のリトライの状態 (例外と, 次の待機時間) を模した RetryCallState を作成する."""
+    state = RetryCallState(retry_object=MagicMock(), fn=None, args=(), kwargs={})
+    if error is not None:
+        state.set_exception((type(error), error, None))
+    if sleep is not None:
+        state.next_action = MagicMock(sleep=sleep)
+    return state
+
+
+class TestCallWithRetry:
+    """`call_with_retry` のテスト."""
+
+    def test_call_with_retry_success(self, no_retry_sleep):
+        """1 回目で成功した場合は, 待たずに戻り値を返し, 引数がそのまま渡されるか検証."""
+        func = MagicMock(return_value="ok")
+
+        result = call_with_retry(func, "a", key="b")
+
+        assert result == "ok"
+        func.assert_called_once_with("a", key="b")
+        no_retry_sleep.assert_not_called()
+
+    def test_call_with_retry_exceeds_max_attempts_failure(self, no_retry_sleep):
+        """一時的なエラーが続いた場合は, 最大試行回数で諦め, 最後のエラーを送出するか検証."""
+        func = MagicMock(side_effect=_api_error(503))
+
+        with pytest.raises(APIError):
+            call_with_retry(func)
+
+        assert func.call_count == RetryPolicy.MAX_ATTEMPTS
+        assert no_retry_sleep.call_count == RetryPolicy.MAX_ATTEMPTS - 1
+
+    def test_call_with_retry_non_retryable_failure(self, no_retry_sleep):
+        """リトライ対象外のエラー (400 など) は, 待たずに即座に送出されるか検証."""
+        func = MagicMock(side_effect=_api_error(400, "INVALID_ARGUMENT", "bad"))
+
+        with pytest.raises(APIError):
+            call_with_retry(func)
+
+        func.assert_called_once()
+        no_retry_sleep.assert_not_called()
+
+    def test_call_with_retry_daily_quota_failure(self, no_retry_sleep):
+        """1 日あたりの上限 (RPD) は, 待っても回復しないため, リトライせずに送出されるか検証."""
+        error = _api_error(
+            429,
+            "RESOURCE_EXHAUSTED",
+            "quota",
+            [{"violations": [{"quotaId": "GenerateRequestsPerDayPerProjectPerModel"}]}],
+        )
+        func = MagicMock(side_effect=error)
+
+        with pytest.raises(APIError):
+            call_with_retry(func)
+
+        func.assert_called_once()
+        no_retry_sleep.assert_not_called()
+
+    def test_call_with_retry_retry_exception(self, no_retry_sleep):
+        """一時的なエラー (503) の場合は, 指数バックオフで待ってリトライし, 成功すれば結果を返すか検証."""
+        func = MagicMock(side_effect=[_api_error(503), _api_error(503), "ok"])
+
+        result = call_with_retry(func)
+
+        assert result == "ok"
+        assert func.call_count == 3
+        waits = [c.args[0] for c in no_retry_sleep.call_args_list]
+        # 1 回目は 1 秒, 2 回目は 2 秒を基準に, ジッター (最大 1 秒) が加わる
+        assert 1.0 <= waits[0] < 1.0 + RetryPolicy.JITTER
+        assert 2.0 <= waits[1] < 2.0 + RetryPolicy.JITTER
+
+    def test_call_with_retry_uses_api_retry_delay_exception(self, no_retry_sleep):
+        """API が推奨待機時間 (retryDelay) を返した場合は, それに余裕を加えた秒数だけ待つか検証."""
+        error = _api_error(
+            429,
+            "RESOURCE_EXHAUSTED",
+            "quota",
+            [{"retryDelay": "30s"}],
+        )
+        func = MagicMock(side_effect=[error, "ok"])
+
+        assert call_with_retry(func) == "ok"
+
+        no_retry_sleep.assert_called_once_with(30.0 + RetryPolicy.RETRY_DELAY_MARGIN)
+
+    def test_call_with_retry_transport_error_exception(self, no_retry_sleep):
+        """ネットワークの一時的なエラー (接続失敗) も, リトライされるか検証."""
+        func = MagicMock(side_effect=[httpx.ConnectError("refused"), "ok"])
+
+        assert call_with_retry(func) == "ok"
+
+        assert func.call_count == 2
+        no_retry_sleep.assert_called_once()
+
+    def test_call_with_retry_logs_warning_exception(self, caplog):
+        """待機に入る前に, 原因と回数が警告として出力されるか検証 (無言で待たない)."""
+        func = MagicMock(side_effect=[_api_error(503), "ok"])
+
+        call_with_retry(func)
+
+        assert "一時的なエラーが発生しました (1/5)" in caplog.text
+        assert "[HTTP 503 UNAVAILABLE]" in caplog.text
+        assert "秒後に再試行します" in caplog.text
 
 
 class TestSendMessageWithRetry:
     """`send_message_with_retry` のテスト."""
 
-    def test_send_message_with_retry_first_try_success(self):
-        """正常系: 1回目の試行で正常にレスポンスが返るケースを検証."""
-        mock_chat = MagicMock()
-        mock_response = MagicMock(text="Hello")
-        mock_chat.send_message.return_value = mock_response
+    def test_send_message_with_retry_success(self):
+        """プロンプトが送信され, レスポンスが返るか検証."""
+        chat = MagicMock()
 
-        res = send_message_with_retry(mock_chat, "hi")
+        result = send_message_with_retry(chat, "hi")
 
-        assert res == mock_response
-        mock_chat.send_message.assert_called_once_with("hi")
+        assert result is chat.send_message.return_value
+        chat.send_message.assert_called_once_with("hi")
 
-    @patch("code_chat_cli.chat.time.sleep")
-    def test_send_message_with_retry_exceeds_max_retries_failure(self, mock_sleep):
-        """異常系 (上限超過): リトライ回数上限を超えて失敗した場合に例外が投げられるか検証."""
-        mock_chat = MagicMock()
-        mock_chat.send_message.side_effect = APIError("503 Service Unavailable", {})
+    def test_send_message_with_retry_retry_exception(self):
+        """一時的なエラーの場合は, リトライされて成功するか検証."""
+        chat = MagicMock()
+        chat.send_message.side_effect = [_api_error(503), "response"]
 
-        with pytest.raises(APIError):
-            send_message_with_retry(mock_chat, "hi", max_retries=3, initial_delay=1.0)
+        assert send_message_with_retry(chat, "hi") == "response"
 
-        assert mock_chat.send_message.call_count == 3
-        assert mock_sleep.call_count == 2
-
-    def test_send_message_with_retry_non_retryable_error_failure(self):
-        """異常系 (リトライ対象外): 400 Bad Request 等のリトライ不可エラーは即座に raise されるか検証."""
-        mock_chat = MagicMock()
-        mock_chat.send_message.side_effect = APIError("400 INVALID_ARGUMENT", {})
-
-        with pytest.raises(APIError):
-            send_message_with_retry(mock_chat, "hi", max_retries=3)
-
-        # 1回目の実行で即座に中断されること
-        assert mock_chat.send_message.call_count == 1
-
-    @patch("code_chat_cli.chat.time.sleep")
-    def test_send_message_with_retry_uses_api_retry_delay_exception(self, mock_sleep):
-        """異常系 (retryDelay 優先): エラーレスポンスに含まれる retryDelay 秒数が sleep に適用されるか検証."""
-        mock_chat = MagicMock()
-        mock_response = MagicMock(text="Success")
-
-        # APIError クラスのインスタンスとして作成し, __str__ を明示的に設定
-        err_with_delay = APIError("429 RESOURCE_EXHAUSTED retryDelay: '30s'", {})
-        err_with_delay.__str__ = lambda: "429 RESOURCE_EXHAUSTED retryDelay: '30s'"
-
-        mock_chat.send_message.side_effect = [err_with_delay, mock_response]
-
-        res = send_message_with_retry(mock_chat, "hi", max_retries=3)
-
-        assert res == mock_response
-        # api_retry_delay + 1.0 秒（30.0 + 1.0 = 31.0）待機されることを検証
-        mock_sleep.assert_called_once_with(31.0)
-
-    @patch("code_chat_cli.chat.time.sleep")
-    def test_send_message_with_retry_retry_exception(self, mock_sleep):
-        """異常系からの回復: 503 エラーが発生した後に2回目で成功するケースを検証."""
-        mock_chat = MagicMock()
-        mock_response = MagicMock(text="Hello after retry")
-
-        # 1回目は 503 エラー, 2回目は成功
-        mock_chat.send_message.side_effect = [
-            APIError("503 Service Unavailable", {}),
-            mock_response,
-        ]
-
-        res = send_message_with_retry(mock_chat, "hi", max_retries=3, initial_delay=1.0)
-
-        assert res == mock_response
-        assert mock_chat.send_message.call_count == 2
-        mock_sleep.assert_called_once()
+        assert chat.send_message.call_count == 2
 
 
 class TestSendMessageStreamWithRetry:
     """`send_message_stream_with_retry` のテスト."""
 
     def test_send_message_stream_with_retry_success(self):
-        """正常系: 1回目の試行で正常にストリームが返却されるか検証."""
-        mock_chat = MagicMock()
-        mock_chat.send_message_stream.return_value = iter(["chunk1", "chunk2"])
+        """すべてのチャンクが, 順に返されるか検証."""
+        chat = MagicMock()
+        chat.send_message_stream.return_value = iter(["chunk1", "chunk2", "chunk3"])
 
-        result = send_message_stream_with_retry(mock_chat, "hello")
-
-        assert list(result) == ["chunk1", "chunk2"]
-        assert mock_chat.send_message_stream.call_count == 1
-
-    def test_send_message_stream_with_retry_exceeds_max_retries_failure(
-        self, monkeypatch
-    ):
-        """異常系: リトライ上限（max_retries）を超えて APIError が送出されるか検証."""
-        mock_chat = MagicMock()
-        error_429 = APIError("429 Too Many Requests", {})
-        error_429.code = 429
-        mock_chat.send_message_stream.side_effect = error_429
-
-        sleep_calls = []
-        monkeypatch.setattr("time.sleep", sleep_calls.append)
-
-        with pytest.raises(APIError) as exc_info:
-            list(
-                send_message_stream_with_retry(
-                    mock_chat, "hello", max_retries=3, initial_delay=1.0
-                )
-            )
-
-        assert getattr(exc_info.value, "code", None) == 429
-        assert mock_chat.send_message_stream.call_count == 3
-        # 指数バックオフ（1.0s, 2.0s）で2回スリープされたこと
-        assert sleep_calls == [1.0, 2.0]
-
-    def test_send_message_stream_with_retry_non_retryable_error_failure(self):
-        """異常系: 503/429 以外のエラー（例: 400 Bad Request）が発生した場合, リトライせず即座に例外を送出するか検証."""
-        mock_chat = MagicMock()
-        error_400 = APIError("400 Bad Request", {})
-        error_400.code = 400
-        mock_chat.send_message_stream.side_effect = error_400
-
-        with pytest.raises(APIError) as exc_info:
-            # ジェネレータを評価・消費して例外を発生させる
-            list(send_message_stream_with_retry(mock_chat, "hello"))
-
-        assert getattr(exc_info.value, "code", None) == 400
-        assert mock_chat.send_message_stream.call_count == 1
+        assert list(send_message_stream_with_retry(chat, "hi")) == [
+            "chunk1",
+            "chunk2",
+            "chunk3",
+        ]
+        chat.send_message_stream.assert_called_once_with("hi")
 
     def test_send_message_stream_with_retry_error_after_yielding_chunks_failure(
         self, caplog
     ):
-        """異常系: 途中でチャンクを出力した後にエラーが発生した場合, リトライせずに即座に例外を送出するか検証."""
-        mock_chat = MagicMock()
+        """出力が始まったあとのエラーは, 出力の重複を避けるため, リトライせずに送出されるか検証."""
+        chat = MagicMock()
 
-        # 1つ目のチャンクを出力したあとに例外を投げるジェネレータ
         def partial_stream():
             yield "first_chunk"
-            raise APIError("503 Service Unavailable", {})
+            raise _api_error(503)
 
-        mock_chat.send_message_stream.return_value = partial_stream()
+        chat.send_message_stream.return_value = partial_stream()
 
+        gen = send_message_stream_with_retry(chat, "hello")
+        assert next(gen) == "first_chunk"
         with pytest.raises(APIError):
-            # 途中まで取得してから例外が発生することを確認
-            gen = send_message_stream_with_retry(mock_chat, "hello", max_retries=3)
-            assert next(gen) == "first_chunk"
-            next(gen)  # ここで例外送出
+            next(gen)
 
-        # リトライされずに呼び出し回数が 1 回であることを検証
-        assert mock_chat.send_message_stream.call_count == 1
+        assert chat.send_message_stream.call_count == 1
         assert "一部出力済みのため" in caplog.text
 
-    def test_send_message_stream_with_retry_503_retry_exception(self, monkeypatch):
-        """異常系 -> 正常系: 503 エラーが発生し, リトライ後に成功するか検証."""
-        mock_chat = MagicMock()
-        mock_stream = iter(["success_chunk"])
+    def test_send_message_stream_with_retry_non_retryable_error_failure(self):
+        """最初のチャンクの前に, リトライ対象外のエラーが発生した場合は, 即座に送出されるか検証."""
+        chat = MagicMock()
 
-        # APIError の生成 (第一引数: message, 第二引数: response_json)
-        error_503 = APIError("503 Service Unavailable", {})
-        error_503.code = 503
-        mock_chat.send_message_stream.side_effect = [error_503, mock_stream]
+        def failing_stream():
+            raise _api_error(400, "INVALID_ARGUMENT", "bad")
+            yield  # pylint: disable=unreachable  # ジェネレータにするために必要
 
-        # time.sleep の実行を記録＆スキップ
-        sleep_calls = []
-        monkeypatch.setattr("time.sleep", sleep_calls.append)
+        chat.send_message_stream.return_value = failing_stream()
 
-        result = send_message_stream_with_retry(
-            mock_chat, "hello", max_retries=3, initial_delay=2.5
-        )
+        with pytest.raises(APIError):
+            list(send_message_stream_with_retry(chat, "hello"))
 
-        assert list(result) == ["success_chunk"]
-        assert mock_chat.send_message_stream.call_count == 2
-        assert sleep_calls == [2.5]  # 初回ディレイが適用されていること
+        assert chat.send_message_stream.call_count == 1
 
-    def test_send_message_stream_with_retry_error_during_iteration_exception(
-        self, monkeypatch
-    ):
-        """異常系: イテレーション（データ受信）の最初で 503 エラーが発生し, リトライして成功するか検証."""
-        mock_chat = MagicMock()
+    def test_send_message_stream_with_retry_retry_exception(self):
+        """最初のチャンクの前に, 一時的なエラーが発生した場合は, リトライされて成功するか検証."""
+        chat = MagicMock()
 
-        # 1回目のイテレーション（__iter__）で APIError を発生させる例外イテレータ
-        class ErrorStream:  # pylint: disable=too-few-public-methods
-            """テスト用モックストリームクラス.
+        def failing_stream():
+            raise _api_error(503)
+            yield  # pylint: disable=unreachable  # ジェネレータにするために必要
 
-            イテレーションの開始時（`__iter__` 呼び出し時）に即座に APIError を送出することで,
-            レスポンス取得ループ（`for chunk in response_stream`）の開始直後に発生する
-            通信エラーの挙動をシミュレートします.
-            """
+        chat.send_message_stream.side_effect = [failing_stream(), iter(["ok"])]
 
-            def __iter__(self):
-                raise APIError("503 Service Unavailable", {})
+        assert list(send_message_stream_with_retry(chat, "hello")) == ["ok"]
 
-        mock_chat.send_message_stream.side_effect = [
-            ErrorStream(),
-            ["success_chunk"],
-        ]
+        assert chat.send_message_stream.call_count == 2
 
-        sleep_calls = []
-        monkeypatch.setattr("time.sleep", sleep_calls.append)
+    def test_send_message_stream_with_retry_request_error_exception(self):
+        """ストリームを開く呼び出し自体が, 一時的なエラーで失敗した場合も, リトライされるか検証."""
+        chat = MagicMock()
+        chat.send_message_stream.side_effect = [_api_error(503), iter(["ok"])]
 
-        result = list(send_message_stream_with_retry(mock_chat, "hello", max_retries=3))
+        assert list(send_message_stream_with_retry(chat, "hello")) == ["ok"]
 
-        assert result == ["success_chunk"]
-        assert len(sleep_calls) == 1  # 1回リトライされたこと
+    def test_send_message_stream_with_retry_empty_stream(self):
+        """チャンクが 1 つも無いストリームは, 何も返さずに終了するか検証."""
+        chat = MagicMock()
+        chat.send_message_stream.return_value = iter([])
 
-    @patch("code_chat_cli.chat.time.sleep")
-    def test_send_message_stream_with_retry_uses_api_retry_delay_exception(
-        self, mock_sleep
-    ):
-        """ストリーミング異常系 (retryDelay 優先): エラーレスポンスの retryDelay 秒数が sleep に適用されるか検証."""
-        mock_chat = MagicMock()
-        mock_chunk = MagicMock(text="stream_chunk")
+        assert not list(send_message_stream_with_retry(chat, "hello"))
 
-        # 1回目の呼び出しで retryDelay 付きの例外, 2回目で正常なイテレータを返す
-        err_with_delay = APIError("429 RESOURCE_EXHAUSTED retryDelay: '30s'", {})
-        err_with_delay.__str__ = lambda: "429 RESOURCE_EXHAUSTED retryDelay: '30s'"
 
-        mock_chat.send_message_stream.side_effect = [
-            err_with_delay,
-            [mock_chunk],
-        ]
+class TestOpenStream:
+    """`_open_stream` のテスト."""
 
-        gen = send_message_stream_with_retry(mock_chat, "hi", max_retries=3)
-        chunks = list(gen)
+    def test_open_stream_success(self):
+        """最初のチャンクと, 残りのストリームが返るか検証."""
+        chat = MagicMock()
+        chat.send_message_stream.return_value = ["a", "b"]
 
-        # 最終的に正常なチャンクが取得できること
-        assert chunks == [mock_chunk]
+        first, stream = _open_stream(chat, "hi")
 
-        # api_retry_delay + 1.0 秒（30.0 + 1.0 = 31.0）で sleep が呼ばれたこと
-        mock_sleep.assert_called_once_with(31.0)
+        assert first == "a"
+        assert list(stream) == ["b"]
+
+    def test_open_stream_empty(self):
+        """チャンクが無い場合は, 最初のチャンクが終了の目印になるか検証."""
+        chat = MagicMock()
+        chat.send_message_stream.return_value = []
+
+        first, _ = _open_stream(chat, "hi")
+
+        assert first is _STREAM_END
 
 
 class TestIsRetryableError:
     """`_is_retryable_error` のテスト."""
 
-    def test_is_retryable_error_value_error_fallback_exception(self):
-        """異常系: code 属性が数値に変換できない文字列（ValueError）の場合, メッセージ判定へフォールバックするか検証."""
-        # code 属性に int() 変換できない文字列を設定
-        error = APIError("503 Service Unavailable", {})
-        error.code = "INVALID_CODE"
+    @pytest.mark.parametrize("code", [503, 429])
+    def test_is_retryable_error_success(self, code):
+        """503 / 429 は, リトライ対象になるか検証."""
+        assert _is_retryable_error(_api_error(code)) is True
 
-        # int(code) で ValueError が発生するが, 内部でキャッチされメッセージ文字列("503")から True と判定される
+    def test_is_retryable_error_transport_error_success(self):
+        """ネットワークの一時的なエラーは, リトライ対象になるか検証."""
+        assert _is_retryable_error(httpx.ReadTimeout("timeout")) is True
+
+    @pytest.mark.parametrize("bad_code", ["not_a_number", object()])
+    def test_is_retryable_error_code_fallback_exception(self, bad_code):
+        """code が整数として比較できない場合は, エラー文のキーワードで判定するか検証."""
+        error = _api_error(503)
+        error.code = bad_code
+
         assert _is_retryable_error(error) is True
 
-    def test_is_retryable_error_type_error_fallback_exception(self):
-        """異常系: code 属性が int() 変換不可な型（TypeError）の場合, メッセージ判定へフォールバックするか検証."""
-        # code 属性に int() 変換できないリスト型を設定
-        error = APIError("400 Bad Request", {})
-        error.code = [503]
-
-        # int(code) で TypeError が発生するが, 内部でキャッチされメッセージ("400")から False と判定される
+    @pytest.mark.parametrize(
+        "error",
+        [
+            _api_error(400, "INVALID_ARGUMENT", "bad"),
+            _api_error(404, "NOT_FOUND", "no model"),
+            ValueError("429"),
+        ],
+    )
+    def test_is_retryable_error_not_retryable(self, error):
+        """リトライ不可のエラー (400 / 404 / Gemini API 以外の例外) は, 対象外になるか検証."""
         assert _is_retryable_error(error) is False
 
     @pytest.mark.parametrize(
@@ -265,9 +296,68 @@ class TestIsRetryableError:
         [
             "ResourceHasExhausted: Quota exceeded for GenerateRequestsPerDay",
             "API limit reached: PerDay limit exceeded for this model.",
-            "Error 429: Quota Exceeded (PerDay)",
         ],
     )
     def test_is_retryable_error_per_day_quota_returns_false(self, error_message):
-        """1日あたりのクォータ超過 (RPD) の場合は, 待っても回復しないため False を返すことを検証."""
-        assert _is_retryable_error(Exception(error_message)) is False
+        """1日あたりのクォータ超過 (RPD) の場合は, 待っても回復しないため False を返すか検証."""
+        error = _api_error(429, "RESOURCE_EXHAUSTED", error_message)
+
+        assert _is_retryable_error(error) is False
+
+
+class TestWaitSeconds:
+    """`_wait_seconds` のテスト."""
+
+    def test_wait_seconds_backoff_success(self):
+        """推奨待機時間が無い場合は, 指数バックオフにジッターを加えた秒数になるか検証."""
+        state = _retry_state(_api_error(503))
+
+        assert 1.0 <= _wait_seconds(state) < 1.0 + RetryPolicy.JITTER
+
+    def test_wait_seconds_retry_delay_success(self):
+        """推奨待機時間 (retryDelay) がある場合は, それに余裕を加えた秒数になるか検証."""
+        error = _api_error(429, "RESOURCE_EXHAUSTED", "q", [{"retryDelay": "12s"}])
+
+        assert (
+            _wait_seconds(_retry_state(error)) == 12.0 + RetryPolicy.RETRY_DELAY_MARGIN
+        )
+
+    def test_wait_seconds_without_outcome(self):
+        """例外が記録されていない状態でも, 指数バックオフの秒数が返るか検証."""
+        assert isinstance(_wait_seconds(_retry_state()), float)
+
+
+class TestLogRetry:
+    """`_log_retry` のテスト."""
+
+    def test_log_retry_api_error_success(self, caplog):
+        """Gemini API のエラーは, 概要・回数・待ち時間が警告として出力されるか検証."""
+        state = _retry_state(_api_error(503), sleep=2.5)
+
+        _log_retry(state)
+
+        assert "(1/5)" in caplog.text
+        assert "[HTTP 503 UNAVAILABLE]" in caplog.text
+        assert "2.5秒後に再試行します" in caplog.text
+
+    def test_log_retry_other_error_success(self, caplog):
+        """Gemini API 以外のエラー (ネットワークなど) は, 例外名とメッセージが出力されるか検証."""
+        state = _retry_state(httpx.ConnectError("refused"), sleep=1.0)
+
+        _log_retry(state)
+
+        assert "ConnectError: refused" in caplog.text
+
+    def test_log_retry_without_state(self, caplog):
+        """例外と待機時間が記録されていない状態でも, 警告が出力されるか検証."""
+        with caplog.at_level(logging.WARNING):
+            _log_retry(_retry_state())
+
+        assert "再試行します" in caplog.text
+
+
+def test_backoff_is_tenacity_wait():
+    """既定の待ち時間 (指数バックオフ + ジッター) が, tenacity の待機として組み立てられているか検証."""
+    from code_chat_cli import api  # pylint: disable=import-outside-toplevel
+
+    assert isinstance(api._BACKOFF, wait_base)  # pylint: disable=protected-access

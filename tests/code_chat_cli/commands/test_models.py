@@ -2,6 +2,7 @@
 """`code_chat_cli.commands.models` モジュールのテスト."""
 
 import logging
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -50,3 +51,24 @@ class TestHandleListModels:
         )
         assert "PERMISSION_DENIED" in record.getMessage() or trace
         assert (record.exc_info is not None) is trace
+
+    def test_handle_list_models_retry_exception(
+        self, mock_client: MagicMock, capsys, no_retry_sleep
+    ) -> None:
+        """一時的なエラー (503) は, リトライされ, 成功すればモデル一覧が表示されるか検証する."""
+        model = SimpleNamespace(
+            name="models/gemini-flash",
+            display_name="Gemini Flash",
+            supported_actions=["generateContent"],
+        )
+        mock_client.models.list.side_effect = [
+            APIError(
+                503, {"error": {"message": "high demand", "status": "UNAVAILABLE"}}
+            ),
+            [model],
+        ]
+
+        handle_list_models(mock_client)
+
+        assert "- gemini-flash (Gemini Flash)" in capsys.readouterr().out
+        no_retry_sleep.assert_called_once()

@@ -13,6 +13,7 @@ from typing import Any
 from google.genai import types
 from google.genai.errors import APIError
 
+from code_chat_cli.api import call_with_retry
 from code_chat_cli.cache_error import CacheError
 from code_chat_cli.file_utils import read_path_content
 from code_chat_cli.gemini_error import format_error
@@ -86,7 +87,7 @@ class ContextCache:
         # 新しい内容を読み込めることを確認してから, 既存のキャッシュを削除する
         cache = self._create_cache(model, target, 3600)
         for old in existing:
-            self.client.caches.delete(name=old.name)
+            call_with_retry(self.client.caches.delete, name=old.name)
             print(f"古いキャッシュを削除しました: {old.name}")
 
         print("キャッシュを更新しました")
@@ -101,7 +102,7 @@ class ContextCache:
         """
         if target:
             name = self._normalize_cache_name(target)
-            self.client.caches.delete(name=name)
+            call_with_retry(self.client.caches.delete, name=name)
             print(f"キャッシュを削除しました: {name}")
             return
 
@@ -110,7 +111,7 @@ class ContextCache:
             print("削除対象のキャッシュはありません")
             return
         for cache in caches:
-            self.client.caches.delete(name=cache.name)
+            call_with_retry(self.client.caches.delete, name=cache.name)
             print(f"キャッシュを削除しました: {cache.name}")
 
     def list_caches(self) -> None:
@@ -139,7 +140,9 @@ class ContextCache:
         """
         if isinstance(cache, str):
             try:
-                return self.client.caches.get(name=self._normalize_cache_name(cache))
+                return call_with_retry(
+                    self.client.caches.get, name=self._normalize_cache_name(cache)
+                )
             except APIError as e:
                 raise CacheError(
                     f"キャッシュ '{cache}' を取得できませんでした: {e}"
@@ -219,7 +222,7 @@ class ContextCache:
         """
         return [
             cache
-            for cache in self.client.caches.list()
+            for cache in call_with_retry(lambda: list(self.client.caches.list()))
             if (cache.display_name or "").startswith(self.DISPLAY_PREFIX)
         ]
 
@@ -243,7 +246,8 @@ class ContextCache:
             raise CacheError(f"'{target}' にキャッシュ対象のファイルがありません")
 
         try:
-            return self.client.caches.create(
+            return call_with_retry(
+                self.client.caches.create,
                 model=model,
                 config=types.CreateCachedContentConfig(
                     display_name=self._display_name(target),
