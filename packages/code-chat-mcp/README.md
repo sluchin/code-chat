@@ -76,20 +76,18 @@ Python コードから直接 MCP サービスを呼び出す場合の使用例�
 import asyncio
 from code_chat_mcp.mcp_service import handle_mcp_run
 
+
 async def main():
     prompt = "現在の Git リポジトリのステータスを確認し、未コミットの変更を要約してください。"
     config_path = "mcp_config.json"
-    
+
     # MCP サーバーとの接続・ツール呼び出し・結果取得を一括実行
-    result = await handle_mcp_run(
-        user_prompt=prompt,
-        config_path=config_path
-    )
+    result = await handle_mcp_run(user_prompt=prompt, config_path=config_path)
     print(result)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
-
 ```
 
 ---

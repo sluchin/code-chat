@@ -67,7 +67,7 @@ class CliArgs:
     debug_mode: bool = False
     """デバッグモード有効化フラグ."""
 
-    log_level: str | None = None
+    log_level: str = "INFO"
     """ログレベル文字列."""
 
     trace_mode: bool = False
@@ -79,11 +79,20 @@ class CliArgs:
     list_models: bool = False
     """モデル一覧表示フラグ."""
 
+    login: bool = False
+    """`--login` による Gemini API への OAuth ログインフラグ."""
+
+    oauth: bool = False
+    """`--oauth` による認証方法の指定 (API キーではなく OAuth を使う)."""
+
     generate_commit_msg: bool = False
     """コミットメッセージ生成フラグ."""
 
     review: bool = False
     """`--review` によるコードレビュー・静的解析モードフラグ."""
+
+    staged: bool = False
+    """`--staged` によるレビュー対象をステージング済み差分に限定するフラグ."""
 
     # rag サブコマンド固有フラグ
     input_dirs: list[str] = field(default_factory=list)
@@ -107,6 +116,10 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
     if args is None:
         args = sys.argv[1:]
 
+    # 先頭の位置引数がサブコマンドでなければ, 位置引数はすべてプロンプトとして扱う
+    # (argparse のサブコマンド解決が "invalid choice" で失敗するのを避ける)
+    args, prompt_tokens = _split_prompt_tokens(args)
+
     global_parser = _build_global_parser()
     main_parser = _build_main_execution_parser(global_parser)
 
@@ -127,7 +140,11 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
         "create", parents=[global_parser], help="Vector DB を作成"
     )
     rag_create.add_argument(
-        "--input_dirs", type=list[str], default=["."], help="入力パス (デフォルト: .)"
+        "--input_dirs",
+        nargs="+",
+        type=str,
+        default=["."],
+        help="入力パス (デフォルト: .)",
     )
     rag_create.add_argument(
         "--output_dir",
@@ -140,7 +157,11 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
         "update", parents=[global_parser], help="差分インデックスを更新"
     )
     rag_update.add_argument(
-        "--input_dirs", type=list[str], default=["."], help="入力パス (デフォルト: .)"
+        "--input_dirs",
+        nargs="+",
+        type=str,
+        default=["."],
+        help="入力パス (デフォルト: .)",
     )
     rag_update.add_argument(
         "--output_dir",
@@ -218,7 +239,11 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
     if raw_args.subcommand in ("rag", "cache", "mcp"):
         prompt_str = ""
     else:
-        prompt_str = " ".join(unparsed_args) if unparsed_args else ""
+        prompt_str = " ".join([*prompt_tokens, *unparsed_args])
+
+    # -f はファイル内容をそのまま送信する用途のため, RAG / MCP とは併用できない
+    if raw_args.files and (raw_args.rag or raw_args.mcp):
+        main_parser.error("-f/--file は --rag / --mcp と併用できません")
 
     context_parts: list[str] = []
 
@@ -228,9 +253,7 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
         context_parts.append(f"--- [標準入力] ---\n{stdin_text}")
 
     # -f, --file オプションのテキスト読み込み
-    file_targets: list[str] = getattr(raw_args, "files", None) or []
-    if isinstance(file_targets, str):
-        file_targets = [file_targets]
+    file_targets: list[str] = raw_args.files or []
 
     for target in file_targets:
         if target:
@@ -247,39 +270,75 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
     )
 
     # ログレベルとデバッグモードの設定同期
-    debug_mode = getattr(raw_args, "debug_mode", False)
-    log_level = getattr(raw_args, "log_level", "INFO")
+    debug_mode = raw_args.debug_mode
+    log_level = raw_args.log_level
     if debug_mode or log_level == "DEBUG":
         debug_mode = True
         log_level = "DEBUG"
 
-    trace_mode = bool(getattr(raw_args, "trace_mode", False) or "--trace" in args)
+    trace_mode = bool(raw_args.trace_mode or "--trace" in args)
 
     return CliArgs(
-        subcommand=getattr(raw_args, "subcommand", None),
+        subcommand=raw_args.subcommand,
         subcommand_action=getattr(raw_args, "subcommand_action", None),
         subcommand_target=getattr(raw_args, "target", None),
         prompt=prompt_str,
         files=file_targets,
-        rag=getattr(raw_args, "rag", False),
-        mcp=getattr(raw_args, "mcp", False),
-        cache=getattr(raw_args, "cache", False),
-        model=getattr(raw_args, "model", "gemini-3.5-flash"),
-        provider=getattr(raw_args, "provider", "gemini"),
-        write_mode=getattr(raw_args, "write_mode", False),
-        auto_save=getattr(raw_args, "auto_save", False),
+        rag=raw_args.rag,
+        mcp=raw_args.mcp,
+        cache=raw_args.cache,
+        model=raw_args.model,
+        provider=raw_args.provider,
+        write_mode=raw_args.write_mode,
+        auto_save=raw_args.auto_save,
         context=context_str,
         cache_ttl=getattr(raw_args, "ttl", 3600),
         debug_mode=debug_mode,
         log_level=log_level,
         trace_mode=trace_mode,
-        dry_run=getattr(raw_args, "dry_run", False),
-        list_models=getattr(raw_args, "list_models", False),
-        generate_commit_msg=getattr(raw_args, "generate_commit_msg", False),
-        review=getattr(raw_args, "review", False),
+        dry_run=raw_args.dry_run,
+        list_models=raw_args.list_models,
+        login=raw_args.login,
+        oauth=raw_args.oauth,
+        generate_commit_msg=raw_args.generate_commit_msg,
+        review=raw_args.review,
+        staged=raw_args.staged,
         input_dirs=input_dirs,
         output_dir=getattr(raw_args, "output_dir", "./.chroma_db"),
     )
+
+
+_SUBCOMMANDS = ("rag", "cache", "mcp")
+_VALUE_OPTIONS = {"-f", "--file", "-m", "--model", "-p", "--provider", "--log-level"}
+
+
+def _split_prompt_tokens(args: list[str]) -> tuple[list[str], list[str]]:
+    """サブコマンド未指定時に, オプション以外の位置引数をプロンプトとして分離する.
+
+    Args:
+        args (list[str]): コマンドライン引数リスト.
+
+    Returns:
+        tuple[list[str], list[str]]: (位置引数を除いた引数リスト, プロンプト用トークン).
+            最初の位置引数がサブコマンドの場合は (args, []) を返す.
+
+    """
+    options: list[str] = []
+    positionals: list[str] = []
+    i = 0
+    while i < len(args):
+        token = args[i]
+        if token.startswith("-") and token != "-":
+            options.append(token)
+            if token in _VALUE_OPTIONS and i + 1 < len(args):
+                i += 1
+                options.append(args[i])
+        else:
+            if not positionals and token in _SUBCOMMANDS:
+                return args, []
+            positionals.append(token)
+        i += 1
+    return options, positionals
 
 
 def _build_global_parser() -> argparse.ArgumentParser:
@@ -324,6 +383,16 @@ def _build_global_parser() -> argparse.ArgumentParser:
         help="利用可能な LLM モデル一覧を表示します",
     )
     parser.add_argument(
+        "--login",
+        action="store_true",
+        help="ブラウザで Google アカウントにログインし, Gemini API の OAuth トークンを保存します",
+    )
+    parser.add_argument(
+        "--oauth",
+        action="store_true",
+        help="GEMINI_API_KEY ではなく OAuth (--login で保存したトークン) で認証します",
+    )
+    parser.add_argument(
         "--generate-commit-msg",
         "-g",
         action="store_true",
@@ -335,6 +404,11 @@ def _build_global_parser() -> argparse.ArgumentParser:
         "-r",
         action="store_true",
         help="指定ファイルまたは Git 差分のコードレビューを実行します",
+    )
+    parser.add_argument(
+        "--staged",
+        action="store_true",
+        help="--review 時にステージング済み (--cached) の差分を対象にします",
     )
     return parser
 

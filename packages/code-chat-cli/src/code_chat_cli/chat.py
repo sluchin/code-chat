@@ -8,6 +8,7 @@ Gemini API と対話を行うためのコマンドラインインターフェー
 import asyncio
 import atexit
 import logging
+import os
 import sys
 import time  # pylint: disable=unused-import # noqa: F401
 from pathlib import Path  # pylint: disable=unused-import
@@ -22,6 +23,7 @@ from code_chat_cli.api import (
     send_message_with_retry,
 )
 from code_chat_cli.args import parse_args
+from code_chat_cli.auth import OAuthError, login
 from code_chat_cli.client import get_gemini_client
 from code_chat_cli.commands.commit import handle_commit_generation
 from code_chat_cli.commands.models import handle_list_models
@@ -72,9 +74,9 @@ def run_single_turn_mode(
 
     """
     # mcp オプションが指定されている場合
-    is_mcp_mode = getattr(cli_args, "mcp", False)
+    is_mcp_mode = cli_args.mcp
     if is_mcp_mode:
-        _handle_mcp_single_turn(cli_args, chat_history)
+        _handle_mcp_single_turn(cli_args, chat_history, rag_service)
         return
 
     if cli_args.context:
@@ -86,7 +88,6 @@ def run_single_turn_mode(
 def run_interactive_loop(
     chat: Any,
     cli_args: Any,
-    output_file: str | None,
     chat_history: list[str],
     rag_service: Any | None = None,
 ) -> None:
@@ -95,7 +96,6 @@ def run_interactive_loop(
     Args:
         chat (Any): Gemini Chat インスタンス.
         cli_args (Any): コマンドライン引数の名前空間オブジェクト.
-        output_file (str | None): 会話ログの出力先ファイルパス.
         chat_history (list[str]): 対話履歴を格納するリスト.
         rag_service (Any | None, optional): RAGサービス. Defaults to None.
 
@@ -122,13 +122,13 @@ def run_interactive_loop(
             break
 
         # スラッシュコマンド処理 (/save など)
-        if _handle_slash_command(user_input, output_file, chat_history):
+        if _handle_slash_command(user_input, chat_history):
             continue
 
         # mcp オプション指定時または /mcp コマンド入力時の分岐
-        is_mcp_mode = getattr(cli_args, "mcp", False) or user_input.startswith("/mcp")
+        is_mcp_mode = cli_args.mcp or user_input.startswith("/mcp")
         if is_mcp_mode:
-            _handle_mcp_interactive(user_input, cli_args, chat_history)
+            _handle_mcp_interactive(user_input, cli_args, chat_history, rag_service)
             continue
 
         # 送信テキスト (プロンプト) の構築
@@ -140,20 +140,18 @@ def run_interactive_loop(
         chat_history.append(f"### Gemini\n\n{response_text}")
 
         # -w / --write モード時の処理
-        if getattr(cli_args, "write_mode", False):
+        if cli_args.write_mode:
             _handle_write_mode(cli_args, response_text)
 
 
 def _handle_slash_command(
     user_input: str,
-    default_output_file: str | None,
     chat_history: list[str],
 ) -> bool:
     """コマンド (/save など) を処理します.
 
     Args:
         user_input (str): ユーザーからの入力文字列.
-        default_output_file (str | None): デフォルトの保存先ファイルパス.
         chat_history (list[str]): 対話履歴を格納するリスト.
 
     Returns:
@@ -164,10 +162,9 @@ def _handle_slash_command(
         return False
 
     parts = user_input.split(maxsplit=1)
-    save_path = parts[1] if len(parts) > 1 else default_output_file
 
-    if save_path:
-        save_chat_history(save_path, chat_history)
+    if len(parts) > 1:
+        save_chat_history(parts[1], chat_history)
     else:
         logger.error("保存先のファイルパスを指定してください（例: /save result.md）")
     return True
@@ -190,7 +187,7 @@ def _build_send_text(
 
     """
     send_text = user_input
-    files = getattr(cli_args, "files", None)
+    files = cli_args.files
 
     if files:
         files_context = _load_files_context(files)
@@ -199,7 +196,7 @@ def _build_send_text(
     elif rag_service:
         send_text = _append_rag_context(send_text, user_input, rag_service)
 
-    if getattr(cli_args, "write_mode", False):
+    if cli_args.write_mode:
         send_text += "\n\n(※指示に従って修正した「完全なコード全体」を省略せずに1つのコードブロックで出力してください)"
 
     return send_text
@@ -284,9 +281,7 @@ def _handle_write_mode(cli_args: Any, response_text: str) -> None:
         response_text (str): Gemini から返却されたレスポンス本文全体.
 
     """
-    target_files = getattr(cli_args, "files", None) or (
-        [cli_args.file] if getattr(cli_args, "file", None) else []
-    )
+    target_files = cli_args.files
     handle_write_mode_confirmation(target_files, response_text)
 
 
@@ -386,12 +381,12 @@ def _handle_context_mode(
 
     """
     full_init_prompt = _build_context_prompt(cli_args, rag_service=rag_service)
-    file_label = getattr(cli_args, "file", None) or "コンテキストテキスト"
+    file_label = ", ".join(cli_args.files) or "コンテキストテキスト"
 
     prompt_summary = f"\n\n[指示]: {cli_args.prompt}" if cli_args.prompt else ""
     history_entry = (
         f"### User (Initial Context)\n\n"
-        f"[ファイル読み込み: {file_label} ({len(cli_args.context)} bytes)]"
+        f"[ファイル読み込み: {file_label} ({len(cli_args.context or '')} bytes)]"
         f"{prompt_summary}"
     )
     chat_history.append(history_entry)
@@ -402,9 +397,7 @@ def _handle_context_mode(
     chat_history.append(f"### Gemini\n\n{response_text}")
 
     if cli_args.write_mode and cli_args.prompt:
-        target_files = getattr(cli_args, "files", None) or (
-            [cli_args.file] if getattr(cli_args, "file", None) else []
-        )
+        target_files = cli_args.files
         handle_write_mode_confirmation(target_files, response_text)
 
 
@@ -447,9 +440,7 @@ def _handle_prompt_mode(
     chat_history.append(f"### Gemini\n\n{response_text}")
 
     if cli_args.write_mode:
-        target_files = getattr(cli_args, "files", None) or (
-            [cli_args.file] if getattr(cli_args, "file", None) else []
-        )
+        target_files = cli_args.files
         handle_write_mode_confirmation(target_files, response_text)
 
 
@@ -468,6 +459,44 @@ def _setup_cli_logging(cli_args: Any) -> None:
 
     log_level = "DEBUG" if cli_args.debug_mode else cli_args.log_level
     setup_logging(level_name=log_level, trace=cli_args.trace_mode)
+
+
+def _require_rag_api_key() -> None:
+    """RAG に必要な API キーが設定されていることを確認します.
+
+    RAG は Embedding API を langchain-google-genai 経由で呼び出すため, --oauth 指定時も
+    環境変数の API キーを使用します.
+
+    Raises:
+        SystemExit: API キーが未設定の場合, 終了コード 1 で終了します.
+
+    """
+    if os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY"):
+        return
+
+    logger.error(
+        "RAG には API キーが必要です. GEMINI_API_KEY を設定してください "
+        "(--oauth 指定時も, RAG は API キーを使用します)."
+    )
+    sys.exit(1)
+
+
+def _handle_login() -> None:
+    """OAuth ログインを実行し, 終了する.
+
+    Raises:
+        SystemExit: ログイン成功時は終了コード 0, 失敗時は終了コード 1.
+
+    """
+    try:
+        login()
+    except OAuthError as e:
+        logger.error("OAuth ログインを実行できませんでした.")
+        print(str(e), file=sys.stderr)
+        sys.exit(1)
+
+    logger.info("OAuth で実行するには, --oauth オプションを指定してください")
+    sys.exit(0)
 
 
 def _handle_dry_run(cli_args: Any, config: types.GenerateContentConfig) -> None:
@@ -491,12 +520,6 @@ def _handle_dry_run(cli_args: Any, config: types.GenerateContentConfig) -> None:
             print(f"    - {file_path}")
     else:
         print("  対象パス: None")
-    if cli_args.cache_dirs:
-        print("  Context Caching ディレクトリ:")
-        for dir_path in cli_args.cache_dirs:
-            print(f"    - {dir_path}")
-    else:
-        print("  Context Caching ディレクトリ: None")
     if cli_args.input_dirs:
         print("  RAG (index) 入力ディレクトリ:")
         for dir_path in cli_args.input_dirs:
@@ -505,7 +528,7 @@ def _handle_dry_run(cli_args: Any, config: types.GenerateContentConfig) -> None:
         print("  RAG 入力ディレクトリ: None")
     print(f"  RAG 出力ディレクトリ: {cli_args.output_dir or 'None'}")
     print(f"  プロンプト: {cli_args.prompt or 'None'}")
-    print(f"  コンテキスト長: {len(cli_args.context)} 文字")
+    print(f"  コンテキスト長: {len(cli_args.context or '')} 文字")
 
     print("\n--- [Chat Config (生成設定)] ---")
     print(f"  System Instruction: {config.system_instruction}")
@@ -532,10 +555,10 @@ def _handle_subcommands(client: Any, cli_args: Any) -> None:
         cli_args (Any): コマンドライン引数の名前空間オブジェクト.
 
     """
-    subcommand = getattr(cli_args, "subcommand", None)
+    subcommand = cli_args.subcommand
     if subcommand is None:
         logger.info("chat サブコマンドを実行します")
-        list_models = getattr(cli_args, "list_models", False)
+        list_models = cli_args.list_models
         if list_models:
             try:
                 handle_list_models(client)
@@ -546,7 +569,7 @@ def _handle_subcommands(client: Any, cli_args: Any) -> None:
                 )
                 sys.exit(1)
 
-        generate_commit_msg = getattr(cli_args, "generate_commit_msg", False)
+        generate_commit_msg = cli_args.generate_commit_msg
         if generate_commit_msg:
             try:
                 handle_commit_generation(client, cli_args.model)
@@ -568,14 +591,14 @@ def _handle_subcommands(client: Any, cli_args: Any) -> None:
     elif subcommand == "cache":
         logger.info("cache サブコマンドを実行します")
 
-    review = getattr(cli_args, "review", False)
+    review = cli_args.review
     if review:
         try:
             handle_code_review(
                 client,
                 cli_args.model,
-                staged=getattr(cli_args, "staged", False),
-                file_path=getattr(cli_args, "file", None),
+                staged=cli_args.staged,
+                file_path=cli_args.files,
             )
             sys.exit(0)
         except Exception:  # pylint: disable=broad-exception-caught
@@ -591,9 +614,9 @@ def _handle_rag_subcommand(cli_args: Any) -> None:
 
     """
     logger.info("rag サブコマンドを実行します")
-    input_dirs = getattr(cli_args, "input_dirs", None) or ["."]
-    output_dir = getattr(cli_args, "output_dir", None) or "./.chroma_db"
-    action = getattr(cli_args, "subcommand_action", None)
+    input_dirs = cli_args.input_dirs or ["."]
+    output_dir = cli_args.output_dir or "./.chroma_db"
+    action = cli_args.subcommand_action
 
     try:
         if action == "create":
@@ -613,7 +636,7 @@ def _handle_rag_subcommand(cli_args: Any) -> None:
             sys.exit(0)
 
         # アクション未指定かつプロンプトが渡された場合（ワンショット検索）
-        prompt = getattr(cli_args, "prompt", None)
+        prompt = cli_args.prompt
         if prompt:
             prompt_str = " ".join(prompt) if isinstance(prompt, list) else str(prompt)
             logger.info("RAG 検索クエリを実行します: %s", prompt_str)
@@ -634,7 +657,7 @@ def _handle_mcp_subcommand(cli_args: Any) -> None:
 
     """
     logger.info("mcp サブコマンドを実行します")
-    action = getattr(cli_args, "subcommand_action", None)
+    action = cli_args.subcommand_action
     config_path = getattr(cli_args, "config_path", None)
 
     try:
@@ -705,12 +728,16 @@ def _build_chat_config(is_write_mode: bool) -> types.GenerateContentConfig:
 def _handle_mcp_single_turn(
     cli_args: Any,
     chat_history: list[str],
+    rag_service: Any | None = None,
 ) -> None:
     """ワンショットモードで --mcp が指定された場合の MCP 処理を行います.
+
+    --rag との併用時は, RAG で検索したコンテキストをプロンプトに付加して MCP に渡します.
 
     Args:
         cli_args (Any): コマンドライン引数の名前空間オブジェクト.
         chat_history (list[str]): 対話履歴を格納するリスト.
+        rag_service (Any | None, optional): RAGサービス. Defaults to None.
 
     """
     prompt = cli_args.prompt or cli_args.context
@@ -720,12 +747,19 @@ def _handle_mcp_single_turn(
 
     config_path = getattr(cli_args, "config_path", None)
     chat_history.append(f"### User (MCP)\n\n{prompt}")
+    send_prompt = (
+        _append_rag_context(prompt, prompt, rag_service) if rag_service else prompt
+    )
 
     print("Gemini (MCP) > ", end="", flush=True)
     try:
         # handle_mcp_run を呼ぶだけでライフサイクル管理からツール実行まで完了する
         result_text = asyncio.run(
-            handle_mcp_run(user_prompt=prompt, config_path=config_path)
+            handle_mcp_run(
+                user_prompt=send_prompt,
+                config_path=config_path,
+                use_oauth=cli_args.oauth,
+            )
         )
         print(result_text)
         chat_history.append(f"### Gemini (MCP)\n\n{result_text}")
@@ -737,13 +771,17 @@ def _handle_mcp_interactive(
     user_input: str,
     cli_args: Any,
     chat_history: list[str],
+    rag_service: Any | None = None,
 ) -> None:
     """対話型ループ内から MCP ツール連携クエリ (execute_mcp_query) を実行します.
+
+    --rag との併用時は, RAG で検索したコンテキストをプロンプトに付加して MCP に渡します.
 
     Args:
         user_input (str): ユーザーからの入力文字列.
         cli_args (Any): コマンドライン引数の名前空間オブジェクト.
         chat_history (list[str]): 対話履歴を格納するリスト.
+        rag_service (Any | None, optional): RAGサービス. Defaults to None.
 
     """
     # `/mcp <prompt>` のようなスラッシュコマンド形式の場合はプレフィックスを除去
@@ -759,11 +797,18 @@ def _handle_mcp_interactive(
 
     config_path = getattr(cli_args, "config_path", None)
     chat_history.append(f"### User (MCP)\n\n{prompt}")
+    send_prompt = (
+        _append_rag_context(prompt, prompt, rag_service) if rag_service else prompt
+    )
 
     print("Gemini (MCP) > ", end="", flush=True)
     try:
         result_text = asyncio.run(
-            handle_mcp_run(user_prompt=prompt, config_path=config_path)
+            handle_mcp_run(
+                user_prompt=send_prompt,
+                config_path=config_path,
+                use_oauth=cli_args.oauth,
+            )
         )
         print(result_text)
         print()
@@ -775,7 +820,6 @@ def _handle_mcp_interactive(
 def main() -> None:
     """Gemini CLI のメイン対話処理を実行します."""
     chat_history: list[str] = []
-    output_file: str | None = None
     auto_save = False
 
     try:
@@ -787,26 +831,30 @@ def main() -> None:
             cli_args.files,
         )
 
-        auto_save = getattr(cli_args, "auto_save", False)
-        input_dirs = getattr(cli_args, "input_dirs", None) or ["."]
-        output_dir = getattr(cli_args, "output_dir", None) or "./.chroma_db"
+        auto_save = cli_args.auto_save
+        input_dirs = cli_args.input_dirs or ["."]
+        output_dir = cli_args.output_dir or "./.chroma_db"
 
         logger.debug("デバッグモードが有効化されました")
         logger.info("Gemini CLI ツールを起動します")
 
-        write_mode = getattr(cli_args, "write_mode", False)
+        write_mode = cli_args.write_mode
         config = _build_chat_config(write_mode)
 
         if cli_args.dry_run:
             _handle_dry_run(cli_args, config)
             sys.exit(0)
 
-        client = get_gemini_client()
+        if cli_args.login:
+            _handle_login()
+
+        client = get_gemini_client(use_oauth=cli_args.oauth)
         _handle_subcommands(client, cli_args)
 
         # RAG モードの場合は RagService を初期化
         rag_service = None
         if cli_args.rag:
+            _require_rag_api_key()
             rag_service = RagService(input_dirs=input_dirs, output_dir=output_dir)
 
         chat = client.chats.create(model=cli_args.model, config=config)
@@ -814,9 +862,7 @@ def main() -> None:
         if cli_args.context or cli_args.prompt:
             run_single_turn_mode(chat, cli_args, chat_history, rag_service=rag_service)
         else:
-            run_interactive_loop(
-                chat, cli_args, output_file, chat_history, rag_service=rag_service
-            )
+            run_interactive_loop(chat, cli_args, chat_history, rag_service=rag_service)
 
     except (KeyboardInterrupt, EOFError):
         logger.info("\n[Ctrl+C] 会話を終了します")
@@ -835,7 +881,7 @@ def main() -> None:
         )
         sys.exit(1)
     finally:
-        save_history_if_needed(chat_history, output_file, auto_save)
+        save_history_if_needed(chat_history, auto_save)
 
 
 if __name__ == "__main__":  # pragma: no cover

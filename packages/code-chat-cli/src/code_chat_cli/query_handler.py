@@ -24,7 +24,7 @@ def _is_rate_limit_error(exception: BaseException) -> bool:
 
     """
     if isinstance(exception, APIError):
-        if getattr(exception, "code", None) == 429:
+        if exception.code == 429:
             return True
         if "429" in str(exception):
             return True

@@ -186,10 +186,8 @@ def _is_retryable_error(e: Exception) -> bool:
         return False
 
     # APIError, ServerError, ClientError すべてを対象
-    if isinstance(e, (APIError, ServerError, ClientError)):
-        code = getattr(e, "code", None) or getattr(e, "status_code", None)
-        if code in (503, 429):
-            return True
+    if isinstance(e, (APIError, ServerError, ClientError)) and e.code in (503, 429):
+        return True
 
     err_msg = str(e).upper()
     return any(

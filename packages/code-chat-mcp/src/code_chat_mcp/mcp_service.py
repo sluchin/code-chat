@@ -118,12 +118,8 @@ class McpService:
                         McpToolInfo(
                             server_name=server_name,
                             name=tool.name,
-                            description=getattr(tool, "description", None),
-                            input_schema=getattr(
-                                tool,
-                                "inputSchema",
-                                getattr(tool, "input_schema", {}),
-                            ),
+                            description=tool.description,
+                            input_schema=tool.inputSchema,
                         )
                     )
             except Exception:  # pylint: disable=broad-exception-caught
@@ -245,7 +241,7 @@ class McpService:
 
                 # 取得したツール名を軽くプレビュー表示
                 for tool in tools:
-                    desc = getattr(tool, "description", None) or "No description"
+                    desc = tool.description or "No description"
                     print(f"   └─ {tool.name}: {desc}")
 
                 success_count += 1

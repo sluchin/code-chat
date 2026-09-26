@@ -1,37 +1,57 @@
 # code-chat
 
-Gemini API やローカル LLM を使用してローカルソースコードの参照・対話・自動更新を行う CLI ツール。
+Gemini API を使用してローカルソースコードの参照・対話・自動更新を行う CLI ツール。
 
 ## 主な機能 (Features)
 
-`code-chat` は、ローカルのソースコード構造を理解し、CLI 上で直接コードの参照・修正・コミット作成までを完結させるための開発者向け AI ツールです。
+`code-chat` は、ローカルのソースコード構造を理解し、CLI 上で直接コードの参照・修正・レビュー・コミット作成までを完結させるための開発者向け AI ツールです。
 
 - 💬 **ローカルコードベースとの対話 (Interactive Chat)**
-  - 指定したディレクトリやファイルをコンテキストとして読み込み、コードの挙動解説やバグ修正案を対話形式で確認できます。
+  - ファイルやディレクトリ (`-f`)、標準入力（パイプ）をコンテキストとして読み込み、コードの解説やバグ修正案を確認できます。
+  - プロンプトを引数で渡すとワンショット実行、省略すると対話モード (REPL) で起動します。
 
 - ✏️ **ファイルへの直接書き込み・自動更新 (`-w`, `--write`)**
-  - LLM が生成したコードを直接ローカルファイルへ自動上書き・反映します。
-  - **安全設計**: 不完全な省略コード（`...` など）を検知して誤上書きを防ぐ `is_partial_code` チェックおよびサニタイズ処理、実行前の確認プロンプトを搭載。
+  - LLM が生成したコードを対象ファイルへ反映します。
+  - **安全設計**: 実行前の確認プロンプト、省略コード（`# ...` や「変更なし」など）の検知による警告、上書き前のバックアップ（`.bak.orig` と直近 5 世代のタイムスタンプ付きバックアップ）。
+
+- 🔎 **コードレビュー (`-r`, `--review`)**
+  - 指定ファイル (`-f`) または Git の差分（`--staged` でステージ済み差分）を LLM がレビューします。
 
 - 📝 **Git コミットメッセージの自動生成 (`-g`, `--generate-commit-msg`)**
-  - `git diff` の変更内容を分析し、Conventional Commits 形式に沿った適切なコミットメッセージを提案・生成します。
+  - `git diff` の変更内容を分析し、Conventional Commits 形式のコミットメッセージを生成します。
 
-- 🔌 **MCP (Model Context Protocol) 統合**
-  - 外部の MCP サーバーと連携し、安全なファイル構造の参照や環境隔離されたコマンド実行（`uv run` 経由）を自動化。
+- 📚 **RAG (コードベース検索) (`--rag`, `rag` サブコマンド)**
+  - ソースコードをチャンク分割して ChromaDB にインデックス化し、質問に関連するコードを検索して回答のコンテキストに加えます。
 
-- 🛡️ **堅牢なコード品質保証**
-  - POSIX 標準（ファイル末尾の改行コード保証）に準拠したフォーマット出力。
-  - `ruff` / `mypy` / `pytest` / `pre-commit` をフル活用したクリーンな開発基盤。
+- 🔌 **MCP (Model Context Protocol) 統合 (`--mcp`, `mcp` サブコマンド)**
+  - 外部の MCP サーバーのツールを Gemini の Function Calling 経由で呼び出します。
+
+- 🛡️ **開発基盤**
+  - `ruff` / `pylint` / `mypy` / `pytest` / `pre-commit` によるチェック。
+
+> **未実装**: `cache` サブコマンドと `-c/--cache`（Context Caching）は引数定義のみで、まだ動作しません。`-p/--provider` も現時点では `gemini` のみ対応です。
+
+コマンドとオプションの一覧は [COMMANDS.md](COMMANDS.md) も参照してください。
+
+## プロジェクト構成
+
+uv workspace による 3 パッケージ構成です。
+
+| パッケージ | 役割 |
+| --- | --- |
+| `packages/code-chat-cli` | CLI 本体 (`code_chat_cli`): 引数解析、対話、ファイル書き込み、レビュー、コミットメッセージ生成 |
+| `packages/code-chat-rag` | RAG (`code_chat_rag`): インデックス作成、ベクトルストア (ChromaDB)、検索 |
+| `packages/code-chat-mcp` | MCP (`code_chat_mcp`): 設定読み込み、MCP サーバーの起動とツール呼び出し |
 
 ## 前提条件
 
 - **Python**: 3.12 以上
 - **uv**: パッケージ管理ツール ([インストール方法](https://docs.astral.sh/uv/))
-- **Node.js**: `npx` (MCP サーバー実行時に使用)
+- **Git**: コミットメッセージ生成・差分レビューで使用
+- **Node.js**: `npx` (MCP サーバーを `npx` で起動する場合)
+- **Gemini API キー**
 
 ## セットアップ・インストール手順
-
-リポジトリを clone した後、用途に合わせて開発環境のセットアップまたは CLI ツールとしてのインストールを行います。
 
 ### 1. 開発環境のセットアップ
 
@@ -45,10 +65,9 @@ uv sync
 
 # 3. pre-commit フックの有効化 (コミット時の自動コードチェック)
 uv run pre-commit install
-
 ```
 
-### 2. code-chat のインストール (CLIツールとしての利用)
+### 2. CLI ツールとしてのインストール
 
 `uv tool` を使用すると、環境を汚さずに CLI コマンドとしてグローバルにインストールできます。
 
@@ -57,60 +76,163 @@ uv run pre-commit install
 uv tool install .
 
 # インストール後は直接コマンドとして呼び出し可能
-cchat
-
+code-chat
 ```
 
 > **Note:** 開発中の変更を即座に反映させたい場合は、編集可能モード（Editable install）でインストールします。
 > ```bash
 > uv tool install --editable .
-> 
 > ```
-> 
-> 
 
-## 環境変数の設定
+> **Note:** `cchat` という短縮コマンドは `packages/code-chat-cli` パッケージに定義されています。開発環境では `uv run cchat` で利用できますが、`uv tool install .` ではインストールされません。
 
-プロジェクトルートに `.env` ファイルを作成し、Gemini API キーを設定してください。
+### 3. (任意) Claude Code を使う場合のローカル設定
 
-```bash
-# .env
-GEMINI_API_KEY=your_api_key_here
+[Claude Code](https://claude.com/claude-code) でこのリポジトリを開発する場合、`uv` コマンド (`uv run pytest` など) を確認なしで実行できるようにするには、`.claude/settings.local.json` を作成して次の内容を書きます。
 
+```json
+{"permissions": {"allow": ["Bash(uv *)"]}}
 ```
 
-## 実行方法
+> **Note:** `.claude/` は `.gitignore` の対象です (コミットされません)。`Bash(uv *)` は `uv run python -c ...` のような任意のコードを実行するコマンドも許可するため、個人のローカル環境でのみ設定してください。
 
-`uv run` を使用してスクリプトを実行するか、インストールした `cchat` コマンドを実行します。
+## 認証の設定
+
+Gemini API への認証は、次のいずれかを選びます。**既定は API キー**で、OAuth を使うときは `--oauth` オプションを指定します。`GEMINI_API_KEY` が設定されていても、`--oauth` を付ければ OAuth が使われます。
+
+### 方法 1: API キー
+
+Gemini API キーを環境変数 `GEMINI_API_KEY` に設定してください。
 
 ```bash
-# uv run 経由で実行
-uv run cchat
-
-# または直接実行（uv tool install 済みの場合）
-cchat
-
+export GEMINI_API_KEY=your_api_key_here
 ```
+
+### 方法 2: OAuth ログイン (Google アカウント)
+
+ブラウザで Google アカウントにログインして認証します。API キーは不要です。Google Cloud での設定を含む詳しい手順は、[OAUTH.md](OAUTH.md) を参照してください。以下は概要です。
+
+1. Google Cloud コンソールで、Gemini API を使うプロジェクトに **OAuth クライアント ID** (種類: **デスクトップアプリ**) を作成します。
+2. OAuth 同意画面が「テスト中」の場合は、ログインに使う Google アカウントを **テストユーザー** に追加します (追加しないと `access_denied` になります)。
+3. クライアント ID とシークレットを環境変数に設定します (`~/.zshenv` などに書いておくと、毎回設定せずに済みます)。
+
+   ```bash
+   export GEMINI_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
+   export GEMINI_OAUTH_CLIENT_SECRET=your-client-secret
+   ```
+
+4. ログインします。
+
+   ```bash
+   code-chat --login
+   ```
+
+5. `--oauth` を付けて実行します。
+
+   ```bash
+   code-chat --oauth "こんにちは"
+   ```
+
+トークンは `~/.config/code-chat/oauth_token.json` (所有者のみ読み書き可能) に保存され、期限切れ時は自動で更新されます。
+
+- **`--oauth` を付けたときだけ OAuth を使います。** 付けない場合は、`GEMINI_API_KEY` の API キーを使います (未設定ならエラーです。OAuth に自動では切り替わりません)。
+- `--oauth` を付けて、保存済みのトークンがない場合、対話端末から起動すると自動でブラウザ認証が始まります。パイプ実行などの非対話環境では、`code-chat --login` の実行を促すエラーで終了します。
+- 毎回 `--oauth` を付けたくない場合は、`alias code-chat='code-chat --oauth'` のようにエイリアスを設定してください。
+- ダウンロードした OAuth クライアントの JSON (`client_secret_*.json`) は `.gitignore` の対象です。リポジトリに含めないでください。
+- OAuth 同意画面が「テスト中」のままだと、リフレッシュトークンは 7 日で失効し、再ログインが必要になります。
+- RAG (`--rag`, `rag` サブコマンド) は Embedding API を langchain 経由で呼び出すため、OAuth に対応していません。`--rag` と `--oauth` を併用する場合、RAG の検索には `GEMINI_API_KEY` の API キーが使われます (Gemini への問い合わせ自体は OAuth です)。
+
+> **Note:** `.env` ファイルは自動では読み込まれません。`.env` を使う場合は `uv run --env-file .env code-chat ...` のように明示するか、シェルで読み込んでください。
+
+## 使い方
+
+`uv run` 経由、またはインストール済みの `code-chat` コマンドで実行します。
+
+```bash
+# 対話モードで起動 (終了: exit / quit / q、会話ログ保存: /save <path>)
+code-chat
+
+# ワンショット実行 (ファイルをコンテキストにして質問)
+code-chat "このコードのバグを修正して" -f ./src/main.py
+
+# パイプ入力をコンテキストにする
+git diff | code-chat "この変更を要約して"
+
+# 対象ファイルを LLM の出力で更新 (確認プロンプトあり)
+code-chat "型ヒントを追加して" -f ./src/main.py --write
+
+# コードレビュー (ファイル指定 / Git 差分 / ステージ済み差分)
+code-chat --review -f ./src/main.py
+code-chat --review
+code-chat --review --staged
+
+# Git 差分からコミットメッセージを生成
+code-chat --generate-commit-msg
+
+# 利用可能なモデル一覧
+code-chat --list-models
+
+# Google アカウントで OAuth ログイン (初回のみ)
+code-chat --login
+
+# OAuth で実行 (GEMINI_API_KEY が設定されていても OAuth を使う)
+code-chat --oauth "こんにちは"
+
+# API を呼ばずに解析結果だけ確認
+code-chat "テスト" -f ./src/main.py --dry-run
+```
+
+主なオプション:
+
+| オプション | 説明 |
+| --- | --- |
+| `[PROMPT]` | プロンプト。省略時は対話モード |
+| `-f, --file <PATH>` | コンテキストとして読み込む（`-w` の書き込み対象にもなる）ファイル・ディレクトリ。複数指定可。`--rag` / `--mcp` とは併用できません (エラー終了) |
+| `-m, --model <MODEL>` | 使用するモデル (デフォルト: `gemini-3.5-flash`) |
+| `-w, --write` | 生成コードを対象ファイルに書き込む |
+| `-r, --review` / `--staged` | コードレビュー / ステージ済み差分のみ対象 |
+| `-g, --generate-commit-msg` | コミットメッセージを生成 |
+| `-l, --list-models` | モデル一覧を表示 |
+| `--login` | ブラウザで OAuth ログインし、トークンを保存して終了 |
+| `--oauth` | `GEMINI_API_KEY` ではなく OAuth (`--login` で保存したトークン) で認証 |
+| `--rag` | RAG 検索によるコンテキスト注入 (`--mcp` と併用可) |
+| `--mcp` | MCP ツール連携 (`--rag` と併用可) |
+| `-a, --auto-save` | 対話ログを `<日時>_chat.md` に自動保存 |
+| `-D, --debug` / `--log-level` / `--trace` | ログ出力の制御 |
+| `--dry-run` | API 呼び出しを行わず引数と読み込み内容を表示 |
+
+## RAG (コードベース検索)
+
+Vector DB は既定で `./.chroma_db` に作成されます。インデックス作成と検索には Gemini の Embedding API を使用します。
+
+```bash
+# インデックスの作成 (既存の内容は初期化されます)
+code-chat rag create --input_dirs ./packages --output_dir ./.chroma_db
+
+# 差分更新
+code-chat rag update --input_dirs ./packages
+
+# ステータス確認 / 削除
+code-chat rag status
+code-chat rag rm
+
+# RAG を有効にして質問
+code-chat "認証機能の実装箇所を説明して" --rag
+```
+
+> **Note:** `-f` (ファイルをそのまま送信) は `--rag` / `--mcp` と併用できません。併用するとエラー終了します。`--rag --mcp` を併用すると、RAG で検索したコンテキストが MCP に渡すプロンプトに付加されます。
+
+> **Note:** `--dry-run` は API 呼び出しを伴う処理全般をスキップする共通オプションです。`rag create --dry-run` では、インデックス対象ファイルの一覧は表示されず、引数の解析結果のみが表示されます。
+
+インデックス対象の拡張子は `.py` `.cpp` `.hpp` `.c` `.h` `.ts` `.js` で、`.git` `.venv` `node_modules` などの除外ディレクトリと、`.` で始まる隠しディレクトリはスキップされます。
 
 ## MCP (Model Context Protocol) の設定と利用
 
-`code-chat` は MCP (Model Context Protocol) に対応しており、LLM がローカル環境のファイル参照やコマンド実行を動的かつ安全に行えます。
+`code-chat` は MCP に対応しており、Gemini が MCP サーバーのツールを呼び出して回答できます。
 
-### 1. サポートしている MCP サーバー
+### 1. 設定ファイル
 
-* 📂 **`@modelcontextprotocol/server-filesystem`**:
-* プロジェクト内のファイル参照・検索・読み込みを安全に行います。
-
-
-* ⚡ **`mcp-server-commands`**:
-* `uv` 経由でのテスト実行や Git 操作などの CLI コマンドを実行します。
-* 許可リスト（Allowlist）によるコマンド制限を行い、安全性を確保します。
-
-
-
-### 2. 設定ファイル (`mcp.json`)
-
-プロジェクトルートに `mcp.json` を配置してサーバーを定義します。
+設定ファイルは `~/.config/code-chat/mcp.json` から読み込まれます（ファイルが無い場合は警告が出て、サーバーなしで動作します）。
 
 ```json
 {
@@ -120,7 +242,7 @@ cchat
       "args": [
         "-y",
         "@modelcontextprotocol/server-filesystem",
-        "/home/higashi/src/code-chat"
+        "${CWD}"
       ],
       "enabled": true
     },
@@ -132,70 +254,86 @@ cchat
         "--allowed-commands",
         "uv,git"
       ],
-      "env": {
-        "PATH": "/home/higashi/.local/bin:/usr/local/bin:/usr/bin:/bin"
-      },
       "enabled": true
     }
   }
 }
-
 ```
 
-> **重要:** Python の依存関係やテストを正しく認識させるため、`mcp-server-commands` の許可コマンドは `uv` と `git` に絞り込み、ツール内での実行時も必ず `uv run` を前置（例: `uv run pytest`）する運用を推奨します。
+- `args` 内の `${CWD}` は、実行時のカレントディレクトリの絶対パスに置換されます。
+- `env`（環境変数の辞書）は任意です。`"enabled": false` でサーバーを無効化できます。
+- ツール名は `<サーバー名>__<ツール名>` の形式で Gemini に渡されます。
+
+> **重要:** `mcp-server-commands` の許可コマンドは必要最小限（例: `uv`, `git`）に絞り、実行時も `uv run pytest` のように `uv run` を前置する運用を推奨します。
+
+### 2. 実行
+
+```bash
+# MCP サーバーの一覧とツールを表示
+code-chat mcp status
+
+# 全 MCP サーバーの導通テスト
+code-chat mcp test
+
+# MCP を使ってワンショット実行
+code-chat "git の状態を確認して" --mcp
+
+# RAG で検索したコードをプロンプトに付加して、MCP のツールを使って実行
+code-chat "認証機能の実装箇所を調べて、関連する変更履歴を確認して" --rag --mcp
+
+# 対話モード内では /mcp を前置して実行
+# You > /mcp 未コミットの変更を要約して
+```
+
+詳細は [packages/code-chat-mcp/README.md](packages/code-chat-mcp/README.md) を参照してください。
+
+## ビルド
+
+```bash
+uv build
+```
 
 ## テストの実行
 
-`pytest` を使用してテストおよびカバレッジ測定を実行します。
-
-### 全テストの実行とカバー率の確認
+`pytest` を使用してテストおよびカバレッジ測定を実行します（設定は `pyproject.toml` の `[tool.pytest.ini_options]`）。テストは `tests/code_chat_cli/`、`tests/code_chat_rag/` にあります。
 
 ```bash
+# 全テストの実行とカバレッジの確認
 uv run pytest
 
-```
-
-### 特定のテストファイルや個別テストの実行
-
-特定のテストファイル（例: `tests/test_args.py`）や個別のテストケースを対象に、詳細ログや短縮トレースバックを出力して実行する場合は以下のコマンドを使用します。
-
-```bash
 # 特定のテストファイル全体を実行
-uv run pytest tests/test_args.py -vv --tb=short
+uv run pytest --no-cov tests/code_chat_cli/test_args.py -vv --tb=short
 
-# 特定のテスト関数（テストスイート）を指定して実行
-uv run pytest tests/test_args.py::test_read_path_content_directory -vv --tb=short
+# 特定のテスト関数を実行
+uv run pytest --no-cov tests/code_chat_cli/test_args.py::test_parse_args_default -vv --tb=short
 
-# テスト名キーワード指定（名前に "retry" が含まれるテストのみ実行）
-uv run pytest -k "retry" -vv --tb=short
+# テスト名のキーワード指定 (名前に "retry" を含むテストのみ)
+uv run pytest --no-cov -k "retry" -vv --tb=short
 
-# 標準出力（print文やログ）をキャプチャせずリアルタイム表示して実行
-uv run pytest tests/test_chat.py -s -vv --tb=short
-
+# 標準出力をキャプチャせずに表示
+uv run pytest --no-cov tests/code_chat_cli/test_chat.py -s -vv --tb=short
 ```
+
+> **Note:** カバレッジは 100% を基準（`fail_under = 100`）としており、下回ると `uv run pytest` は失敗します。一部のテストだけを実行する場合は、基準の判定を避けるため `--no-cov` を付けてください（例: `uv run pytest --no-cov tests/code_chat_cli/test_args.py`）。
 
 ## コード品質チェック・開発用コマンド
 
-コミット前や開発中に手動でコードチェックや `pre-commit` を実行できます。
-
 ```bash
-# フォーマットとリンターチェック (Ruff)
+# リンター・フォーマッター (Ruff)
 uv run ruff check --fix .
 uv run ruff format .
 
 # 詳細リンターチェック (Pylint)
-uv run pylint src/
+uv run pylint packages tests
 
-# 静的型チェック (Mypy)
-uv run mypy src/
-
-# pre-commit フックの手動実行 (全ファイル対象)
+# pre-commit フックの手動実行 (全ファイル対象: trailing-whitespace / ruff / pylint / mypy)
 uv run pre-commit run --all-files
 
 # pre-commit フックの更新
 uv run pre-commit autoupdate
-
 ```
+
+> **Note:** 型チェック (Mypy) は `uv run pre-commit run mypy --all-files` で実行してください。
 
 ## トラブルシューティング
 
@@ -207,7 +345,6 @@ uv run pre-commit autoupdate
 ```bash
 # 開発用依存関係を含めて同期
 uv sync --dev
-
 ```
 
 上記で解消しない場合や、パッケージ名の変更・環境構築時の不整合が発生している場合は、仮想環境を一度再構築・再同期してください。
@@ -215,5 +352,20 @@ uv sync --dev
 ```bash
 # 仮想環境をクリアして全依存関係を再同期
 uv sync --all-groups --reinstall
-
 ```
+
+### `GEMINI_API_KEY is missing` と表示される
+
+環境変数 `GEMINI_API_KEY` が設定されていません。`.env` は自動で読み込まれないため、`export` するか `uv run --env-file .env ...` を使用してください。API キーの代わりに OAuth を使う場合は、[OAuth ログイン](#方法-2-oauth-ログイン-google-アカウント)を行い、`--oauth` を指定してください。
+
+### `OAuth credentials are missing` と表示される
+
+`--oauth` を指定しましたが、OAuth の設定または保存済みのトークンがありません。表示されたメッセージに従って、環境変数の設定と `code-chat --login` を行ってください。
+
+### OAuth ログインで `access_denied` (エラー 403) になる
+
+OAuth 同意画面が「テスト中」で、ログインしたアカウントがテストユーザーに登録されていません。Google Cloud コンソールの「Google Auth Platform」→「対象」で、テストユーザーに追加してください。
+
+### OAuth の再ログインを求められる
+
+リフレッシュトークンが失効しています (同意画面が「テスト中」の場合は 7 日で失効します)。`code-chat --login` で再ログインしてください。

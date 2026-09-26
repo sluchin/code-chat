@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 def handle_commit_generation(client: Any, model_name: str, lang: str = "en") -> None:
     """Git の diff（差分）を取得し, Gemini API を用いてコミットメッセージを自動生成します.
 
-    `git diff --staged`（ステージング済み差分）および `git diff`（未ステージング差分）を
+    ステージング済み差分 (`git diff --staged`) および未ステージング差分 (`git diff`) を
     読み取り, 変更内容が存在する場合に指定された言語で Conventional Commits 形式に沿った
     適切なコミットメッセージを生成して標準出力に表示します.
 

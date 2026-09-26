@@ -49,3 +49,9 @@ htmlcov/
 
 # code-chat
 .chroma_db/
+
+# OAuth クライアントの認証情報 (Google Cloud からダウンロードした JSON)
+client_secret*.json
+
+# Claude Code のローカル設定
+.claude/
