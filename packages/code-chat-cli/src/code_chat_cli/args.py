@@ -172,8 +172,15 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
 
     context_parts: list[str] = []
 
-    # 標準入力の取得
-    stdin_text = _read_stdin_content()
+    # 標準入力の取得 (コンテキストを使わないコマンドでは, 入力の終了を待って固まらないよう, 読み込まない)
+    uses_context = not (
+        raw_args.subcommand
+        or raw_args.list_models
+        or raw_args.login
+        or raw_args.generate_commit_msg
+        or raw_args.review
+    )
+    stdin_text = _read_stdin_content() if uses_context else ""
     if stdin_text:
         context_parts.append(f"--- [標準入力] ---\n{stdin_text}")
 
