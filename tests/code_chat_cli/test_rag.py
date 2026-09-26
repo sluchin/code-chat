@@ -142,9 +142,9 @@ class TestHandleRag:
         mock_rag_service_cls.return_value = mock_service
 
         with patch("builtins.print") as mock_print:
-            handle_rag("テストの質問")
+            handle_rag("テストの質問", "/path/to/db")
 
-        mock_rag_service_cls.assert_called_once_with(output_dir="./.chroma_db")
+        mock_rag_service_cls.assert_called_once_with(output_dir="/path/to/db")
         mock_service.query_stream.assert_called_once_with("テストの質問")
 
         # ストリーミング出力（flush=True）と最後の改行の検証

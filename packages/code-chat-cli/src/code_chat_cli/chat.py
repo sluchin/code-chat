@@ -793,7 +793,7 @@ def _handle_rag_subcommand(cli_args: Any) -> None:
         if prompt:
             prompt_str = " ".join(prompt) if isinstance(prompt, list) else str(prompt)
             logger.info("RAG 検索クエリを実行します: %s", prompt_str)
-            handle_rag(prompt_str)
+            handle_rag(prompt_str, output_dir)
             sys.exit(0)
 
     # ハンドラの中で送出される langchain / chroma / Embedding API の例外は種類が多く, 特定できないため

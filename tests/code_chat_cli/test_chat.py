@@ -893,7 +893,9 @@ class TestHandleSubcommands:
     def test_handle_subcommands_rag_prompt_success(self) -> None:
         """rag のアクション未指定でプロンプトがある場合, handle_rag が呼ばれ sys.exit(0) されること."""
         # アクションなし + プロンプトを指定 (ワンショット検索)
-        cli_args = _cli_args(subcommand="rag", prompt="how to use this?")
+        cli_args = _cli_args(
+            subcommand="rag", prompt="how to use this?", output_dir="/path/to/db"
+        )
 
         # RAG 検索のハンドラをモック化
         with (
@@ -903,7 +905,7 @@ class TestHandleSubcommands:
             _handle_subcommands(MagicMock(), cli_args)
 
         # プロンプトが検索に渡され, 正常終了すること
-        mock_handle.assert_called_once_with("how to use this?")
+        mock_handle.assert_called_once_with("how to use this?", "/path/to/db")
         assert exc_info.value.code == 0
 
     def test_handle_subcommands_dispatch_success(self):
@@ -995,7 +997,9 @@ class TestHandleSubcommands:
 
     def test_handle_subcommands_rag_prompt_failure(self) -> None:
         """rag のプロンプト検索で例外が発生した場合, sys.exit(1) されること."""
-        cli_args = _cli_args(subcommand="rag", prompt="how to use this?")
+        cli_args = _cli_args(
+            subcommand="rag", prompt="how to use this?", output_dir="/path/to/db"
+        )
 
         # 検索ハンドラが例外を送出する設定
         with (
@@ -1082,7 +1086,7 @@ class TestHandleRagSubcommand:
             _handle_rag_subcommand(args)
 
         # 空白区切りで結合した文字列で検索されること
-        handler.assert_called_once_with("how to")
+        handler.assert_called_once_with("how to", "./.chroma_db")
         assert exc_info.value.code == 0
 
     def test_handle_rag_subcommand_no_action_no_prompt(self):
