@@ -175,6 +175,8 @@ class Indexer:
         for input_dir in input_dirs:
             path = Path(input_dir)
             if not path.exists():
+                # --dry-run など, load_and_chunk を経由しない場合でも, 対象が 0 件の理由が分かるようにする
+                logger.warning("インデックス対象のパスが存在しません: '%s'", input_dir)
                 continue
 
             for file_path in path.rglob("*"):

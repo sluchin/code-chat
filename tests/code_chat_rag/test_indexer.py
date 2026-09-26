@@ -210,6 +210,14 @@ class TestGetTargetFiles:
             str(repo / "sub" / "c.TS"),
         ]
 
+    def test_get_target_files_warns_missing_path(self, tmp_path, caplog):
+        """存在しないパスは, 黙って飛ばさずに, 警告を出すか検証する."""
+        missing = tmp_path / "missing"
+
+        assert not Indexer(input_dirs=[str(missing)]).get_target_files()
+
+        assert f"インデックス対象のパスが存在しません: '{missing}'" in caplog.text
+
     def test_get_target_files_uses_suffixes(self, tmp_path):
         """コンストラクタで指定した拡張子だけを対象にするか検証する."""
         (tmp_path / "a.py").write_text("a", encoding="utf-8")
