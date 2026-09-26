@@ -3,10 +3,10 @@
 import subprocess
 from typing import Any
 
-from code_chat_cli.api import send_message_stream_with_retry
 from code_chat_cli.git_utils import get_git_diff
-from code_chat_cli.logger import get_logger
 from code_chat_cli.prompts import Prompts
+from code_chat_lib.api import send_message_stream_with_retry
+from code_chat_lib.logger import get_logger
 
 logger = get_logger(__name__)
 

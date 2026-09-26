@@ -2,7 +2,7 @@
 
 from langchain_core.embeddings import Embeddings
 
-from code_chat_cli.api import call_with_retry
+from code_chat_lib.api import call_with_retry
 
 
 class RetryEmbeddings(Embeddings):

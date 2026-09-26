@@ -1,16 +1,16 @@
 """MCP サーバー管理およびライフサイクル制御を行うサービスクラス."""
 
-import logging
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Self
 
+from code_chat_lib.logger import get_logger
 from code_chat_mcp.mcp_config import McpConfig
 from code_chat_mcp.mcp_server_config import McpServerConfig
 from code_chat_mcp.mcp_server_connection import McpServerConnection
 from code_chat_mcp.mcp_tool_info import McpToolInfo
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class McpService:

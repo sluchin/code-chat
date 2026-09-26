@@ -1,4 +1,4 @@
-"""`code_chat_cli.logger` モジュールにおけるログフォーマット, 出力レベル設定, およびファイル出力のテスト."""
+"""`code_chat_lib.logger` モジュールにおけるログフォーマット, 出力レベル設定, およびファイル出力のテスト."""
 
 import logging
 import os
@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 from google.genai.errors import APIError
 
-from code_chat_cli.logger import (
+from code_chat_lib.logger import (
     THIRD_PARTY_LOGGERS,
     _is_trace_enabled,
     _syslog_context_filter,
@@ -68,9 +68,9 @@ class TestSyslogContextFilter:
         assert hasattr(record, "app_name")
         assert isinstance(record.app_name, str)
 
-    @patch("code_chat_cli.logger.APP_NAME", "custom-app")
-    @patch("code_chat_cli.logger.HOSTNAME", "test-host")
-    @patch("code_chat_cli.logger.PID", 12345)
+    @patch("code_chat_lib.logger.APP_NAME", "custom-app")
+    @patch("code_chat_lib.logger.HOSTNAME", "test-host")
+    @patch("code_chat_lib.logger.PID", 12345)
     def test_syslog_context_filter_mocked_values_success(self):
         """正常系: モックされたシステム定数が LogRecord に正しくセットされるか検証."""
         record = logging.LogRecord(

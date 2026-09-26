@@ -2,8 +2,8 @@
 
 from typing import Any
 
-from code_chat_cli.api import call_with_retry
-from code_chat_cli.logger import get_logger, log_exception
+from code_chat_lib.api import call_with_retry
+from code_chat_lib.logger import get_logger, log_exception
 
 # logger を定義
 logger = get_logger(__name__)

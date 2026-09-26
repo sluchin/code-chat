@@ -14,12 +14,12 @@ from typing import Any
 from google.genai import types
 from google.genai.errors import APIError
 
-from code_chat_cli.api import call_with_retry
 from code_chat_cli.cache_error import CacheError
 from code_chat_cli.file_utils import read_path_content
-from code_chat_cli.gemini_error import format_error
-from code_chat_cli.logger import get_logger
 from code_chat_cli.prompts import Prompts
+from code_chat_lib.api import call_with_retry
+from code_chat_lib.gemini_error import format_error
+from code_chat_lib.logger import get_logger
 
 logger = get_logger(__name__)
 

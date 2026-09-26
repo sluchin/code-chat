@@ -12,6 +12,7 @@ resolution-markers = [
 members = [
     "code-chat",
     "code-chat-cli",
+    "code-chat-lib",
     "code-chat-mcp",
     "code-chat-rag",
 ]
@@ -687,6 +688,7 @@ name = "code-chat-cli"
 version = "0.1.0"
 source = { editable = "packages/code-chat-cli" }
 dependencies = [
+    { name = "code-chat-lib" },
     { name = "code-chat-mcp" },
     { name = "code-chat-rag" },
     { name = "google-auth-oauthlib" },
@@ -709,6 +711,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "code-chat-lib", editable = "packages/code-chat-lib" },
     { name = "code-chat-mcp", editable = "packages/code-chat-mcp" },
     { name = "code-chat-rag", editable = "packages/code-chat-rag" },
     { name = "google-auth-oauthlib", specifier = ">=1.4.1" },
@@ -730,11 +733,29 @@ dev = [
 ]
 
 [[package]]
+name = "code-chat-lib"
+version = "0.1.0"
+source = { editable = "packages/code-chat-lib" }
+dependencies = [
+    { name = "google-genai" },
+    { name = "httpx" },
+    { name = "tenacity" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "google-genai", specifier = ">=2.24.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "tenacity", specifier = ">=9.0.0" },
+]
+
+[[package]]
 name = "code-chat-mcp"
 version = "0.1.0"
 source = { editable = "packages/code-chat-mcp" }
 dependencies = [
     { name = "chromadb" },
+    { name = "code-chat-lib" },
     { name = "esprima" },
     { name = "google-genai" },
     { name = "mcp" },
@@ -743,6 +764,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "chromadb", specifier = ">=1.5.9" },
+    { name = "code-chat-lib", editable = "packages/code-chat-lib" },
     { name = "esprima", specifier = ">=4.0.1" },
     { name = "google-genai", specifier = ">=2.24.0" },
     { name = "mcp", specifier = ">=2.2.0" },
@@ -754,6 +776,7 @@ version = "0.1.0"
 source = { editable = "packages/code-chat-rag" }
 dependencies = [
     { name = "chromadb" },
+    { name = "code-chat-lib" },
     { name = "esprima" },
     { name = "google-genai" },
     { name = "langchain" },
@@ -765,6 +788,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "chromadb", specifier = ">=1.5.9" },
+    { name = "code-chat-lib", editable = "packages/code-chat-lib" },
     { name = "esprima", specifier = ">=4.0.1" },
     { name = "google-genai", specifier = ">=2.24.0" },
     { name = "langchain", specifier = ">=1.3.15" },

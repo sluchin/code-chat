@@ -1,0 +1,21 @@
+[project]
+name = "code-chat-lib"
+version = "0.1.0"
+description = "Shared library (logging, Gemini API retry and error handling) for code-chat packages"
+readme = "README.md"
+authors = [
+    { name = "Tetsuya Higashi", email = "996846+sluchin@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "google-genai>=2.24.0",
+    "httpx>=0.28.1",
+    "tenacity>=9.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/code_chat_lib"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

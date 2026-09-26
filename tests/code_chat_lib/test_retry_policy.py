@@ -1,6 +1,6 @@
-"""`code_chat_cli.retry_policy` モジュールのテスト."""
+"""`code_chat_lib.retry_policy` モジュールのテスト."""
 
-from code_chat_cli.retry_policy import RetryPolicy
+from code_chat_lib.retry_policy import RetryPolicy
 
 
 class TestRetryPolicy:

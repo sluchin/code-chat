@@ -12,8 +12,8 @@ from langchain_community.document_loaders.generic import GenericLoader
 from langchain_community.document_loaders.parsers import LanguageParser
 from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
 
-from code_chat_cli.constants import Constants
-from code_chat_cli.logger import get_logger
+from code_chat_lib.constants import Constants
+from code_chat_lib.logger import get_logger
 
 # インデックス対象の拡張子 (除外ディレクトリは, ファイル読み込みと共通の Constants.EXCLUDE_DIRS)
 TARGET_EXTENSIONS = {".py", ".cpp", ".hpp", ".c", ".h", ".ts", ".js"}

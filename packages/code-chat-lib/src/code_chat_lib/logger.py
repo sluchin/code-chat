@@ -7,7 +7,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from code_chat_cli.gemini_error import find_api_error, format_error
+from code_chat_lib.gemini_error import find_api_error, format_error
 
 # システム固定情報（ホスト名およびプロセスID）
 HOSTNAME = socket.gethostname()

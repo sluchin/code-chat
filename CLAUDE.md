@@ -12,8 +12,8 @@
 
 ## プロジェクト構成
 
-- uv workspace (`packages/*`) による 3 パッケージ構成: `code-chat-cli` (CLI 本体), `code-chat-rag` (RAG), `code-chat-mcp` (MCP)。
-- テストは `tests/code_chat_cli/`, `tests/code_chat_rag/`, `tests/code_chat_mcp/` に置く。テストファイル名は、ディレクトリをまたいでも重複させない。
+- uv workspace (`packages/*`) による 4 パッケージ構成: `code-chat-cli` (CLI 本体), `code-chat-lib` (共通ライブラリ: ロガー・Gemini API のリトライ・エラー整形。他のパッケージに依存しない), `code-chat-rag` (RAG), `code-chat-mcp` (MCP)。
+- テストは `tests/code_chat_cli/`, `tests/code_chat_lib/`, `tests/code_chat_rag/`, `tests/code_chat_mcp/` に置く。テストファイル名は、ディレクトリをまたいでも重複させない。
 - テストで `CliArgs.parse_args` の戻り値を作るときは、`MagicMock` ではなく `CliArgs` から作る (`tests/conftest.py` の `mock_args`、または `asdict(CliArgs(...))`)。`MagicMock` の属性は常に真値になり、`--dry-run` や `--mcp` の分岐に意図せず入って、実際の API に接続する恐れがある。
 - テストから外部 API (Gemini など) や実際の MCP サーバーへ接続しないこと。
 
@@ -27,7 +27,7 @@
 - **状態を持たない処理は、クラスにしない**: 状態を持たず、メソッドだけになるものは、モジュール直下の関数のままにする (`chat.py`、`history.py`、`file_writer.py` など)。`@staticmethod` だけを並べた、名前空間としてのクラスは作らない。この場合、ファイル名はクラス名と対応しない。
 - **クラス本体での自己参照**: メソッドの型注釈や既定値で、そのメソッドが属するクラス自身を参照するときは、文字列にする (`-> "Foo"`)。Python 3.12 / 3.13 では、クラス本体の実行時にクラス名が未定義で `NameError` になるため (Python 3.14 では遅延評価されるので、気づきにくい)。
 - **内部関数の命名**: 他のモジュールから使わない関数・メソッドには、名前の先頭に `_` を付ける。内部からしか使わなくても、公開 API として自然なものは、例外として `_` を付けずに公開し、その旨を、定義の直前のコメントに書く (`McpServerConnection.connect`)。実行時 (`src`) から一度も呼ばれず、テストからしか使われないコードは、削除する。
-- **Gemini API の呼び出し**: Gemini API を呼び出すときは、`code_chat_cli.api.call_with_retry` (または、それを使う `send_message_with_retry` など) を通し、リトライの方針を 1 か所に集約する。SDK の `retry_options` は、二重にリトライしないよう、設定しない。リトライの設定値は、`RetryPolicy` に置く。
+- **Gemini API の呼び出し**: Gemini API を呼び出すときは、`code_chat_lib.api.call_with_retry` (または、それを使う `send_message_with_retry` など) を通し、リトライの方針を 1 か所に集約する。SDK の `retry_options` は、二重にリトライしないよう、設定しない。リトライの設定値は、`RetryPolicy` に置く。
 - **コメントの書き方**: コメントに、`# --- 見出し ---` や `# ===` のような、装飾の記号を入れない。見出しは、文字だけの短いコメントにする。
 - **例外の捕捉**: `except Exception` は避け、想定される例外 (`APIError`、`OSError` など) に絞る。外部ライブラリの例外が多岐にわたるなど、やむを得ず `except Exception` を使う場合は、`except` の直前に、理由をコメントで書く (ログに記録して再送出する場合も同様)。
 - **エントリポイント**: `pyproject.toml` の `[project.scripts]` は `code_chat_cli.chat:main` を指す。

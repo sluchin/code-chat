@@ -9,7 +9,7 @@ from google.genai.errors import APIError
 from tenacity import RetryCallState
 from tenacity.wait import wait_base
 
-from code_chat_cli.api import (
+from code_chat_lib.api import (
     _STREAM_END,
     _is_retryable_error,
     _log_retry,
@@ -20,7 +20,7 @@ from code_chat_cli.api import (
     send_message_with_retry,
     stream_with_retry,
 )
-from code_chat_cli.retry_policy import RetryPolicy
+from code_chat_lib.retry_policy import RetryPolicy
 
 
 def _api_error(code, status="UNAVAILABLE", message="high demand", extra=None):
@@ -450,6 +450,6 @@ class TestLogRetry:
 
 def test_backoff_is_tenacity_wait():
     """既定の待ち時間 (指数バックオフ + ジッター) が, tenacity の待機として組み立てられているか検証."""
-    from code_chat_cli import api  # pylint: disable=import-outside-toplevel
+    from code_chat_lib import api  # pylint: disable=import-outside-toplevel
 
     assert isinstance(api._BACKOFF, wait_base)  # pylint: disable=protected-access

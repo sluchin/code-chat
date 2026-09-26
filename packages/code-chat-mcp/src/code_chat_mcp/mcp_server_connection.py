@@ -1,6 +1,5 @@
 """MCP サーバーへの接続 (サブプロセスの起動と MCP セッションの確立) およびツール取得・呼び出しを行うモジュール."""
 
-import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -9,7 +8,9 @@ from typing import Any
 from mcp import ClientSession, StdioServerParameters, Tool
 from mcp.client.stdio import stdio_client
 
-logger = logging.getLogger(__name__)
+from code_chat_lib.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class McpServerConnection:

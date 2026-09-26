@@ -11,7 +11,7 @@ import re
 
 from google.genai.errors import APIError
 
-from code_chat_cli.gemini_error_kind import GeminiErrorKind
+from code_chat_lib.gemini_error_kind import GeminiErrorKind
 
 _MAX_CAUSE_DEPTH = 10
 _MAX_MESSAGE_LENGTH = 200

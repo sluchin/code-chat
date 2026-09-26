@@ -58,11 +58,12 @@ code-chat を使うメリットは、次のとおりです。
 
 ## プロジェクト構成
 
-uv workspace による 3 パッケージ構成です。
+uv workspace による 4 パッケージ構成です。
 
 | パッケージ | 役割 |
 | --- | --- |
 | `packages/code-chat-cli` | CLI 本体 (`code_chat_cli`): 引数解析、対話、ファイル書き込み、レビュー、コミットメッセージ生成 |
+| `packages/code-chat-lib` | 共通ライブラリ (`code_chat_lib`): ロガー、Gemini API のリトライ、エラーの概要・ヒントの作成。他のパッケージに依存しない |
 | `packages/code-chat-rag` | RAG (`code_chat_rag`): インデックス作成、ベクトルストア (ChromaDB)、検索 |
 | `packages/code-chat-mcp` | MCP (`code_chat_mcp`): 設定読み込み、MCP サーバーの起動とツール呼び出し |
 

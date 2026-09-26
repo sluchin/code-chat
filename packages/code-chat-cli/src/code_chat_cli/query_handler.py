@@ -6,9 +6,9 @@ from typing import Any
 from google import genai
 from google.genai import types
 
-from code_chat_cli.api import call_with_retry
-from code_chat_cli.constants import Constants
-from code_chat_cli.logger import get_logger
+from code_chat_lib.api import call_with_retry
+from code_chat_lib.constants import Constants
+from code_chat_lib.logger import get_logger
 from code_chat_mcp.mcp_service import McpService
 from code_chat_mcp.mcp_tool_info import McpToolInfo
 

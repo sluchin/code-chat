@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "code-chat-lib",
     "chromadb>=1.5.9",
     "esprima>=4.0.1",
     "google-genai>=2.24.0",
@@ -16,6 +17,9 @@ dependencies = [
     "langchain-community>=0.4.2",
     "langchain-google-genai>=4.3.4",
 ]
+
+[tool.uv.sources]
+code-chat-lib = { workspace = true }
 
 #[tool.uv.build-backend]
 #source-dir = "src"

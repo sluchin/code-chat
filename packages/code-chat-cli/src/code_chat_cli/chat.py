@@ -17,7 +17,6 @@ from typing import Any
 from google.genai import types
 from google.genai.errors import APIError, ClientError, ServerError
 
-from code_chat_cli.api import send_message_stream_with_retry, send_message_with_retry
 from code_chat_cli.args import parse_args
 from code_chat_cli.auth import login
 from code_chat_cli.cache_error import CacheError
@@ -28,20 +27,12 @@ from code_chat_cli.commands.models import handle_list_models
 from code_chat_cli.commands.review import handle_code_review
 from code_chat_cli.context_cache import ContextCache
 from code_chat_cli.file_writer import handle_write_mode_confirmation
-from code_chat_cli.gemini_error import format_error
 from code_chat_cli.history import (
     HAVE_READLINE,
     save_chat_history,
     save_history_if_needed,
     save_readline_history,
     setup_readline_history,
-)
-from code_chat_cli.logger import (
-    get_logger,
-    log_exception,
-    set_trace,
-    setup_logging,
-    suppress_info_logs,
 )
 from code_chat_cli.mcp import handle_mcp_run, handle_mcp_status, handle_mcp_test
 from code_chat_cli.oauth_error import OAuthError
@@ -52,6 +43,15 @@ from code_chat_cli.rag import (
     handle_rag_rm,
     handle_rag_status,
     handle_rag_update,
+)
+from code_chat_lib.api import send_message_stream_with_retry, send_message_with_retry
+from code_chat_lib.gemini_error import format_error
+from code_chat_lib.logger import (
+    get_logger,
+    log_exception,
+    set_trace,
+    setup_logging,
+    suppress_info_logs,
 )
 from code_chat_rag.rag_service import RagService
 
