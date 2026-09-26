@@ -1,8 +1,6 @@
 """MCP サーバー管理およびライフサイクル制御を行うサービスクラス."""
 
-import asyncio
 import logging
-import sys
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Self
@@ -56,31 +54,6 @@ class McpService:
 
         """
         await self._stop_all_servers()
-
-    def run(
-        self, server_name: str, tool_name: str, arguments: dict | None = None
-    ) -> None:
-        """単体テスト用: MCP ツールを直接実行して結果を出力します.
-
-        Args:
-            server_name (str): 実行対象の MCP サーバー名.
-            tool_name (str): 実行するツール名.
-            arguments (dict | None): ツールに引き渡す引数辞書.
-
-        """
-        server = self._get_server_or_fail(server_name)
-        connection = McpServerConnection(
-            command=server.command,
-            args=server.args,
-            env=server.env or None,
-        )
-
-        async def _run() -> None:
-            result = await connection.call_tool(tool_name, arguments or {})
-            print(f"=== Execution Result: {tool_name} ===")
-            print(result)
-
-        asyncio.run(_run())
 
     async def get_all_tools(self) -> list[McpToolInfo]:
         """有効化されている全 MCP サーバーからツール一覧を取得します.
@@ -173,25 +146,6 @@ class McpService:
         if not connection:
             raise ValueError(f"Server '{server_name}' is not running.")
         return await connection.call_tool(tool_name, arguments or {})
-
-    def _get_server_or_fail(self, server_name: str) -> McpServerConfig:
-        """サーバー名が存在するか検証し, 無ければ終了します.
-
-        Args:
-            server_name (str): 検証対象のサーバー名.
-
-        Returns:
-            McpServerConfig: サーバー設定オブジェクト.
-
-        """
-        server = self.servers.get(server_name)
-        if not server:
-            logger.error(
-                "指定された MCP サーバー '%s' は設定に存在しません",
-                server_name,
-            )
-            sys.exit(1)
-        return server
 
     async def _test_servers_async(self) -> None:
         """MCP サーバー群に対して順番に Stdio 接続を行い, ツールを取得できるかテストします."""
