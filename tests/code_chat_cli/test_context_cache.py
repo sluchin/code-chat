@@ -338,6 +338,15 @@ class TestResolve:
 
         assert ContextCache(_client([older, newer, other])).resolve(True) is newer
 
+    def test_resolve_latest_ignores_missing_create_time(self):
+        """作成日時を取得できないキャッシュがあっても, 比較で例外にならず, 日時のあるものが選ばれるか検証."""
+        unknown = _cache("unknown", create_time=None)
+        known = _cache(
+            "known", create_time=datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC)
+        )
+
+        assert ContextCache(_client([unknown, known])).resolve(True) is known
+
     def test_resolve_no_caches_failure(self):
         """使えるキャッシュが無い場合は, 作成方法を示す CacheError が発生するか検証."""
         with pytest.raises(CacheError, match="cache create"):
