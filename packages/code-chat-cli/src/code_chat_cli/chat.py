@@ -954,6 +954,9 @@ def _handle_mcp_single_turn(
         chat_history (list[str]): 対話履歴を格納するリスト.
         rag_service (Any | None, optional): RAGサービス. Defaults to None.
 
+    Raises:
+        SystemExit: MCP の実行に失敗した場合, 終了コード 1 で終了します.
+
     """
     # プロンプトの指定がなければ, 標準入力・ファイルのコンテキストをプロンプトとして使う
     prompt = cli_args.prompt or cli_args.context
@@ -961,7 +964,9 @@ def _handle_mcp_single_turn(
         logger.error("MCP 実行用のプロンプトまたはコンテキストを指定してください")
         return
 
-    _query_mcp(prompt, cli_args, chat_history, rag_service)
+    # 通常のチャットと同じく, 失敗を終了コードで呼び出し元 (スクリプトなど) に伝える
+    if not _query_mcp(prompt, cli_args, chat_history, rag_service):
+        sys.exit(1)
 
 
 def _handle_mcp_interactive(
