@@ -62,15 +62,16 @@ class ContextCache:
         print("キャッシュを作成しました")
         self._print_cache(cache)
 
-    def update(self, model: str, target: str = ".") -> None:
+    def update(self, model: str, target: str = ".", ttl: int = 3600) -> None:
         """同じ対象パスの既存キャッシュを削除し, 最新の内容で作り直します.
 
         キャッシュの内容は更新できないため, 削除して再作成します. 既存のキャッシュがない場合は,
-        新規に作成します. 保持時間は既定値 (3600 秒) になります.
+        新規に作成します. 既存のキャッシュの保持時間は引き継がず, `ttl` で指定した値になります.
 
         Args:
             model (str): キャッシュを使用するモデル名.
             target (str): コンテキストとして読み込むファイル・ディレクトリのパス. Defaults to ".".
+            ttl (int): キャッシュの保持時間 (秒). Defaults to 3600.
 
         Raises:
             CacheError: キャッシュを作成できなかった場合.
@@ -86,7 +87,7 @@ class ContextCache:
             )
 
         # 新しい内容を読み込めることを確認してから, 既存のキャッシュを削除する
-        cache = self._create_cache(model, target, 3600)
+        cache = self._create_cache(model, target, ttl)
         for old in existing:
             call_with_retry(self.client.caches.delete, name=old.name)
             print(f"古いキャッシュを削除しました: {old.name}")

@@ -258,6 +258,18 @@ class TestParseArgs:
         assert args.subcommand_target == "src"
         assert args.cache_ttl == 120
 
+    def test_parse_args_cache_update_ttl_success(self, monkeypatch):
+        """cache update の --ttl が解析され, 省略時は 3600 秒になるか検証."""
+        monkeypatch.setattr("sys.argv", ["chat.py", "cache", "update", "src"])
+        default = parse_args()
+        monkeypatch.setattr(
+            "sys.argv", ["chat.py", "cache", "update", "src", "--ttl", "120"]
+        )
+        specified = parse_args()
+
+        assert default.cache_ttl == 3600
+        assert specified.cache_ttl == 120
+
     @pytest.mark.parametrize("option", ["--rag", "--mcp"])
     def test_parse_args_file_with_rag_or_mcp_failure(
         self, monkeypatch, tmp_path, capsys, option

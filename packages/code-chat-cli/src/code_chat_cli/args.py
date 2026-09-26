@@ -108,6 +108,9 @@ def parse_args(args: list[str] | None = None) -> CliArgs:
     cache_update.add_argument(
         "target", nargs="?", default=".", help="対象パス (デフォルト: .)"
     )
+    cache_update.add_argument(
+        "--ttl", type=int, default=3600, help="保持時間(秒) (デフォルト: 3600)"
+    )
 
     cache_rm = cache_subparsers.add_parser(
         "rm", parents=[global_parser], help="指定したキャッシュを削除"

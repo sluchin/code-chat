@@ -554,7 +554,7 @@ def _handle_cache_subcommand(client: Any, cli_args: Any) -> None:
             sys.exit(0)
 
         if action == "update":
-            context_cache.update(cli_args.model, target or ".")
+            context_cache.update(cli_args.model, target or ".", cli_args.cache_ttl)
             sys.exit(0)
 
         if action == "rm":

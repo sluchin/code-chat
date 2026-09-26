@@ -643,7 +643,7 @@ class TestHandleCacheSubcommand:
         ("action", "handler", "expected_args"),
         [
             ("create", "create", ("gemini-flash-latest", "src", 120)),
-            ("update", "update", ("gemini-flash-latest", "src")),
+            ("update", "update", ("gemini-flash-latest", "src", 120)),
             ("rm", "remove", ("src",)),
             ("list", "list_caches", ()),
         ],
