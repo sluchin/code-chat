@@ -67,6 +67,25 @@ class TestHandleMcpRun:
         assert handler_cls.call_args.kwargs["model_name"] == "models/gemini-cache"
         assert handler_cls.call_args.kwargs["cached_content"] == "cachedContents/abc"
 
+    def test_handle_mcp_run_max_tool_rounds_success(self):
+        """ツール呼び出しの回数の上限が, 指定した値 (省略時は既定値) で QueryHandler に渡されるか検証."""
+        service_cls = _service_cm(MagicMock())
+        handler = MagicMock()
+        handler.run = AsyncMock(return_value="answer")
+
+        with (
+            patch("code_chat_cli.mcp.McpService", service_cls),
+            patch("code_chat_cli.mcp.get_gemini_client"),
+            patch(
+                "code_chat_cli.mcp.QueryHandler", return_value=handler
+            ) as handler_cls,
+        ):
+            asyncio.run(handle_mcp_run("hello"))
+            asyncio.run(handle_mcp_run("hello", max_tool_rounds=3))
+
+        rounds = [c.kwargs["max_tool_rounds"] for c in handler_cls.call_args_list]
+        assert rounds == [20, 3]
+
     def test_handle_mcp_run_use_oauth_success(self):
         """use_oauth が Gemini クライアントの作成に渡されるか検証."""
         service_cls = _service_cm(MagicMock())

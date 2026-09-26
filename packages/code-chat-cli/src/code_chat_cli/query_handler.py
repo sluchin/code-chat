@@ -7,6 +7,7 @@ from google import genai
 from google.genai import types
 
 from code_chat_cli.api import call_with_retry
+from code_chat_cli.constants import Constants
 from code_chat_cli.logger import get_logger
 from code_chat_mcp.mcp_service import McpService
 from code_chat_mcp.mcp_tool_info import McpToolInfo
@@ -17,15 +18,13 @@ logger = get_logger(__name__)
 class QueryHandler:
     """Gemini API と MCP サーバー間の Tool Calling 対話ループを管理するクラス."""
 
-    MAX_TOOL_ROUNDS = 20
-    """ツールの呼び出しを繰り返す回数の上限 (モデルがツールを呼び続けて, 終わらなくなることを防ぐ)."""
-
     def __init__(
         self,
         gemini_client: genai.Client,
         mcp_service: McpService,
         model_name: str | None = None,
         cached_content: str | None = None,
+        max_tool_rounds: int = Constants.DEFAULT_MAX_TOOL_ROUNDS,
     ) -> None:
         """QueryHandler インスタンスを初期化します.
 
@@ -36,12 +35,15 @@ class QueryHandler:
             キャッシュを使う場合は, キャッシュのモデルを指定する.
             cached_content (str | None): 使用するキャッシュ名 (`cachedContents/<ID>`). 省略時はキャッシュを使わない.
                 ツール定義はキャッシュに含まれないため, Gemini API がエラーを返す場合がある.
+            max_tool_rounds (int): ツールの呼び出しを繰り返す回数の上限 (モデルがツールを呼び続けて,
+                終わらなくなることを防ぐ). 省略時は 20 回.
 
         """
         self.client = gemini_client
         self.mcp_service = mcp_service
         self.model_name = model_name or "gemini-3.5-flash"
         self.cached_content = cached_content
+        self.max_tool_rounds = max_tool_rounds
 
     def _generate_content_with_retry(
         self, contents: list[Any], config: types.GenerateContentConfig
@@ -74,7 +76,7 @@ class QueryHandler:
             str: Gemini からの最終回答テキスト.
 
         Raises:
-            RuntimeError: ツールの呼び出しが `MAX_TOOL_ROUNDS` 回を超えても終わらない場合.
+            RuntimeError: ツールの呼び出しが `max_tool_rounds` 回を超えても終わらない場合.
 
         """
         # 各 MCP サーバーからツール一覧を取得し,
@@ -94,7 +96,7 @@ class QueryHandler:
         contents: list[Any] = [user_prompt]
 
         # Tool Calling ループ (ツールの呼び出し要求がなくなるまで, 上限の回数まで反復)
-        for _ in range(self.MAX_TOOL_ROUNDS):
+        for _ in range(self.max_tool_rounds):
             logger.info("Gemini API にリクエストを送信中...")
             response = self._generate_content_with_retry(
                 contents=contents,
@@ -165,7 +167,7 @@ class QueryHandler:
             contents.append(types.Content(role="user", parts=response_parts))
 
         raise RuntimeError(
-            f"ツールの呼び出しが {self.MAX_TOOL_ROUNDS} 回を超えたため, 処理を中断しました"
+            f"ツールの呼び出しが {self.max_tool_rounds} 回を超えたため, 処理を中断しました"
         )
 
     def _format_tools_for_gemini(
