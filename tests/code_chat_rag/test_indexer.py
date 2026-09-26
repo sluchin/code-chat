@@ -210,6 +210,15 @@ class TestGetTargetFiles:
             str(repo / "sub" / "c.TS"),
         ]
 
+    def test_get_target_files_uses_suffixes(self, tmp_path):
+        """コンストラクタで指定した拡張子だけを対象にするか検証する."""
+        (tmp_path / "a.py").write_text("a", encoding="utf-8")
+        (tmp_path / "b.ts").write_text("b", encoding="utf-8")
+
+        indexer = Indexer(input_dirs=[str(tmp_path)], suffixes=[".ts"])
+
+        assert indexer.get_target_files() == [str(tmp_path / "b.ts")]
+
     def test_get_target_files_ignores_hidden_and_excluded_parents(self, tmp_path):
         """走査対象のパス自体が, 隠しディレクトリや除外ディレクトリ配下にあっても, 対象にするか検証する."""
         repo = tmp_path / ".work" / "build" / "repo"
