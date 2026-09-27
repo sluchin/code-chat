@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*' # v1.0.0 などのバージョンタグがプッシュされた際に実行
+  workflow_dispatch:
+
 
 # GitHub Pages へのデプロイに必要な権限の設定
 permissions:
