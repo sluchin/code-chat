@@ -1,0 +1,42 @@
+name: Build and Release
+
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+
+# GitHub Release を作成・編集するための権限を付与
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # uv のセットアップ
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # Python のセットアップ
+      - name: Set up Python
+        run: uv python install
+
+      # uv build でパッケージ（.whl と .tar.gz）をビルド
+      # 成果物はデフォルトで dist/ ディレクトリに出力されます
+      - name: Build package
+        run: uv build
+
+      # GitHub Release を作成し、dist/ 配下の全成果物を添付
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true # コミット履歴から自動でリリースノートを生成
