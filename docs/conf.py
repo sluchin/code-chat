@@ -36,13 +36,13 @@ language = "ja"
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 # html_theme = 'alabaster'
-#html_theme = "furo"
+# html_theme = "furo"
 # テーマの変更
 html_theme = "pydata_sphinx_theme"
 
 # テーマ固有のオプション設定（例：ダークモード対応やソーシャルリンクなど）
 html_theme_options = {
-    "use_edit_page_button": True, # GitHubの編集ボタンを表示
-    "show_toc_level": 2,          # 目次の深さ
+    "use_edit_page_button": True,  # GitHubの編集ボタンを表示
+    "show_toc_level": 2,  # 目次の深さ
 }
 html_static_path = ["_static"]
