@@ -14,6 +14,7 @@ def mock_stdin(monkeypatch):
     monkeypatch.setattr("sys.stdin", io.StringIO(""))
 
 
+# pylint: disable=too-many-public-methods
 class TestParseArgs:
     """`parse_args` のテスト."""
 

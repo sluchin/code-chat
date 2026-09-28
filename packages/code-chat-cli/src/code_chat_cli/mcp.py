@@ -14,6 +14,7 @@ from code_chat_mcp.mcp_tool_info import McpToolInfo
 logger = get_logger(__name__)
 
 
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 async def handle_mcp_run(
     user_prompt: str,
     config_path: Path | str | None = None,
