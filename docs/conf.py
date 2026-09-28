@@ -46,3 +46,11 @@ html_theme_options = {
     "show_toc_level": 2,  # 目次の深さ
 }
 html_static_path = ["_static"]
+
+# use_edit_page_button に必須 (GitHub の編集ボタンのリンク先を構成する)
+html_context = {
+    "github_user": "sluchin",
+    "github_repo": "code-chat",
+    "github_version": "main",
+    "doc_path": "docs",
+}
