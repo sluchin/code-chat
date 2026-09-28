@@ -105,8 +105,19 @@ class TestLoadAndChunk:
 
     def test_load_and_chunk_file_not_found_failure(self):
         """存在しないパスを指定した場合に FileNotFoundError が発生するか検証する."""
-        indexer = Indexer(input_dirs=["/non_existent_directory_path_12345"])
-        with pytest.raises(FileNotFoundError):
+        non_existent_path = (
+            "C:\\non_existent_directory_path_12345"
+            if sys.platform == "win32"
+            else "/non_existent_directory_path_12345"
+        )
+        indexer = Indexer(input_dirs=[non_existent_path])
+        # path.mkdir が OSError を発生させるようにモックし、
+        # その結果 path.exists() も False のままにしておく
+        with (
+            patch("pathlib.Path.mkdir", side_effect=OSError("Permission denied")),
+            patch("pathlib.Path.exists", return_value=False),
+            pytest.raises(FileNotFoundError),
+        ):
             indexer.load_and_chunk()
 
     @patch("code_chat_rag.indexer.TextLoader")

@@ -2,6 +2,7 @@
 
 import importlib
 import re
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -19,6 +20,10 @@ from code_chat_cli.history import (
 class TestReadlineImport:
     """モジュール読み込み時の readline の import 処理のテスト."""
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Windows does not support standard readline module",
+    )
     def test_readline_import_primary_success(self):
         """標準の readline が正常にインポートできるケース."""
         with patch.dict("sys.modules", {"readline": MagicMock()}):

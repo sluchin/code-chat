@@ -1,6 +1,7 @@
 # pylint: disable=redefined-outer-name,protected-access
 """`code_chat_rag.vector_store` モジュールのテスト."""
 
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -226,6 +227,19 @@ class TestGetDb:
 
     def test_get_db_file_not_found_failure(self):
         """存在しないディレクトリを指定した場合に FileNotFoundError が発生するか検証する."""
-        store = VectorStore(output_dir="/non_existent_directory_path_12345")
-        with pytest.raises(FileNotFoundError):
+        # Windowsなら C:\ から始まるパス、それ以外なら / から始まるパスを使用する
+        non_existent_path = (
+            "C:\\non_existent_directory_path_12345"
+            if sys.platform == "win32"
+            else "/non_existent_directory_path_12345"
+        )
+        store = VectorStore(output_dir=non_existent_path)
+
+        # path.mkdir が OSError を発生させるようにモックし、
+        # その結果 path.exists() も False のままにしておく
+        with (
+            patch("pathlib.Path.mkdir", side_effect=OSError("Permission denied")),
+            patch("pathlib.Path.exists", return_value=False),
+            pytest.raises(FileNotFoundError),
+        ):
             store._get_db()
