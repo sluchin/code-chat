@@ -6,13 +6,11 @@ on:
   pull_request:
     branches: [ "main", "master" ]
 
-# GitHub Pagesへのデプロイに必要な権限設定
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# 同時実行の制御（同じブランチで新しいコミットが来たら前のビルドをキャンセル）
 concurrency:
   group: "pages"
   cancel-in-progress: true
@@ -25,7 +23,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # uvのセットアップ
+      # uvのセットアップ (最新版を使用)
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
         with:
@@ -37,41 +35,34 @@ jobs:
         with:
           python-version: "3.11"
 
-      # 依存関係のインストール (sphinx, furo等もここで入ります)
       - name: Install dependencies
         run: |
           uv sync --all-extras --dev
 
-      # pre-commit の実行
       - name: Run pre-commit
         run: |
           uv run pre-commit run --all-files
 
-      # pytest の実行
       - name: Run pytest
         run: |
           uv run pytest
 
-      # ビルドの実行 (パッケージ自体のビルド)
       - name: Build package
         run: |
           uv run build
 
-      # Sphinxによるドキュメントの自動生成
       - name: Build Sphinx Documentation
         run: |
           cd docs
           uv run make apidoc
           uv run make html
 
-      # GitHub Pages用の成果物をアップロード
       - name: Upload Pages artifact
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' # main/masterにプッシュされた時のみ
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/_build/html # SphinxがHTMLを出力する一般的なディレクトリ
+          path: docs/_build/html
 
-  # GitHub Pagesへのデプロイジョブ
   deploy:
     needs: ci
     runs-on: ubuntu-latest
