@@ -14,7 +14,7 @@ readline: Any = None
 try:
     import readline
 
-    HAVE_READLINE = True
+    HAVE_READLINE = True  # pragma: no cover
 except ImportError:
     try:
         import pyreadline3 as readline  # type: ignore[no-redef]

@@ -44,6 +44,8 @@ jobs:
           uv run pre-commit run --all-files
 
       - name: Run pytest
+        env:
+          GEMINI_API_KEY: "test-api-key-for-ci"
         run: |
           uv run pytest
 

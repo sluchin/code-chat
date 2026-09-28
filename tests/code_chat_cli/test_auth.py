@@ -4,6 +4,7 @@ import asyncio
 import datetime
 import json
 import stat
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -72,6 +73,10 @@ class TestGetTokenPath:
 class TestSaveCredentials:
     """`_save_credentials` のテスト."""
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Windows does not support POSIX file permissions",
+    )
     def test_save_credentials_success(self, tmp_path):
         """親ディレクトリが作成され, 所有者のみ読み書き可能なファイルで保存されるか検証."""
         path = tmp_path / "nested" / "oauth_token.json"
@@ -84,6 +89,10 @@ class TestSaveCredentials:
         )
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Windows does not support POSIX file permissions",
+    )
     def test_save_credentials_overwrites_permissions_success(self, tmp_path):
         """既存ファイルの権限が緩くても, 保存後は 0600 になるか検証."""
         path = tmp_path / "oauth_token.json"

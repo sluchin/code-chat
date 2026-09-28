@@ -99,7 +99,7 @@ def _run_interactive_loop(
     """
     setup_readline_history()
     if HAVE_READLINE:
-        atexit.register(save_readline_history)
+        atexit.register(save_readline_history)  # pragma: no cover
 
     print("=== Gemini Chat Mode (終了: 'exit' / 保存: '/save <path>') ===\n")
 
