@@ -8,6 +8,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "code-chat-cli",
+    "pydata-sphinx-theme>=0.22.0",
 ]
 
 [project.scripts]
