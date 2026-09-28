@@ -12,14 +12,6 @@ Subpackages
 Submodules
 ----------
 
-code\_chat\_cli.api module
---------------------------
-
-.. automodule:: code_chat_cli.api
-   :members:
-   :show-inheritance:
-   :undoc-members:
-
 code\_chat\_cli.args module
 ---------------------------
 
@@ -76,14 +68,6 @@ code\_chat\_cli.client\_config\_error module
    :show-inheritance:
    :undoc-members:
 
-code\_chat\_cli.constants module
---------------------------------
-
-.. automodule:: code_chat_cli.constants
-   :members:
-   :show-inheritance:
-   :undoc-members:
-
 code\_chat\_cli.context\_cache module
 -------------------------------------
 
@@ -120,14 +104,6 @@ code\_chat\_cli.history module
 ------------------------------
 
 .. automodule:: code_chat_cli.history
-   :members:
-   :show-inheritance:
-   :undoc-members:
-
-code\_chat\_cli.logger module
------------------------------
-
-.. automodule:: code_chat_cli.logger
    :members:
    :show-inheritance:
    :undoc-members:

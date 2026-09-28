@@ -29,8 +29,11 @@ members = ["packages/*"]
 
 [dependency-groups]
 dev = [
+    "furo>=2025.12.19",
     "pre-commit>=4.6.2",
     "pytest-cov>=7.1.0",
+    "sphinx>=9.1.0",
+    "sphinx-autobuild>=2025.8.25",
 ]
 
 [tool.ruff.lint]
