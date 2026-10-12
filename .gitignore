@@ -54,4 +54,4 @@ htmlcov/
 client_secret*.json
 
 # Claude Code のローカル設定
-.claude/
+.claude/settings.local.json
