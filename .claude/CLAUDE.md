@@ -54,10 +54,26 @@
 - CLI の引数やコマンドを変更したら、`README.md` と `COMMANDS.md` も更新すること。
 - pre-commit が README などの行末の空白を自動で削除することがある。意図しない差分が出た場合は、内容に影響がないか確認する。
 
-### コミットメッセージ
+### コミットガイドライン
 
-- コミットメッセージは英語で書く。
-- 本文は、`- ` で始まる箇条書きにする (散文の段落にしない)。件名の直後に空行を挟み、本文の先頭から箇条書きにする。
+- コミットメッセージは英語で記述
+- **件名は、Conventional Commits の形式で書く**: `type(scope): description`。scope (括弧を含む) は、省略できる。description は、英語で、命令形 (例: `feat(rag): Add the index of the source files`)。
+  - type は、次のどれか。
+    - `feat`: 機能の追加
+    - `fix`: バグの修正
+    - `docs`: 文書とコメントだけの変更 (`*.md`、`docs/`、docstring)
+    - `style`: 整形、規約の適用 (動作を変えない)
+    - `refactor`: 動作を変えない、書き換え
+    - `test`: テストだけの変更
+    - `build`: ビルドと、開発環境 (`pyproject.toml`、`uv.lock`、`.python-version`、`.pre-commit-config.yaml`) の変更
+    - `ci`: CI (`.github/`) の変更
+    - `chore`: そのほかの雑務 (最初のコミット、`.gitignore` など)
+  - scope は、変更の場所: パッケージ (`packages/` のディレクトリ名から `code-chat-` を除いたもの: `cli` / `lib` / `mcp` / `rag`)、`deps` (依存パッケージの更新)。複数のパッケージにまたがるときは、省略する。
+  - 互換性を壊す変更は、type (または scope) の直後に、感嘆符を付ける (Conventional Commits の仕様のとおり)。
+  - 複数の type にまたがるときは、変更の中心になる type にする。
+- 件名のあとに空行を 1 行入れて、本文を書く。本文はダッシュ/ハイフンで始まる箇条書き (例: `- Fix bug in parser`)。箇条書きの各行の間には、空行を入れない
+- コミットメッセージに `Co-Authored-By` または Claude 帰属行を含めない
+- **rebase したあとの push は、`git push --force-with-lease --force-if-includes origin <ブランチ名>` で行う** (`--force` は使わない。リモートに、手元に取り込んでいないコミットがあれば、push は失敗する)。ユーザーに依頼されたときだけ、push する。
 
 ### 完了条件・タスク完了時の動作
 
