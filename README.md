@@ -406,3 +406,7 @@ OAuth 同意画面が「テスト中」で、ログインしたアカウント�
 ### OAuth の再ログインを求められる
 
 リフレッシュトークンが失効しています (同意画面が「テスト中」の場合は 7 日で失効します)。`code-chat --login` で再ログインしてください。
+
+## リリース
+
+`v0.1.0` のようなタグを push すると、GitHub Actions の `release.yml` が、GitHub Releases の**ドラフト**を作ります (載せるもの: sdist と wheel (`uv build` で作る))。中身を確かめて、手で公開します。タグを打たずに試すときは、Actions の Release を手動で実行します (成果物は、Artifacts に保存されます)。

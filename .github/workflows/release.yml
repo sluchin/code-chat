@@ -1,0 +1,42 @@
+name: Release
+
+# v から始まるタグ (例: v0.1.0) を push すると、sdist と wheel を載せた、GitHub Releases のドラフトを作る
+# (中身を確かめて、手で公開する。ソースの zip と tar.gz は、GitHub が自動で付ける).
+# 手動実行 (workflow_dispatch) は、タグを打たずに、成果物を Actions の Artifacts に保存する.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  dist:
+    name: dist
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # GitHub Releases への書き込み
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Build the sdist and the wheel
+        run: uv build
+
+      - name: Create the draft release with the packages
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/* \
+            --draft --title "code-chat ${{ github.ref_name }}" --generate-notes
+
+      - name: Upload the packages as an artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: code-chat-dist
+          path: dist/*
+          if-no-files-found: error
