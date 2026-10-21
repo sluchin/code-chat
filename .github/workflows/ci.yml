@@ -12,7 +12,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  # ブランチ (PR) ごとに分ける. 1 つにすると, 別の PR の実行どうしで取り消し合う.
+  group: "ci-${{ github.ref }}"
   cancel-in-progress: true
 
 jobs:
