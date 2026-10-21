@@ -35,7 +35,7 @@ jobs:
             --draft --title "code-chat ${{ github.ref_name }}" --generate-notes
 
       - name: Upload the packages as an artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: code-chat-dist
           path: dist/*
