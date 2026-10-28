@@ -8,7 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "google-genai>=2.31.0",
+    "google-genai>=2.33.0",
     "httpx>=0.28.1",
     "tenacity>=9.0.0",
 ]
