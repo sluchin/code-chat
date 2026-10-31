@@ -99,10 +99,10 @@ uv run sphinx-autobuild docs docs/_build/html
 ```make
 # apidoc と html ビルドを一括実行するターゲット
 apidoc:
-	uv run sphinx-apidoc -f -o api/code_chat_cli ../packages/code-chat-cli/src/code_chat_cli
-	uv run sphinx-apidoc -f -o api/code_chat_rag ../packages/code-chat-rag/src/code_chat_rag
-	uv run sphinx-apidoc -f -o api/code_chat_mcp ../packages/code-chat-mcp/src/code_chat_mcp
-	@$(SPHINXBUILD) -M html "." "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+ uv run sphinx-apidoc -f -o api/code_chat_cli ../packages/code-chat-cli/src/code_chat_cli
+ uv run sphinx-apidoc -f -o api/code_chat_rag ../packages/code-chat-rag/src/code_chat_rag
+ uv run sphinx-apidoc -f -o api/code_chat_mcp ../packages/code-chat-mcp/src/code_chat_mcp
+ @$(SPHINXBUILD) -M html "." "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 ```
 
@@ -129,6 +129,4 @@ def example_function(param1: str, param2: int = 0) -> bool:
         ValueError: エラー条件の説明.
     """
     return True
-```
-
 ```

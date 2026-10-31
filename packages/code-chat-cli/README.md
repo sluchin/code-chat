@@ -2,7 +2,7 @@
 
 `code-chat-cli` は、Gemini を使った対話・コード修正・コードレビュー・コミットメッセージ生成に、RAG (コードベース検索) と MCP (ツール連携) を組み合わせた CLI ツール `code-chat` の本体です。
 
-コマンドとオプションの一覧は、リポジトリのルートの [COMMANDS.md](../../COMMANDS.md), セットアップと使い方は [README.md](../../README.md) を参照してください。
+コマンドとオプションの一覧は、リポジトリのルートの [COMMANDS.md](../../docs/commands.md), セットアップと使い方は [README.md](../../README.md) を参照してください。
 
 ---
 

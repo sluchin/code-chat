@@ -63,7 +63,7 @@
 
 - **原因**: Context Caching (`cache create`) で保存できるトークン量の上限が、無料枠では **0** のため。
 - **code-chat の動作**: `無料枠では Context Caching を利用できません (課金を有効にした有料枠のプロジェクトが必要です)` と表示して終了します (終了コード 1)。
-- **対処**: 有料枠の API キーを使う。詳しくは [COMMANDS.md の `cache`](COMMANDS.md#32-cache-context-caching-管理) を参照。
+- **対処**: 有料枠の API キーを使う。詳しくは [COMMANDS.md の `cache`](commands.md#32-cache-context-caching-管理) を参照。
 
 ### 2.3 503 モデルが高負荷
 
@@ -129,7 +129,7 @@ method: google.ai.generativelanguage.v1beta.CacheService.CreateCachedContent
 
 ### 2.8 `google-genai` SDK の `ValueError` (OAuth との関係)
 
-Gemini API を OAuth で使うために、`code-chat` は SDK の外側で `Authorization` ヘッダーを付けています (詳しくは [OAUTH.md](OAUTH.md#6-動作の仕組み))。これは、SDK が OAuth の認証情報を直接受け付けないためです。
+Gemini API を OAuth で使うために、`code-chat` は SDK の外側で `Authorization` ヘッダーを付けています (詳しくは [OAUTH.md](oauth.md#6-動作の仕組み))。これは、SDK が OAuth の認証情報を直接受け付けないためです。
 
 ```text
 ValueError: No API key was provided. Please pass a valid API key.
@@ -226,7 +226,7 @@ Gemini API のエラーではなく、`code-chat` 自身が、認証情報やキ
 | `OAuth トークンの更新に失敗しました. code-chat --login で再ログインしてください.` | リフレッシュトークンが失効した。`code-chat --login` で再ログインする |
 | `RAG には API キーが必要です. GEMINI_API_KEY を設定してください` | `--rag` は、`--oauth` 指定時も API キーを使う。`GEMINI_API_KEY` を設定する |
 
-OAuth のログイン時のエラー (`access_denied`、`redirect_uri_mismatch`、`invalid_client` など) は、[OAUTH.md のトラブルシューティング](OAUTH.md#8-トラブルシューティング)を参照してください。
+OAuth のログイン時のエラー (`access_denied`、`redirect_uri_mismatch`、`invalid_client` など) は、[OAUTH.md のトラブルシューティング](oauth.md#8-トラブルシューティング)を参照してください。
 
 ### Context Caching
 

@@ -165,7 +165,7 @@ export GEMINI_API_KEY=your_api_key_here
 - 毎回 `--oauth` を付けたくない場合は、`alias code-chat='code-chat --oauth'` のようにエイリアスを設定してください。
 - ダウンロードした OAuth クライアントの JSON (`client_secret_*.json`) は `.gitignore` の対象です。リポジトリに含めないでください。
 - OAuth 同意画面が「テスト中」のままだと、リフレッシュトークンは 7 日で失効し、再ログインが必要になります。
-- **`--oauth` にしても、無料枠は API キーと同じで、増えません。** 上限は、OAuth クライアントを作成したプロジェクトの Gemini API の無料枠です (確認: `gemini-3.5-flash` は、どちらも 1 分あたり 5 リクエスト)。詳しくは [OAUTH.md](OAUTH.md#9-制限事項) を参照してください。
+- **`--oauth` にしても、無料枠は API キーと同じで、増えません。** 上限は、OAuth クライアントを作成したプロジェクトの Gemini API の無料枠です (確認: `gemini-3.5-flash` は、どちらも 1 分あたり 5 リクエスト)。詳しくは [OAUTH.md](docs/oauth.md#9-制限事項) を参照してください。
 - RAG (`--rag`、`rag` サブコマンド) は Embedding API を langchain 経由で呼び出すため、OAuth に対応していません。`--rag` と `--oauth` を併用する場合、RAG の検索には `GEMINI_API_KEY` の API キーが使われます (Gemini への問い合わせ自体は OAuth です)。
 
 > **Note:** `.env` ファイルは自動では読み込まれません。`.env` を使う場合は `uv run --env-file .env code-chat ...` のように明示するか、シェルで読み込んでください。
