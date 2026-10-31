@@ -12,7 +12,7 @@
 * プロンプト引数 (`PROMPT`) あり $\rightarrow$ ワンショット実行 (処理結果を出力して終了)
 * プロンプト引数 (`PROMPT`) なし $\rightarrow$ 対話モード (REPL) 起動
 
-* **サブコマンド (`rag`, `cache`, `mcp`)**: 各リソースの管理・個別実行系コマンド
+* **サブコマンド (`rag`、`cache`、`mcp`)**: 各リソースの管理・個別実行系コマンド
 * 最初の位置引数が `rag` / `cache` / `mcp` のときだけサブコマンドとして扱い、それ以外の位置引数はすべてプロンプトになります。
 
 ---
@@ -47,7 +47,7 @@ code-chat [PROMPT] [OPTIONS]
 | `--staged` | フラグ | `False` | `--review` 時に、ステージ済み (`--cached`) の差分を対象にする |
 | `-l, --list-models` | フラグ | `False` | 利用可能な LLM モデルの一覧を表示 |
 | `--login` | フラグ | `False` | ブラウザで Google アカウントに OAuth ログインし、トークンを `~/.config/code-chat/oauth_token.json` に保存して終了。事前に環境変数 `GEMINI_OAUTH_CLIENT_ID` / `GEMINI_OAUTH_CLIENT_SECRET` の設定が必要 |
-| `--oauth` | フラグ | `False` | `GEMINI_API_KEY` ではなく OAuth (`--login` で保存したトークン) で認証する。`GEMINI_API_KEY` が設定されていても OAuth を使う。トークンがなく対話端末の場合は、ブラウザ認証を開始する。RAG (`--rag`, `rag`) の検索は OAuth に対応せず、API キー (`GEMINI_API_KEY`) を使う |
+| `--oauth` | フラグ | `False` | `GEMINI_API_KEY` ではなく OAuth (`--login` で保存したトークン) で認証する。`GEMINI_API_KEY` が設定されていても OAuth を使う。トークンがなく対話端末の場合は、ブラウザ認証を開始する。RAG (`--rag`、`rag`) の検索は OAuth に対応せず、API キー (`GEMINI_API_KEY`) を使う |
 | `-D, --debug` | フラグ | `False` | デバッグログを出力 (`--log-level DEBUG` と同等) |
 | `--log-level` | 文字列 | `INFO` | ログレベル (`DEBUG` / `INFO` / `WARNING` / `ERROR` / `CRITICAL`) |
 | `--trace` | フラグ | `False` | SDK や HTTP クライアント等のライブラリ内部通信ログを出力。あわせて、Gemini API のエラー時にもトレースバックを出力する (指定しない場合、Gemini API のエラーは、エラー内容だけを出力する。それ以外の例外は、トレースバック付き。ただし、ファイルやディレクトリが見つからないエラーは、概要の 1 行のみ) |
