@@ -36,7 +36,7 @@ Gemini API を使用してローカルソースコードの参照・対話・自
 
 > **未実装**: `-p/--provider` は現時点では `gemini` のみ対応です (それ以外の値は、引数のエラーになります)。
 
-コマンドとオプションの一覧は [COMMANDS.md](docs/commands.md) も参照してください。
+コマンドとオプションの一覧は [COMMANDS.md](docs/commands.md) も参照してください。今後の機能追加や改善タスクについては [TODO.md](TODO.md) を参照してください。
 
 ## Gemini CLI との違い (code-chat を使うメリット)
 
