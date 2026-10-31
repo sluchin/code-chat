@@ -40,7 +40,7 @@
 
 **メッセージ (抜粋)**
 
-```
+```text
 429 RESOURCE_EXHAUSTED. You exceeded your current quota, please check your plan and billing details.
 * Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.8-flash
   quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier
@@ -57,7 +57,7 @@
 
 **メッセージ**
 
-```
+```text
 429 RESOURCE_EXHAUSTED. TotalCachedContentStorageTokensPerModelFreeTier limit exceeded for model gemini-3.8-flash: limit=0, requested=16713
 ```
 
@@ -69,7 +69,7 @@
 
 **メッセージ**
 
-```
+```text
 503 UNAVAILABLE. This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.
 ```
 
@@ -81,7 +81,7 @@
 
 **メッセージ (抜粋)**
 
-```
+```text
 404 NOT_FOUND. This model models/gemini-2.5-flash is no longer available to new users. Please update your code to use models/gemini-3.8-flash for the latest features and improvements.
 ```
 
@@ -93,7 +93,7 @@
 
 **メッセージ**
 
-```
+```text
 400 INVALID_ARGUMENT. API key not valid. Please pass a valid API key.
 ```
 
@@ -105,7 +105,7 @@
 
 **メッセージ**
 
-```
+```text
 400 INVALID_ARGUMENT. Cached content is too small. total_token_count=2, min_total_token_count=1024
 ```
 
@@ -117,7 +117,7 @@
 
 **メッセージ (抜粋)**
 
-```
+```text
 403 PERMISSION_DENIED. Request had insufficient authentication scopes.
 reason: ACCESS_TOKEN_SCOPE_INSUFFICIENT
 method: google.ai.generativelanguage.v1beta.CacheService.CreateCachedContent
@@ -131,7 +131,7 @@ method: google.ai.generativelanguage.v1beta.CacheService.CreateCachedContent
 
 Gemini API を OAuth で使うために、`code-chat` は SDK の外側で `Authorization` ヘッダーを付けています (詳しくは [OAUTH.md](OAUTH.md#6-動作の仕組み))。これは、SDK が OAuth の認証情報を直接受け付けないためです。
 
-```
+```text
 ValueError: No API key was provided. Please pass a valid API key.
 ValueError: Credentials and API key are mutually exclusive in the client initializer.
 ```
@@ -181,7 +181,7 @@ MCP 連携でも、3.1 と同じリトライを使います (503 と 429、ネ�
 
 Gemini API のエラーは、どのコマンド (チャット、`--review`、`--list-models`、`--generate-commit-msg`、`--mcp`、`cache`、`rag`) でも、次の形式で **1 回だけ**表示します。レスポンスの辞書の全文は出力しません。
 
-```
+```text
 Gemini API エラーにより処理を中断しました: [HTTP 429 RESOURCE_EXHAUSTED] 無料枠の 1 日あたりのリクエスト上限に到達しました (モデル: gemini-3.8-flash, 上限: 20 件)
   ヒント: 1 日あたりの上限は, 翌日まで回復しません. 別のモデルを -m で指定するか, 課金を有効にした API キーを使ってください.
 ```

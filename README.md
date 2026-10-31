@@ -104,6 +104,7 @@ code-chat
 ```
 
 > **Note:** 開発中の変更を即座に反映させたい場合は、編集可能モード（Editable install）でインストールします。
+>
 > ```bash
 > uv tool install --editable .
 > ```
