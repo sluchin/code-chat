@@ -36,7 +36,7 @@ Gemini API を使用してローカルソースコードの参照・対話・自
 
 > **未実装**: `-p/--provider` は現時点では `gemini` のみ対応です (それ以外の値は、引数のエラーになります)。
 
-コマンドとオプションの一覧は [COMMANDS.md](COMMANDS.md) も参照してください。
+コマンドとオプションの一覧は [COMMANDS.md](docs/commands.md) も参照してください。
 
 ## Gemini CLI との違い (code-chat を使うメリット)
 
@@ -49,7 +49,7 @@ code-chat を使うメリットは、次のとおりです。
 
 - **RAG (ChromaDB)**: リポジトリを自前でインデックス化し、検索結果を質問に付加します。`--rag` と `--mcp` は併用できます。
 - **明示的な Context Caching**: `cache create` で作成し、`-c` で再利用します (有料枠が必要)。
-- **エラー表示とリトライの制御**: 429 / 503 を、原因とヒントを付けた 1 行で表示します。`retryDelay` に従って自動でリトライし、1 日の上限は対象から除きます (RAG を含む全ての Gemini 呼び出しで統一)。詳しくは [ERRORS.md](ERRORS.md) を参照してください。
+- **エラー表示とリトライの制御**: 429 / 503 を、原因とヒントを付けた 1 行で表示します。`retryDelay` に従って自動でリトライし、1 日の上限は対象から除きます (RAG を含む全ての Gemini 呼び出しで統一)。詳しくは [ERRORS.md](docs/errors.md) を参照してください。
 - **非対話での利用**: パイプ入力、`--review`、`-g` (コミットメッセージ生成) を、ワンショットで実行できます。
 - **Write モードの安全性**: 上書き前に確認し、省略コードを検知して警告し、世代付きのバックアップを残します。
 - **変更しやすい**: プロンプト、リトライの方針、MCP の扱いを、自分で決められます。
@@ -135,7 +135,7 @@ export GEMINI_API_KEY=your_api_key_here
 
 ### 方法 2: OAuth ログイン (Google アカウント)
 
-ブラウザで Google アカウントにログインして認証します。API キーは不要です。Google Cloud での設定を含む詳しい手順は、[OAUTH.md](OAUTH.md) を参照してください。以下は概要です。
+ブラウザで Google アカウントにログインして認証します。API キーは不要です。Google Cloud での設定を含む詳しい手順は、[OAUTH.md](docs/oauth.md) を参照してください。以下は概要です。
 
 1. Google Cloud コンソールで、Gemini API を使うプロジェクトに **OAuth クライアント ID** (種類: **デスクトップアプリ**) を作成します。
 2. OAuth 同意画面が「テスト中」の場合は、ログインに使う Google アカウントを **テストユーザー** に追加します (追加しないと `access_denied` になります)。
@@ -373,7 +373,7 @@ uv run pre-commit autoupdate
 
 ## トラブルシューティング
 
-Gemini API のエラー (429、503、404 など) の原因と対処、`code-chat` のリトライ動作は、[ERRORS.md](ERRORS.md) にまとめています。
+Gemini API のエラー (429、503、404 など) の原因と対処、`code-chat` のリトライ動作は、[ERRORS.md](docs/errors.md) にまとめています。
 
 ### `uv run pytest` 実行時に `unrecognized arguments: --cov=...` エラーが発生する
 

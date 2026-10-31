@@ -258,7 +258,7 @@ OAuth のログイン時のエラー (`access_denied`、`redirect_uri_mismatch`�
 ## 6. 関連ドキュメント
 
 - [README.md](README.md): セットアップ、認証の設定、トラブルシューティング
-- [COMMANDS.md](COMMANDS.md): コマンドとオプションの一覧 (`cache` の制約を含む)
-- [OAUTH.md](OAUTH.md): OAuth ログインの設定手順とトラブルシューティング
+- [COMMANDS.md](commands.md): コマンドとオプションの一覧 (`cache` の制約を含む)
+- [OAUTH.md](oauth.md): OAuth ログインの設定手順とトラブルシューティング
 - [Gemini API のエラーコード (公式)](https://ai.google.dev/gemini-api/docs/troubleshooting)
 - [Gemini API のレート制限 (公式)](https://ai.google.dev/gemini-api/docs/rate-limits)

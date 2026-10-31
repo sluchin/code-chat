@@ -40,7 +40,7 @@
 | --- | --- | --- |
 | 無料枠の API キー | `GEMINI_API_KEY` に、無料枠のプロジェクトのキーを設定 | 通常の項目。使用回数の制限は、ありません (上限は 1 分あたり 5 リクエスト程度) |
 | 有料枠の API キー | `GEMINI_API_KEY` に、課金を有効にしたプロジェクトのキーを設定 | 「H. Context Caching」のみ。**料金が発生します** |
-| OAuth | `GEMINI_OAUTH_CLIENT_ID` / `GEMINI_OAUTH_CLIENT_SECRET` を設定し、`code-chat --login` を実行済み | 「A. 認証」 (手順は [OAUTH.md](OAUTH.md)) |
+| OAuth | `GEMINI_OAUTH_CLIENT_ID` / `GEMINI_OAUTH_CLIENT_SECRET` を設定し、`code-chat --login` を実行済み | 「A. 認証」 (手順は [OAUTH.md](oauth.md)) |
 
 - 各項目の「手順」に書いた API キーの種別を使ってください。
 - 有料枠のキーを使う項目 (H) は、費用の発生を了承した上で、実施してください。作成したキャッシュは、実施後に `code-chat cache rm` で削除します。
