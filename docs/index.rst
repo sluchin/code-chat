@@ -10,7 +10,7 @@ code-chat documentation
 RAG (コードベース検索) と MCP (ツール連携) を組み合わせた開発者向け CLI ツールです.
 
 以下は各パッケージの API リファレンスです. 使い方やコマンド仕様は, リポジトリの
-``README.md`` と ``COMMANDS.md``, OAuth ログインの設定手順は ``OAUTH.md`` を参照してください.
+``README.md`` と ``docs/commands.md``, OAuth ログインの設定手順は ``docs/oauth.md`` を参照してください.
 
 
 .. toctree::

@@ -1,132 +1,87 @@
-### `DOCUMENTATION.md`（ドキュメント構築・運用マニュアル）
+# ドキュメントの作り方
 
-```markdown
-# ドキュメント構築・運用ガイド
+Python のコードの Docstring (Google Style) から、[Sphinx](https://www.sphinx-doc.org/) で API リファレンスの HTML を作ります。パッケージの管理と実行には `uv` を使います。
 
-本プロジェクトでは, Python コード内の Docstring（Google Style）から [Sphinx](https://www.sphinx-doc.org/) を使用して自動的に API リファレンスおよび HTML ドキュメントを生成します。
+## 1. 準備
 
-パッケージマネージャーおよび実行環境には `uv` を使用します。
-
----
-
-## 1. 事前準備
-
-プロジェクトの依存関係（Sphinx および開発用ツール）をインストールします。
+依存関係 (Sphinx と開発用のツール) を入れます。
 
 ```bash
-# プロジェクトルートで実行
+# リポジトリの直下で実行する
 uv sync
-
 ```
 
-※ まだ依存関係に追加していない場合は以下を実行してください:
+## 2. ビルド
 
-```bash
-uv add --dev sphinx sphinx-autobuild furo
+### API の `.rst` を作り直して、HTML をビルドする
 
-```
-
----
-
-## 2. ドキュメントのビルド手順
-
-### 方法 A: API ドキュメント再生成 + HTML ビルド（推奨）
-
-コード内の Docstring を変更した場合や新しいモジュールを追加した場合は, `.rst` ファイルを更新してビルドします。
+Docstring を変えたときや、モジュールを足したときに使います。
 
 ```bash
 cd docs
 make apidoc
-
 ```
 
-> **Note:** `make apidoc` は `sphinx-apidoc` で `.rst` を最新化してから HTML を生成するカスタムターゲットです。
+`make apidoc` は、`sphinx-apidoc` で `api/` の `.rst` を作り直してから、HTML を作ります (`docs/Makefile` の独自のターゲット)。
 
----
+### HTML だけをビルドする
 
-### 方法 B: 通常の HTML ビルド
-
-`.rst` ファイルの変更のみ（文言の修正など）の場合は, 標準の `make` コマンドでビルドできます。
+`.rst` の文言だけを変えたときに使います。
 
 ```bash
 cd docs
-uv run make html
-
+make html
 ```
 
-生成された HTML は `docs/_build/html/index.html` からブラウザで閲覧できます。
+HTML は `build/docs/html/index.html` にできます (`docs/Makefile` の `BUILDDIR` は `../build/docs`)。
 
----
+## 3. 書きながら確かめる
 
-## 3. リアルタイムプレビュー（開発時）
-
-ドキュメントの執筆中やスタイルの確認時には, ファイルを保存するたびに自動で再ビルドしてブラウザをリロードする `sphinx-autobuild` を使用すると便利です。
+`sphinx-autobuild` は、ファイルを保存するたびに、ビルドし直して、ブラウザを読み込み直します。
 
 ```bash
-# プロジェクトルートから実行
-uv run sphinx-autobuild docs docs/_build/html
-
+# リポジトリの直下で実行する
+uv run sphinx-autobuild docs build/docs/html
 ```
 
-起動後, ターミナルに表示される URL（例: `http://127.0.0.1:8000`）にブラウザでアクセスしてください。
+起動すると、端末に URL (例: `http://127.0.0.1:8000`) が出ます。
 
----
-
-## 4. プロジェクト構造と設定ファイル
+## 4. 構成
 
 ```text
 .
-├── pyproject.toml          # uv の依存関係管理 (workspace)
-├── packages/               # Python ソースコード (uv workspace)
-│   ├── code-chat-cli/      #   CLI 本体 (code_chat_cli)
+├── pyproject.toml          # uv の依存関係 (workspace)
+├── packages/               # Python のソース (uv workspace)
+│   ├── code-chat-cli/      #   CLI の本体 (code_chat_cli)
 │   ├── code-chat-rag/      #   RAG (code_chat_rag)
 │   └── code-chat-mcp/      #   MCP (code_chat_mcp)
-└── docs/                   # Sphinx ドキュメント用ディレクトリ
-    ├── conf.py             # Sphinx 設定ファイル (パス指定, 拡張子, テーマ設定)
-    ├── index.rst           # ドキュメントのトップページ（目次）
-    ├── api/                # sphinx-apidoc によって自動生成される .rst 群 (パッケージごと)
-    ├── Makefile            # ビルド用コマンド設定
-    └── _build/             # 生成された HTML の出力先 (git 追跡対象外)
-
+├── docs/                   # Sphinx のドキュメント
+│   ├── conf.py             #   Sphinx の設定 (パス、拡張、テーマ sphinx_rtd_theme)
+│   ├── index.rst           #   トップページ (目次)
+│   ├── api/                #   sphinx-apidoc が作る .rst (パッケージごと)
+│   └── Makefile            #   ビルドのコマンド (apidoc のターゲットを含む)
+└── build/docs/             # 生成した HTML (git の対象外)
 ```
 
----
+## 5. Docstring の書き方
 
-## 5. Makefile の設定 (`docs/Makefile`)
-
-`make apidoc` を有効にするため, `docs/Makefile` の末尾に以下のターゲットが記述されていることを確認してください。
-
-```make
-# apidoc と html ビルドを一括実行するターゲット
-apidoc:
- uv run sphinx-apidoc -f -o api/code_chat_cli ../packages/code-chat-cli/src/code_chat_cli
- uv run sphinx-apidoc -f -o api/code_chat_rag ../packages/code-chat-rag/src/code_chat_rag
- uv run sphinx-apidoc -f -o api/code_chat_mcp ../packages/code-chat-mcp/src/code_chat_mcp
- @$(SPHINXBUILD) -M html "." "$(BUILDDIR)" $(SPHINXOPTS) $(O)
-
-```
-
----
-
-## 6. Docstring の記述ルール
-
-本プロジェクトの Python コードは **Google Style Python Docstrings** に準拠して記述します。
+Python のコードは、**Google Style Python Docstrings** で書きます。
 
 ```python
 def example_function(param1: str, param2: int = 0) -> bool:
-    """関数の概要を1行で記述（末尾はピリオド）.
+    """関数の概要を 1 行で書く (末尾はピリオド).
 
-    詳細な説明をここに記述します.
+    詳しい説明をここに書く.
 
     Args:
-        param1 (str): パラメータ1の説明.
-        param2 (int, optional): パラメータ2の説明. Defaults to 0.
+        param1 (str): パラメータ 1 の説明.
+        param2 (int, optional): パラメータ 2 の説明. Defaults to 0.
 
     Returns:
         bool: 戻り値の説明.
 
     Raises:
-        ValueError: エラー条件の説明.
+        ValueError: エラーの条件の説明.
     """
     return True
 ```
