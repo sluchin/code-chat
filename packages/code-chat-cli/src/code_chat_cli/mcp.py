@@ -47,7 +47,7 @@ async def handle_mcp_run(
 
     # async with で MCP サーバープロセスの自動起動・自動クリーンアップを行う
     async with McpService(config_path=config) as mcp_service:
-        # クライアントの初期化（API キーまたは OAuth 認証）
+        # クライアントの初期化 (API キーまたは OAuth 認証)
         client = get_gemini_client(use_oauth=use_oauth)
         handler = QueryHandler(
             gemini_client=client,

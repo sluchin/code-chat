@@ -56,7 +56,7 @@ uv run sphinx-autobuild docs build/docs/html
 │   ├── code-chat-rag/      #   RAG (code_chat_rag)
 │   └── code-chat-mcp/      #   MCP (code_chat_mcp)
 ├── docs/                   # Sphinx のドキュメント
-│   ├── conf.py             #   Sphinx の設定 (パス、拡張、テーマ sphinx_rtd_theme)
+│   ├── conf.py             #   Sphinx の設定 (パス, 拡張, テーマ sphinx_rtd_theme)
 │   ├── index.rst           #   トップページ (目次)
 │   ├── api/                #   sphinx-apidoc が作る .rst (パッケージごと)
 │   └── Makefile            #   ビルドのコマンド (apidoc のターゲットを含む)

@@ -58,7 +58,7 @@ class TestSyslogContextFilter:
         # 追加された各属性値の検証
         assert hasattr(record, "syslog_time")
         assert isinstance(record.syslog_time, str)
-        # ISO 8601 形式のタイムスタンプが含まれているか（例: 2026-08-14T...）
+        # ISO 8601 形式のタイムスタンプが含まれているか (例: 2026-08-14T...)
         assert "T" in record.syslog_time
 
         assert record.hostname == socket.gethostname()

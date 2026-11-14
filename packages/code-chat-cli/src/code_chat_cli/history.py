@@ -25,7 +25,7 @@ except ImportError:
 
 logger = get_logger(__name__)
 
-# 履歴ファイルの保存先指定（例: ホームディレクトリ配下）
+# 履歴ファイルの保存先指定 (例: ホームディレクトリ配下)
 HISTORY_FILE = Path.home() / ".code_chat_history"
 MAX_HISTORY_LENGTH = 1000
 

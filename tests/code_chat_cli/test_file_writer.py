@@ -108,7 +108,7 @@ class TestApplyFileModification:
         """異常系: パスが存在しない, またはディレクトリの場合, 早期リターンして何も処理しないか検証."""
         non_existent_file = tmp_path / "non_existent.py"
 
-        # 存在しないパスを指定（ログを出力して終了）
+        # 存在しないパスを指定 (ログを出力して終了)
         _apply_file_modification(str(non_existent_file), "new_code")
 
         bak_file = tmp_path / "non_existent.py.bak"
@@ -162,7 +162,7 @@ class TestIsPartialCode:
             "// 変更なし",
             "# 変更なし",
             "// rest of code",
-            "# REST OF CODE",  # 大文字小文字（re.IGNORECASE）の検証
+            "# REST OF CODE",  # 大文字小文字 (re.IGNORECASE) の検証
         ],
     )
     def test_is_partial_code_returns_true(self, code_input):

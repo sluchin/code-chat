@@ -21,7 +21,7 @@
 
 ### 1. リポジトリのインデックスを作成する
 
-指定したディレクトリ配下のソースコードを読み込み、ChromaDB に保存します。戻り値は、保存したチャンクの数です。
+指定したディレクトリ配下のソースコードを読み込み、ChromaDB に保存します。戻り値は保存したチャンクの数です。
 
 ```python
 from code_chat_rag import RagService
@@ -36,7 +36,7 @@ print(f"Indexed {chunk_count} chunks successfully.")
 
 ### 2. 差分更新する
 
-`update_only=True` を指定すると、読み込んだファイルの既存のチャンクを置き換えて (同じファイルのチャンクが重複しないよう、先に削除してから追加), 他のファイルのデータは残します。
+`update_only=True` を指定すると、読み込んだファイルの既存のチャンクを置き換えて (同じファイルのチャンクが重複しないよう、先に削除してから追加)、他のファイルのデータは残します。
 
 ```python
 chunk_count = service.index_repository(["/path/to/target/repo"], update_only=True)
@@ -44,7 +44,7 @@ chunk_count = service.index_repository(["/path/to/target/repo"], update_only=Tru
 
 ### 3. 質問に関連するコードを取得する
 
-質問に類似したチャンクを検索し、ファイルパス付きの文字列に整形して返します (`k` は取得するチャンク数、既定は 5).
+質問に類似したチャンクを検索し、ファイルパス付きの文字列に整形して返します (`k` は取得するチャンク数、既定は 5)。
 
 ```python
 context = service.get_context("ChromaDB への接続処理を行っているモジュールはどれですか？", k=5)
@@ -64,7 +64,7 @@ service.clear()              # ベクトルストアの内容を削除
 
 `Indexer` は、次のファイルを対象にします。
 
-* 拡張子: `.py` `.cpp` `.hpp` `.c` `.h` `.ts` `.js` (`suffixes` 引数で変更できます).
+* 拡張子: `.py` `.cpp` `.hpp` `.c` `.h` `.ts` `.js` (`suffixes` 引数で変更できます)。
 * 除外: `.git` `.venv` `node_modules` `__pycache__` `build` `dist` などの除外ディレクトリ (`code_chat_lib.constants.Constants.EXCLUDE_DIRS`) と、`.` で始まる隠しディレクトリ。走査を始める場所として指定したパス自体は、判定の対象外です。
 
 インデックスを作らずに、対象のファイルだけを確認するには、`Indexer.get_target_files()` を使います。
@@ -94,7 +94,7 @@ print(Indexer(input_dirs=["/path/to/target/repo"]).get_target_files())
 
 1. `Indexer` がリポジトリのソースコードを取得し、メタデータ (ファイルパス) を保持した状態でチャンク化します。
 2. `VectorStore` が埋め込みベクトルを生成し、ローカルデータベース (既定は `./.chroma_db`) に永続化します。
-3. `RagService.get_context` が、質問に関連するチャンクを取得して返します。取得したコードは、`code-chat` が、質問に付加して Gemini に送ります (`--rag`).
+3. `RagService.get_context` が、質問に関連するチャンクを取得して返します。取得したコードは、`code-chat` が、質問に付加して Gemini に送ります (`--rag`)。
 
 このパッケージは、`code-chat-lib` (ロガー、Gemini API のリトライ) に依存します。 `code-chat-cli` には依存しません。
 
@@ -102,7 +102,7 @@ print(Indexer(input_dirs=["/path/to/target/repo"]).get_target_files())
 
 ## 開発・テスト
 
-このパッケージのテストを実行します (リポジトリのルートで実行します).
+このパッケージのテストを実行します (リポジトリのルートで実行します)。
 
 ```bash
 uv run pytest --no-cov tests/code_chat_rag

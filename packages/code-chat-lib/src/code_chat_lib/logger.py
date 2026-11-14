@@ -9,7 +9,7 @@ from pathlib import Path
 
 from code_chat_lib.gemini_error import find_api_error, format_error
 
-# システム固定情報（ホスト名およびプロセスID）
+# システム固定情報 (ホスト名およびプロセスID)
 HOSTNAME = socket.gethostname()
 PID = os.getpid()
 APP_NAME = Path(sys.argv[0]).stem if sys.argv and sys.argv[0] else "python"
@@ -54,7 +54,7 @@ def setup_logging(level_name: str = "INFO", trace: bool = False) -> None:
 
     formatter = logging.Formatter(fmt=log_format)
 
-    # ハンドラを作成し, フィルターを追加する（Logger ではなく Handler に追加）
+    # ハンドラを作成し, フィルターを追加する (Logger ではなく Handler に追加)
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(formatter)
     handler.addFilter(_syslog_context_filter)

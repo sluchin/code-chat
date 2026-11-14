@@ -227,7 +227,7 @@ class TestGetDb:
 
     def test_get_db_file_not_found_failure(self):
         """存在しないディレクトリを指定した場合に FileNotFoundError が発生するか検証する."""
-        # Windowsなら C:\ から始まるパス、それ以外なら / から始まるパスを使用する
+        # Windowsなら C:\ から始まるパス, それ以外なら / から始まるパスを使用する
         non_existent_path = (
             "C:\\non_existent_directory_path_12345"
             if sys.platform == "win32"
@@ -235,7 +235,7 @@ class TestGetDb:
         )
         store = VectorStore(output_dir=non_existent_path)
 
-        # path.mkdir が OSError を発生させるようにモックし、
+        # path.mkdir が OSError を発生させるようにモックし,
         # その結果 path.exists() も False のままにしておく
         with (
             patch("pathlib.Path.mkdir", side_effect=OSError("Permission denied")),

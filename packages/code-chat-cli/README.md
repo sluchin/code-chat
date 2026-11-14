@@ -16,7 +16,7 @@
 * **Context Caching (`-c`、`cache` サブコマンド)**: 大きなコンテキストを Gemini のサーバー上にキャッシュして、再利用します。
 * **認証**: API キー (`GEMINI_API_KEY`) と、OAuth (`--login`、`--oauth`) に対応します。
 
-チャットは、すべて、サブコマンドなしで、`--rag`、`--mcp`、`-c` などを指定して行います。 `rag` / `cache` / `mcp` のサブコマンドは、管理用です (`rag create`、`cache list`、`mcp status` など).
+チャットは全て、サブコマンドなしで `--rag`、`--mcp`、`-c` などを指定して行います。`rag` / `cache` / `mcp` のサブコマンドは管理用です (`rag create`、`cache list`、`mcp status` など)。
 
 ---
 
@@ -55,12 +55,12 @@ uv run code-chat "git の状態を確認して" --mcp
 
 | モジュール | 役割 |
 | --- | --- |
-| `chat.py` | エントリポイント (`main`), 対話・ワンショットの処理、サブコマンドの振り分け |
+| `chat.py` | エントリポイント (`main`)、対話・ワンショットの処理、サブコマンドの振り分け |
 | `args.py` / `cli_args.py` | 引数の解析、解析結果を保持するデータクラス (`CliArgs`) |
 | `client.py` / `auth.py` | Gemini クライアントの作成、API キーと OAuth の認証 |
 | `context_cache.py` | Context Caching の作成・更新・削除・一覧・解決 |
 | `file_writer.py` / `file_utils.py` | Write モードのファイル書き込みとバックアップ、パスからのコンテキストの読み込み |
-| `commands/` | コードレビュー (`review.py`), コミットメッセージ生成 (`commit.py`), モデル一覧 (`models.py`) |
+| `commands/` | コードレビュー (`review.py`)、コミットメッセージ生成 (`commit.py`)、モデル一覧 (`models.py`) |
 | `rag.py` | `rag` サブコマンドのハンドラー (`code-chat-rag` を呼び出す) |
 | `mcp.py` / `query_handler.py` | MCP の実行 (`handle_mcp_run`) と、Gemini と MCP サーバーの間のツール呼び出しのループ (`QueryHandler`) |
 | `prompts.py` | システム指示とプロンプトテンプレート |

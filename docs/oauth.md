@@ -127,7 +127,7 @@ export GEMINI_OAUTH_CLIENT_SECRET='your-client-secret'
 ```
 
 ```bash
-# シークレットを含むため、所有者のみ読み書き可能にする
+# シークレットを含むため, 所有者のみ読み書き可能にする
 chmod 600 ~/.zshenv
 
 # 現在のシェルに反映する (新しく開いたシェルでは自動で有効)
@@ -253,7 +253,7 @@ rm ~/.config/code-chat/oauth_token.json
 - **ブラウザが必要です。** 画面のない環境 (SSH 先、CI など) でのログインには向きません。
 - **無料枠・料金**は、認証方法ではなくプロジェクトの Gemini API の設定に依存します。**`--oauth` にしても、無料枠は API キーと同じで、増えません。**
   - 実際に確認した結果 (2026-09-26、`gemini-3.5-flash`): `--oauth` でも、無料の API キーでも、429 のエラーは、同じ上限 (`GenerateRequestsPerMinutePerProjectPerModel-FreeTier`、1 分あたり 5 リクエスト、指標 `generate_content_free_tier_requests`) を示しました。
-  - 上限は、OAuth クライアントを作成したプロジェクトの、Gemini API の無料枠です。1 日あたりの上限の値は、確認していません。
+  - 上限は、OAuth クライアントを作成したプロジェクトの、Gemini API の無料枠です。1 日あたりの上限の値は確認していません。
   - 別製品の **Gemini CLI** の「Google アカウントでログイン」は、別の枠 (公式のドキュメントでは 1 日 1,000 リクエスト) です。code-chat の `--oauth` は Gemini API に直接アクセスするため、この枠は使えません。
 
 ---

@@ -227,7 +227,7 @@ def _sanitize_code_output(raw_output: str) -> str:
     for line in lines:
         stripped = line.strip()
 
-        # 先頭の解説文（英語・日本語の代表的な導入フレーズやコメントでない自然言語行）をスキップ
+        # 先頭の解説文 (英語・日本語の代表的な導入フレーズやコメントでない自然言語行) をスキップ
         if not is_code_started:
             # 既にコメント行やコードらしい記号で始まっている場合はコード開始とみなす
             if (
@@ -279,7 +279,7 @@ def _cleanup_old_backups(path: Path, max_keep: int) -> None:
         if not p.name.endswith(".bak.orig") and p.is_file()
     ]
 
-    # 作成日時（名前順でもタイムスタンプ順になる）でソート
+    # 作成日時 (名前順でもタイムスタンプ順になる) でソート
     backups.sort(key=lambda p: p.name)
 
     # 保持件数を超えた古いファイルを削除
@@ -327,7 +327,7 @@ def _extract_file_changes(
             original_path = valid_str_paths[resolved_hint]
             changes[original_path] = cleaned_code
 
-    # パスが明記されていない単一コードブロックの場合（対象が1つだけのフォールバック）
+    # パスが明記されていない単一コードブロックの場合 (対象が1つだけのフォールバック)
     if not changes and len(valid_targets) == 1:
         single_code = _sanitize_code_output(response_text)
         if single_code.strip():

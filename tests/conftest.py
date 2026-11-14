@@ -33,7 +33,7 @@ def mock_gemini_client(mock_client):
     with patch("code_chat_cli.chat.get_gemini_client") as mock_get_client:
         mock_chat = MagicMock()
 
-        # ストリーミングレスポンス（イテレータ）のモック
+        # ストリーミングレスポンス (イテレータ) のモック
         mock_chunk = MagicMock()
         mock_chunk.text = "モックされたAIからの回答です."
         mock_chat.send_message_stream.return_value = [mock_chunk]

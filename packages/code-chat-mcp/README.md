@@ -1,6 +1,6 @@
 # code-chat-mcp
 
-`code-chat-mcp` は、**Model Context Protocol (MCP)** のサーバーとの接続を扱うパッケージです。設定ファイルの読み込み、MCP サーバーの起動 (Stdio), ツール一覧の取得、ツールの実行を提供します。
+`code-chat-mcp` は、**Model Context Protocol (MCP)** のサーバーとの接続を扱うパッケージです。設定ファイルの読み込み、MCP サーバーの起動 (Stdio)、ツール一覧の取得、ツールの実行を提供します。
 
 Gemini からのツール呼び出し (Function Calling) と、このパッケージの接続とをつなぐ処理 (ツール呼び出しのループ) は、`code-chat-cli` の `query_handler.py` (`QueryHandler`) と `mcp.py` (`handle_mcp_run`) にあります。
 
@@ -16,7 +16,7 @@ Gemini からのツール呼び出し (Function Calling) と、このパッケ�
 
 ## 設定ファイル (`mcp.json`)
 
-既定のパスは `~/.config/code-chat/mcp.json` です。ファイルがない場合は、警告を出して、サーバーなしで動作します。
+既定のパスは `~/.config/code-chat/mcp.json` です。ファイルがない場合は、警告を出してサーバーなしで動作します。
 
 ```json
 {
@@ -36,8 +36,8 @@ Gemini からのツール呼び出し (Function Calling) と、このパッケ�
 ```
 
 * `command` / `args`: サーバーを起動するコマンドと引数。 `args` 内の `${CWD}` は、実行時のカレントディレクトリの絶対パスに置換されます。
-* `env`: サーバーに追加で渡す環境変数 (任意). 親プロセスの環境変数は、`HOME` `LOGNAME` `PATH` `SHELL` `TERM` `USER` だけが引き継がれるため、サーバーが必要とするトークンなどは、ここに書きます。
-* `enabled`: `false` でサーバーを無効化します (`enable` でも可。省略時は有効).
+* `env`: サーバーに追加で渡す環境変数 (任意)。親プロセスの環境変数は、`HOME` `LOGNAME` `PATH` `SHELL` `TERM` `USER` だけが引き継がれるため、サーバーが必要とするトークンなどは、ここに書きます。
+* `enabled`: `false` でサーバーを無効化します (`enable` でも可。省略時は有効)。
 
 ---
 
@@ -51,7 +51,7 @@ Gemini からのツール呼び出し (Function Calling) と、このパッケ�
 | `mcp_service.py` (`McpService`) | 複数のサーバーをまとめて扱う。全サーバーのツール一覧の取得、ツールの実行、導通テスト |
 | `mcp_tool_info.py` (`McpToolInfo`) | ツール 1 件の情報 (サーバー名、ツール名、説明、入力スキーマ) |
 
-ツールの呼び出しごとに、サーバーのサブプロセスを起動し、終了します (呼び出しの間で、サーバーの状態は保持されません).
+ツールの呼び出しごとに、サーバーのサブプロセスを起動し、終了します (呼び出しの間で、サーバーの状態は保持されません)。
 
 ---
 

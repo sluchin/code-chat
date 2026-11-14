@@ -184,7 +184,7 @@ class QueryHandler:
         """
         declarations: list[dict[str, Any]] = []
 
-        # mcp_tools はリストなので直接ループ（.items() は不要）
+        # mcp_tools はリストなので直接ループ (.items() は不要)
         for tool in mcp_tools:
             # tool.inputSchema (または dict 化したパラメータ) をサニタイズ
             raw_parameters = (

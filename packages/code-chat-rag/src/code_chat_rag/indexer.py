@@ -187,7 +187,7 @@ class Indexer:
                     continue
 
                 # 走査対象のディレクトリ配下に除外対象または隠しフォルダが含まれている場合はスキップ
-                # (走査対象のパス自体に含まれるものは, 指定された場所なので, 判定しない)
+                # (走査対象のパス自体に含まれるものは, 指定された場所なので判定しない)
                 if any(
                     part in Constants.EXCLUDE_DIRS or part.startswith(".")
                     for part in file_path.relative_to(path).parts[:-1]

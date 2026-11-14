@@ -34,7 +34,7 @@ def handle_rag_create(
     logger.info("新規作成モードでインデックス処理を開始します")
     count = service.index_repository(input_dirs)
 
-    # フルパス（絶対パス）を取得
+    # フルパス (絶対パス) を取得
     full_db_path = Path(output_dir).resolve()
     print(f"インデックス作成完了: {count} チャンク追加 (Database: {full_db_path})")
 
@@ -64,7 +64,7 @@ def handle_rag_update(
     logger.info("差分更新モードでインデックス処理を開始します")
     count = service.index_repository(input_dirs, update_only=True)
 
-    # フルパス（絶対パス）を取得
+    # フルパス (絶対パス) を取得
     full_db_path = Path(output_dir).resolve()
     print(f"インデックス作成完了: {count} チャンク追加 (Database: {full_db_path})")
 

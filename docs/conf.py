@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.abspath("../packages/code-chat-mcp/src"))
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",  # Google スタイル Docstring の解釈に必須
-    "sphinx.ext.viewcode",  # ソースコードへのリンクを表示（任意）
+    "sphinx.ext.viewcode",  # ソースコードへのリンクを表示 (任意)
 ]
 
 templates_path = ["_templates"]

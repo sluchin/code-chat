@@ -111,7 +111,7 @@ class TestLoadAndChunk:
             else "/non_existent_directory_path_12345"
         )
         indexer = Indexer(input_dirs=[non_existent_path])
-        # path.mkdir が OSError を発生させるようにモックし、
+        # path.mkdir が OSError を発生させるようにモックし,
         # その結果 path.exists() も False のままにしておく
         with (
             patch("pathlib.Path.mkdir", side_effect=OSError("Permission denied")),

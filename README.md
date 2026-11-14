@@ -7,15 +7,15 @@ Gemini API を使用してローカルソースコードの参照・対話・自
 `code-chat` は、ローカルのソースコード構造を理解し、CLI 上で直接コードの参照・修正・レビュー・コミット作成までを完結させるための開発者向け AI ツールです。
 
 - 💬 **ローカルコードベースとの対話 (Interactive Chat)**
-  - ファイルやディレクトリ (`-f`)、標準入力（パイプ）をコンテキストとして読み込み、コードの解説やバグ修正案を確認できます。
+  - ファイルやディレクトリ (`-f`)、標準入力 (パイプ) をコンテキストとして読み込み、コードの解説やバグ修正案を確認できます。
   - プロンプトを引数で渡すとワンショット実行、省略すると対話モード (REPL) で起動します。
 
 - ✏️ **ファイルへの直接書き込み・自動更新 (`-w`、`--write`)**
   - LLM が生成したコードを対象ファイルへ反映します。
-  - **安全設計**: 実行前の確認プロンプト、省略コード（`# ...` や「変更なし」など）の検知による警告、上書き前のバックアップ（`.bak.orig` と直近 5 世代のタイムスタンプ付きバックアップ）。
+  - **安全設計**: 実行前の確認プロンプト、省略コード (`# ...` や「変更なし」など) の検知による警告、上書き前のバックアップ (`.bak.orig` と直近 5 世代のタイムスタンプ付きバックアップ)。
 
 - 🔎 **コードレビュー (`-r`、`--review`)**
-  - 指定ファイル (`-f`) または Git の差分（`--staged` でステージ済み差分）を LLM がレビューします。
+  - 指定ファイル (`-f`) または Git の差分 (`--staged` でステージ済み差分) を LLM がレビューします。
 
 - 📝 **Git コミットメッセージの自動生成 (`-g`、`--generate-commit-msg`)**
   - `git diff` の変更内容を分析し、Conventional Commits 形式のコミットメッセージを生成します。
@@ -34,7 +34,7 @@ Gemini API を使用してローカルソースコードの参照・対話・自
 - 🛡️ **開発基盤**
   - `ruff` / `pylint` / `mypy` / `pytest` / `pre-commit` によるチェック。
 
-> **未実装**: `-p/--provider` は現時点では `gemini` のみ対応です (それ以外の値は、引数のエラーになります)。
+> **未実装**: `-p/--provider` は現時点では `gemini` のみ対応です (それ以外の値は引数のエラーになります)。
 
 コマンドとオプションの一覧は [commands.md](docs/commands.md) も参照してください。今後の機能追加や改善タスクについては [TODO.md](TODO.md) を参照してください。
 
@@ -103,7 +103,7 @@ uv tool install .
 code-chat
 ```
 
-> **Note:** 開発中の変更を即座に反映させたい場合は、編集可能モード（Editable install）でインストールします。
+> **Note:** 開発中の変更を即座に反映させたい場合は、編集可能モード (Editable install) でインストールします。
 >
 > ```bash
 > uv tool install --editable .
@@ -123,7 +123,7 @@ code-chat
 
 ## 認証の設定
 
-Gemini API への認証は、次のいずれかを選びます。**既定は API キー**で、OAuth を使うときは `--oauth` オプションを指定します。`GEMINI_API_KEY` が設定されていても、`--oauth` を付ければ OAuth が使われます。
+Gemini API への認証は次のいずれかを選びます。**既定は API キー**で、OAuth を使うときは `--oauth` オプションを指定します。`GEMINI_API_KEY` が設定されていても、`--oauth` を付ければ OAuth が使われます。
 
 ### 方法 1: API キー
 
@@ -175,7 +175,7 @@ export GEMINI_API_KEY=your_api_key_here
 `uv run` 経由、またはインストール済みの `code-chat` コマンドで実行します。
 
 ```bash
-# 対話モードで起動 (終了: exit / quit / q、会話ログ保存: /save <path>)
+# 対話モードで起動 (終了: exit / quit / q, 会話ログ保存: /save <path>)
 code-chat
 
 # ワンショット実行 (ファイルをコンテキストにして質問)
@@ -219,7 +219,7 @@ code-chat "テスト" -f ./src/main.py --dry-run
 | オプション | 説明 |
 | --- | --- |
 | `[PROMPT]` | プロンプト。省略時は対話モード |
-| `-f, --file <PATH>` | コンテキストとして読み込む（`-w` の書き込み対象にもなる）ファイル・ディレクトリ。複数指定可。`--rag` / `--mcp` とは併用できません (エラー終了) |
+| `-f, --file <PATH>` | コンテキストとして読み込む (`-w` の書き込み対象にもなる) ファイル・ディレクトリ。複数指定可。`--rag` / `--mcp` とは併用できません (エラー終了) |
 | `-m, --model <MODEL>` | 使用するモデル (デフォルト: `gemini-3.5-flash`) |
 | `-w, --write` | 生成コードを対象ファイルに書き込む |
 | `-r, --review` / `--staged` | コードレビュー / ステージ済み差分のみ対象 |
@@ -266,7 +266,7 @@ code-chat "認証機能の実装箇所を説明して" --rag
 
 ### 1. 設定ファイル
 
-設定ファイルは `~/.config/code-chat/mcp.json` から読み込まれます（ファイルが無い場合は警告が出て、サーバーなしで動作します）。
+設定ファイルは `~/.config/code-chat/mcp.json` から読み込まれます (ファイルが無い場合は警告が出て、サーバーなしで動作します)。
 
 ```json
 {
@@ -295,12 +295,12 @@ code-chat "認証機能の実装箇所を説明して" --rag
 ```
 
 - `args` 内の `${CWD}` は、実行時のカレントディレクトリの絶対パスに置換されます。
-- `env`（環境変数の辞書）は任意です。MCP サーバーには、親プロセスの環境変数のうち `HOME` `LOGNAME` `PATH` `SHELL` `TERM` `USER` だけが引き継がれるため、サーバーが必要とするトークンなどは `env` に書きます。`"enabled": false` でサーバーを無効化できます。
+- `env`(環境変数の辞書) は任意です。MCP サーバーには、親プロセスの環境変数のうち `HOME` `LOGNAME` `PATH` `SHELL` `TERM` `USER` だけが引き継がれるため、サーバーが必要とするトークンなどは `env` に書きます。`"enabled": false` でサーバーを無効化できます。
 - ツール名は `<サーバー名>__<ツール名>` の形式で Gemini に渡されます。
 - Gemini がツールを呼び続けて終わらなくなることを防ぐため、ツール呼び出しの繰り返しは、既定で 20 回までです (`--max-tool-rounds N` で変更できます。超えるとエラー終了します)。
 - ワンショット実行 (`code-chat "..." --mcp`) が失敗した場合は、終了コード 1 で終了します。
 
-> **重要:** `mcp-server-commands` の許可コマンドは必要最小限（例: `uv`、`git`）に絞り、実行時も `uv run pytest` のように `uv run` を前置する運用を推奨します。
+> **重要:** `mcp-server-commands` の許可コマンドは必要最小限 (例: `uv`、`git`) に絞り、実行時も `uv run pytest` のように `uv run` を前置する運用を推奨します。
 
 ### 2. 実行
 
@@ -314,8 +314,8 @@ code-chat mcp test
 # MCP を使ってワンショット実行
 code-chat "git の状態を確認して" --mcp
 
-# RAG で検索したコードをプロンプトに付加して、MCP のツールを使って実行
-code-chat "認証機能の実装箇所を調べて、関連する変更履歴を確認して" --rag --mcp
+# RAG で検索したコードをプロンプトに付加して, MCP のツールを使って実行
+code-chat "認証機能の実装箇所を調べて, 関連する変更履歴を確認して" --rag --mcp
 
 # 対話モード内では /mcp を前置して実行
 # You > /mcp 未コミットの変更を要約して
@@ -331,7 +331,7 @@ uv build
 
 ## テストの実行
 
-`pytest` を使用してテストおよびカバレッジ測定を実行します（設定は `pyproject.toml` の `[tool.pytest.ini_options]`）。テストは `tests/code_chat_cli/`、`tests/code_chat_lib/`、`tests/code_chat_rag/`、`tests/code_chat_mcp/` にあります。
+`pytest` を使用してテストおよびカバレッジ測定を実行します (設定は `pyproject.toml` の `[tool.pytest.ini_options]`)。テストは `tests/code_chat_cli/`、`tests/code_chat_lib/`、`tests/code_chat_rag/`、`tests/code_chat_mcp/` にあります。
 
 ```bash
 # 全テストの実行とカバレッジの確認
@@ -350,7 +350,7 @@ uv run pytest --no-cov -k "retry" -vv --tb=short
 uv run pytest --no-cov tests/code_chat_cli/test_chat.py -s -vv --tb=short
 ```
 
-> **Note:** カバレッジは 100% を基準（`fail_under = 100`）としており、下回ると `uv run pytest` は失敗します。一部のテストだけを実行する場合は、基準の判定を避けるため `--no-cov` を付けてください（例: `uv run pytest --no-cov tests/code_chat_cli/test_args.py`）。
+> **Note:** カバレッジは 100% を基準 (`fail_under = 100`) としており、下回ると `uv run pytest` は失敗します。一部のテストだけを実行する場合は、基準の判定を避けるため `--no-cov` を付けてください (例: `uv run pytest --no-cov tests/code_chat_cli/test_args.py`)。
 
 ## コード品質チェック・開発用コマンド
 
@@ -377,7 +377,7 @@ Gemini API のエラー (429、503、404 など) の原因と対処、`code-chat
 
 ### `uv run pytest` 実行時に `unrecognized arguments: --cov=...` エラーが発生する
 
-`pytest-cov` などの開発用依存パッケージが仮想環境（`.venv`）内にインストールされていない可能性があります。
+`pytest-cov` などの開発用依存パッケージが仮想環境 (`.venv`) 内にインストールされていない可能性があります。
 以下の手順で開発用依存関係を含めて再同期してください。
 
 ```bash
@@ -410,4 +410,4 @@ OAuth 同意画面が「テスト中」で、ログインしたアカウント�
 
 ## リリース
 
-`v0.1.0` のようなタグを push すると、GitHub Actions の `release.yml` が、GitHub Releases の**ドラフト**を作ります (載せるもの: sdist と wheel (`uv build` で作る))。中身を確かめて、手で公開します。タグを打たずに試すときは、Actions の Release を手動で実行します (成果物は、Artifacts に保存されます)。
+`v0.1.0` のようなタグを push すると、GitHub Actions の `release.yml` が、GitHub Releases の**ドラフト**を作ります (載せるもの: sdist と wheel (`uv build` で作る))。中身を確かめて手で公開します。タグを打たずに試すときは、Actions の Release を手動で実行します (成果物は、Artifacts に保存されます)。

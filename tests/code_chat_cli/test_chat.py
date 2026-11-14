@@ -159,7 +159,7 @@ class TestRunInteractiveLoop:
         with patch("code_chat_cli.chat.handle_write_mode_confirmation"):
             main()
 
-        # chat.send_message_stream に渡された第1引数（index 0）を検証
+        # chat.send_message_stream に渡された第1引数 (index 0) を検証
         assert mock_gemini_client["chat"].send_message_stream.call_count == 1
         sent_prompt = mock_gemini_client["chat"].send_message_stream.call_args[0][0]
 
@@ -264,7 +264,7 @@ class TestHandleSlashCommand:
         mock_args.return_value.context = None
         mock_args.return_value.prompt = None
 
-        # 1回目に "/save"（引数なし）, 2回目に "exit" を入力
+        # 1回目に "/save" (引数なし), 2回目に "exit" を入力
         inputs = iter(["/save", "exit"])
         monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
@@ -390,12 +390,12 @@ class TestHandleContextMode:
         mock_args.return_value.write_mode = True
         mock_args.return_value.files = ["src/main.py"]
 
-        # ストリーミング初期応答（チャンクのイテレータ）をモック化
+        # ストリーミング初期応答 (チャンクのイテレータ) をモック化
         response_text = "```python\ndef main(): print('updated')\n```"
         mock_chunk = SimpleNamespace(text=response_text)
         mock_gemini_client["chat"].send_message_stream.return_value = [mock_chunk]
 
-        # 非ストリーミング（send_message / send_message_with_retry）側の応答も設定
+        # 非ストリーミング (send_message / send_message_with_retry) 側の応答も設定
         mock_response = SimpleNamespace(text=response_text)
         mock_gemini_client["chat"].send_message.return_value = mock_response
 
@@ -412,7 +412,7 @@ class TestHandleContextMode:
             mock_handle_write.assert_called_once_with(["src/main.py"], response_text)
 
         # 送信されたプロンプト内に注記が含まれているか検証
-        # （※ send_message か send_message_stream のどちらで呼ばれたかに応じて検証）
+        #  (※ send_message か send_message_stream のどちらで呼ばれたかに応じて検証)
         if mock_gemini_client["chat"].send_message_stream.called:
             sent_prompt = mock_gemini_client["chat"].send_message_stream.call_args[0][0]
         else:
@@ -430,7 +430,7 @@ class TestHandlePromptMode:
         """プロンプト指定モード時に一括処理して終了するか検証."""
         mock_args.return_value.prompt = "パイプからの入力メッセージ"
 
-        # 対話ループに入った際に即座に EOF（終了）となるよう stdin をモック
+        # 対話ループに入った際に即座に EOF (終了) となるよう stdin をモック
         monkeypatch.setattr("sys.stdin", io.StringIO(""))
         monkeypatch.setattr("sys.argv", ["chat.py", "-p", "パイプからの入力メッセージ"])
 
@@ -1551,7 +1551,7 @@ class TestMain:
         """--list-models 指定時にモデル一覧を表示して正常終了するか検証."""
         mock_args.return_value.list_models = True
 
-        # モデルのモックを作成（SimpleNamespace を使用）
+        # モデルのモックを作成 (SimpleNamespace を使用)
         mock_model = SimpleNamespace(
             name="models/gemini-flash-latest",
             display_name="Gemini Flash Latest",
@@ -1756,7 +1756,7 @@ class TestMain:
     )
     def test_main_file_operation_failure(self, monkeypatch, mock_args, file_exception):
         """ファイル操作関連の例外 (ValueError, PermissionError) 発生時に sys.exit(1) で終了するか検証."""
-        # parse_args 呼び出し時（またはファイル操作処理時）に指定の例外を発生させる
+        # parse_args 呼び出し時 (またはファイル操作処理時) に指定の例外を発生させる
         mock_args.side_effect = file_exception
 
         monkeypatch.setattr("sys.argv", ["chat.py"])
