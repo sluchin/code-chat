@@ -38,7 +38,7 @@
 
 ### 2.1 429 無料枠の 1 日あたりのリクエスト上限
 
-**メッセージ (抜粋)**
+**メッセージ (抜粋)**：
 
 ```text
 429 RESOURCE_EXHAUSTED. You exceeded your current quota, please check your plan and billing details.
@@ -55,7 +55,7 @@
 
 ### 2.2 429 無料枠でのキャッシュ保存
 
-**メッセージ**
+**メッセージ**：
 
 ```text
 429 RESOURCE_EXHAUSTED. TotalCachedContentStorageTokensPerModelFreeTier limit exceeded for model gemini-3.8-flash: limit=0, requested=16713
@@ -67,7 +67,7 @@
 
 ### 2.3 503 モデルが高負荷
 
-**メッセージ**
+**メッセージ**：
 
 ```text
 503 UNAVAILABLE. This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.
@@ -79,7 +79,7 @@
 
 ### 2.4 404 モデルが提供終了
 
-**メッセージ (抜粋)**
+**メッセージ (抜粋)**：
 
 ```text
 404 NOT_FOUND. This model models/gemini-2.5-flash is no longer available to new users. Please update your code to use models/gemini-3.8-flash for the latest features and improvements.
@@ -91,7 +91,7 @@
 
 ### 2.5 400 API キーが無効
 
-**メッセージ**
+**メッセージ**：
 
 ```text
 400 INVALID_ARGUMENT. API key not valid. Please pass a valid API key.
@@ -103,7 +103,7 @@
 
 ### 2.6 400 キャッシュ対象が小さすぎる
 
-**メッセージ**
+**メッセージ**：
 
 ```text
 400 INVALID_ARGUMENT. Cached content is too small. total_token_count=2, min_total_token_count=1024
@@ -115,7 +115,7 @@
 
 ### 2.7 403 OAuth のスコープが不足
 
-**メッセージ (抜粋)**
+**メッセージ (抜粋)**：
 
 ```text
 403 PERMISSION_DENIED. Request had insufficient authentication scopes.
