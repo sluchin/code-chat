@@ -10,7 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "google-genai>=2.16.0",
     "mypy>=2.3.0",
-    "pylint>=4.0.6",
+    "pylint>=4.1.4",
     "ruff>=0.16.1",
     "code-chat-lib",
     "code-chat-rag",
